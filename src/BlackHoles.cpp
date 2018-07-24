@@ -147,7 +147,7 @@ struct BlackHoles : Module {
 			outputs[OUT_OUTPUTS + i].value = chanVal;
 			blackHole0 += chanVal;
 		}
-		outputs[BLACKHOLE_OUTPUTS + 0].value = blackHole0;
+		outputs[BLACKHOLE_OUTPUTS + 0].value = clamp(blackHole0, -10.0f, 10.0f);
 			
 			
 		// BlackHole 1 all outputs
@@ -167,8 +167,7 @@ struct BlackHoles : Module {
 			outputs[OUT_OUTPUTS + i + 4].value = chanVal;
 			blackHole1 += chanVal;
 		}
-		outputs[BLACKHOLE_OUTPUTS + 1].value = blackHole1;
-
+		outputs[BLACKHOLE_OUTPUTS + 1].value = clamp(blackHole1, -10.0f, 10.0f);
 
 				
 		// isExponential lights
@@ -234,8 +233,8 @@ struct BlackHolesWidget : ModuleWidget {
 	BlackHolesWidget(BlackHoles *module) : ModuleWidget(module) {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHolesFull.svg")));
         panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles.svg")));
+        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHolesFull.svg")));
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;
         addChild(panel);
@@ -250,6 +249,7 @@ struct BlackHolesWidget : ModuleWidget {
 		float radiusOut = 60.5f;
 		float offsetL = 53.0f;
 		float offsetS = 30.5f;
+		
 		
 		// BlackHole0 knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerBlack0 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 0, -1.0f, 1.0f, 0.0f, &module->panelTheme));
