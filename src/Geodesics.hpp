@@ -64,8 +64,8 @@ struct GeoPushButton : DynamicSVGSwitch, MomentarySwitch {
 
 struct GeoKnob : DynamicSVGKnob {
 	GeoKnob() {
-		minAngle = -0.83*M_PI;
-		maxAngle = 0.83*M_PI;
+		minAngle = -0.73*M_PI;
+		maxAngle = 0.73*M_PI;
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if know is small (taken from IMSmallKnob)
