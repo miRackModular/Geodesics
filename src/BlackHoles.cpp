@@ -245,10 +245,10 @@ struct BlackHolesWidget : ModuleWidget {
 		float colRulerCenter = box.size.x / 2.0f;
 		float rowRulerBlack0 = 108.5f;
 		float rowRulerBlack1 = 272.5f;
-		float radiusIn = 31.0f;
+		float radiusIn = 30.0f;
 		float radiusOut = 60.5f;
-		float offsetL = 53.0f;
-		float offsetS = 30.5f;
+		float offsetL = 52.0f;
+		float offsetS = 30.0f;
 		
 		
 		// BlackHole0 knobs
@@ -281,7 +281,7 @@ struct BlackHolesWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(35.5f, 171.5f), module, BlackHoles::EXP_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 
 		// BlackHole0 light
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(44.5f, 159.5f), module, BlackHoles::EXP_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(45.0f, 160.5f), module, BlackHoles::EXP_LIGHTS + 0));
 		
 		
 				
@@ -315,7 +315,7 @@ struct BlackHolesWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(160.5f, 209.5f), module, BlackHoles::EXP_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
 		// BlackHole1 light
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(150.5f, 220.5f), module, BlackHoles::EXP_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(150.0f, 219.5f), module, BlackHoles::EXP_LIGHTS + 1));
 	}
 };
 
