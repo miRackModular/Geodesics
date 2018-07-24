@@ -254,113 +254,15 @@ struct BlackHolesWidget : ModuleWidget {
 		float radiusOut = 80.0f;
 		
 		// BlackHole0 output
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 0, &module->panelTheme));
+		//addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 0, &module->panelTheme));
 		
 		// BlackHole0 knobs
-		addParam(createParamCentered<GeoKnob>(Vec(colRulerCenter, rowRulerBlack0 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 0, -1.0f, 1.0f, 0.0f));
-		addParam(createParamCentered<GeoKnobRight>(Vec(colRulerCenter + radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 1, -1.0f, 1.0f, 0.0f));
-		addParam(createParamCentered<GeoKnobBottom>(Vec(colRulerCenter, rowRulerBlack0 + radiusOut), module, BlackHoles::LEVEL_PARAMS + 2, -1.0f, 1.0f, 0.0f));
-		addParam(createParamCentered<GeoKnobLeft>(Vec(colRulerCenter - radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 3, -1.0f, 1.0f, 0.0f));
+		//addParam(createParamCentered<GeoKnob>(Vec(colRulerCenter, rowRulerBlack0 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 0, -1.0f, 1.0f, 0.0f));
+		//addParam(createParamCentered<GeoKnobRight>(Vec(colRulerCenter + radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 1, -1.0f, 1.0f, 0.0f));
+		//addParam(createParamCentered<GeoKnobBottom>(Vec(colRulerCenter, rowRulerBlack0 + radiusOut), module, BlackHoles::LEVEL_PARAMS + 2, -1.0f, 1.0f, 0.0f));
+		//addParam(createParamCentered<GeoKnobLeft>(Vec(colRulerCenter - radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 3, -1.0f, 1.0f, 0.0f));
 
-		
-
-
-		/*static const int rowRuler0 = 34;
-		static const int colRulerPadL = 73;
-		static const int colRulerPadR = 136;
-		
-		// Tactile touch pads
-		// Right (no dynamic width, but must do first so that left will get mouse events when wider overlaps)
-		addParam(createDynamicParam2<IMTactile>(Vec(colRulerPadR, rowRuler0), module, Tact::TACT_PARAMS + 1, -1.0f, 11.0f, 0.0f, nullptr, &module->paramReadRequest[1]));
-		// Left (with width dependant on Link value)	
-		addParam(createDynamicParam2<IMTactile>(Vec(colRulerPadL, rowRuler0), module, Tact::TACT_PARAMS + 0, -1.0f, 11.0f, 0.0f,  &module->params[Tact::LINK_PARAM].value, &module->paramReadRequest[0]));
-			
-
-			
-		static const int colRulerLedL = colRulerPadL - 20;
-		static const int colRulerLedR = colRulerPadR + 56;
-		static const int lightsOffsetY = 19;
-		static const int lightsSpacingY = 17;
-				
-		// Tactile lights
-		for (int i = 0 ; i < Tact::numLights; i++) {
-			addChild(ModuleLightWidget::create<MediumLight<GreenRedLight>>(Vec(colRulerLedL, rowRuler0 + lightsOffsetY + i * lightsSpacingY), module, Tact::TACT_LIGHTS + i * 2));
-			addChild(ModuleLightWidget::create<MediumLight<GreenRedLight>>(Vec(colRulerLedR, rowRuler0 + lightsOffsetY + i * lightsSpacingY), module, Tact::TACT_LIGHTS + (Tact::numLights + i) * 2));
-		}
-
-		
-		static const int colRulerCenter = 115;// not real center, but pos so that a jack would be centered
-		static const int rowRuler2 = 265;// outputs and link
-		static const int colRulerC3L = colRulerCenter - 101 - 1;
-		static const int colRulerC3R = colRulerCenter + 101;
-		
-		// Recall CV inputs
-		addInput(createDynamicPort<IMPort>(Vec(colRulerC3L, rowRuler2), Port::INPUT, module, Tact::RECALL_INPUTS + 0, &module->panelTheme));		
-		addInput(createDynamicPort<IMPort>(Vec(colRulerC3R, rowRuler2), Port::INPUT, module, Tact::RECALL_INPUTS + 1, &module->panelTheme));		
-		
-
-		static const int rowRuler1d = rowRuler2 - 54;
-		
-		// Slide switches
-		addParam(ParamWidget::create<CKSS>(Vec(colRulerC3L + hOffsetCKSS, rowRuler1d + vOffsetCKSS), module, Tact::SLIDE_PARAMS + 0, 0.0f, 1.0f, 0.0f));		
-		addParam(ParamWidget::create<CKSS>(Vec(colRulerC3R + hOffsetCKSS, rowRuler1d + vOffsetCKSS), module, Tact::SLIDE_PARAMS + 1, 0.0f, 1.0f, 0.0f));		
-
-
-		static const int rowRuler1c = rowRuler1d - 46;
-
-		// Store buttons
-		addParam(ParamWidget::create<TL1105>(Vec(colRulerC3L + offsetTL1105, rowRuler1c + offsetTL1105), module, Tact::STORE_PARAMS + 0, 0.0f, 1.0f, 0.0f));
-		addParam(ParamWidget::create<TL1105>(Vec(colRulerC3R + offsetTL1105, rowRuler1c + offsetTL1105), module, Tact::STORE_PARAMS + 1, 0.0f, 1.0f, 0.0f));
-		
-		
-		static const int rowRuler1b = rowRuler1c - 59;
-		
-		// Attv knobs
-		addParam(createDynamicParam<IMSmallKnob>(Vec(colRulerC3L + offsetIMSmallKnob, rowRuler1b + offsetIMSmallKnob), module, Tact::ATTV_PARAMS + 0, -1.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<IMSmallKnob>(Vec(colRulerC3R + offsetIMSmallKnob, rowRuler1b + offsetIMSmallKnob), module, Tact::ATTV_PARAMS + 1, -1.0f, 1.0f, 1.0f, &module->panelTheme));
-
-		
-		static const int rowRuler1a = rowRuler1b - 59;
-		
-		// Rate knobs
-		addParam(createDynamicParam<IMSmallKnob>(Vec(colRulerC3L + offsetIMSmallKnob, rowRuler1a + offsetIMSmallKnob), module, Tact::RATE_PARAMS + 0, 0.0f, 4.0f, 0.2f, &module->panelTheme));
-		addParam(createDynamicParam<IMSmallKnob>(Vec(colRulerC3R + offsetIMSmallKnob, rowRuler1a + offsetIMSmallKnob), module, Tact::RATE_PARAMS + 1, 0.0f, 4.0f, 0.2f, &module->panelTheme));
-		
-
-		static const int colRulerC1L = colRulerCenter - 30 - 1;
-		static const int colRulerC1R = colRulerCenter + 30; 
-		static const int colRulerC2L = colRulerCenter - 65 - 1;
-		static const int colRulerC2R = colRulerCenter + 65 + 1; 
-
-		// Exp switch
-		addParam(ParamWidget::create<CKSS>(Vec(colRulerCenter + hOffsetCKSS, rowRuler2 + vOffsetCKSS), module, Tact::EXP_PARAM, 0.0f, 1.0f, 0.0f));		
-
-		// Top/bot CV Inputs
-		addInput(createDynamicPort<IMPort>(Vec(colRulerC2L, rowRuler2), Port::INPUT, module, Tact::TOP_INPUTS + 0, &module->panelTheme));		
-		addInput(createDynamicPort<IMPort>(Vec(colRulerC1L, rowRuler2), Port::INPUT, module, Tact::BOT_INPUTS + 0, &module->panelTheme));		
-		addInput(createDynamicPort<IMPort>(Vec(colRulerC1R, rowRuler2), Port::INPUT, module, Tact::BOT_INPUTS + 1, &module->panelTheme));	
-		addInput(createDynamicPort<IMPort>(Vec(colRulerC2R, rowRuler2), Port::INPUT, module, Tact::TOP_INPUTS + 1, &module->panelTheme));		
-
-		
-		static const int rowRuler3 = rowRuler2 + 54;
-
-		// Link switch
-		addParam(ParamWidget::create<CKSS>(Vec(colRulerCenter + hOffsetCKSS, rowRuler3 + vOffsetCKSS), module, Tact::LINK_PARAM, 0.0f, 1.0f, 0.0f));		
-
-		// Outputs
-		addOutput(createDynamicPort<IMPort>(Vec(colRulerCenter - 49 - 1, rowRuler3), Port::OUTPUT, module, Tact::CV_OUTPUTS + 0, &module->panelTheme));
-		addOutput(createDynamicPort<IMPort>(Vec(colRulerCenter + 49, rowRuler3), Port::OUTPUT, module, Tact::CV_OUTPUTS + 1, &module->panelTheme));
-		
-		// EOC
-		addOutput(createDynamicPort<IMPort>(Vec(colRulerCenter - 89 - 1, rowRuler3), Port::OUTPUT, module, Tact::EOC_OUTPUTS + 0, &module->panelTheme));
-		addOutput(createDynamicPort<IMPort>(Vec(colRulerCenter + 89, rowRuler3), Port::OUTPUT, module, Tact::EOC_OUTPUTS + 1, &module->panelTheme));
-
-		
-		// Lights
-		addChild(ModuleLightWidget::create<SmallLight<GreenLight>>(Vec(colRulerCenter - 47 - 1 + offsetMediumLight, rowRuler2 - 24 + offsetMediumLight), module, Tact::CVIN_LIGHTS + 0 * 2));		
-		addChild(ModuleLightWidget::create<SmallLight<GreenLight>>(Vec(colRulerCenter + 47 + 1 + offsetMediumLight, rowRuler2 - 24 + offsetMediumLight), module, Tact::CVIN_LIGHTS + 1 * 2));
-	*/
-
+		//addChild(ModuleLightWidget::create<MediumLight<GreenRedLight>>(Vec(colRulerLedL, rowRuler0 + lightsOffsetY + i * lightsSpacingY), module, Tact::TACT_LIGHTS + i * 2));
 	}
 };
 

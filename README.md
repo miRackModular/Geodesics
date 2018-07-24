@@ -1,10 +1,9 @@
-# A Modular Collection for VCV Rack by Pyer
+# A Modular Collection for VCV Rack
 
-Code By [Marc Boulé](https://github.com/MarcBoule).
+Module concept and graphics by Pierre Collard (Pyer), code By [Marc Boulé](https://github.com/MarcBoule).
 
 Version 0.6.0
 
-[//]: # (!!!!!UPDATE VERSION NUMBER IN MAKEFILE ALSO!!!!!)
 
 
 ## License
