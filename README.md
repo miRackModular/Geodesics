@@ -1,4 +1,4 @@
-# A Modular Collection for VCV Rack
+# A Modular Collection for VCV Rack by Pyer
 
 Module concept and graphics by Pierre Collard (Pyer), code By [Marc Boulé](https://github.com/MarcBoule).
 

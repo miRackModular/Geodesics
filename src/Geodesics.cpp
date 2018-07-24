@@ -21,30 +21,3 @@ void init(rack::Plugin *p) {
 
 	p->addModel(modelBlackHoles);
 }
-
-
-ScrewSilverRandomRot::ScrewSilverRandomRot() {
-	float angle0_90 = randomUniform()*M_PI/2.0f;
-	//float angle0_90 = randomUniform() > 0.5f ? M_PI/4.0f : 0.0f;// for testing
-	
-	tw = new TransformWidget();
-	addChild(tw);
-	
-	sw = new SVGWidget();
-	tw->addChild(sw);
-	//sw->setSVG(SVG::load(assetPlugin(plugin, "res/Screw0.svg")));
-	sw->setSVG(SVG::load(assetGlobal("res/ComponentLibrary/ScrewSilver.svg")));
-	
-	sc = new ScrewCircle(angle0_90);
-	sc->box.size = sw->box.size;
-	tw->addChild(sc);
-	
-	box.size = sw->box.size;
-	tw->box.size = sw->box.size; 
-	tw->identity();
-	// Rotate SVG
-	Vec center = sw->box.getCenter();
-	tw->translate(center);
-	tw->rotate(angle0_90);
-	tw->translate(center.neg());	
-}

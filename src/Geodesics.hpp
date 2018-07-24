@@ -27,7 +27,7 @@ extern Model *modelBlackHoles;
 
 
 // General constants
-static const std::string lightPanelID = "Classic";
+static const std::string lightPanelID = "Light";
 static const std::string darkPanelID = "Dark";
 
 
@@ -35,38 +35,26 @@ static const std::string darkPanelID = "Dark";
 // Variations on existing knobs, lights, etc
 
 
-// Screws
-
-struct GeoScrew : DynamicSVGScrew {
-	GeoScrew() {
-		//addSVGalt(SVG::load(assetPlugin(plugin, "res/dark/comp/ScrewSilver.svg"))); // no dark screws in Geodesics
-	}
-};
-
-
 // Ports
 
 struct GeoPort : DynamicSVGPort {
 	GeoPort() {
-		addFrame(SVG::load(assetGlobal("res/ComponentLibrary/PJ301M.svg")));
-		addFrame(SVG::load(assetGlobal("res/ComponentLibrary/PJ301M.svg"))); // no dark ports in Geodesics for now
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
+		addFrame(SVG::load(assetPlugin(plugin, "res/light/comp/Jack.svg")));
+		//addFrame(SVG::load(assetPlugin(plugin, "res/dark/comp/Jack.svg")));// no dark ports in Geodesics for now
 	}
 };
 
 
 // Buttons and switches
 
-struct GeoBigPushButton : DynamicSVGSwitch, MomentarySwitch {
-	GeoBigPushButton() {// only one skin for now
-		addFrameAll(SVG::load(assetGlobal("res/ComponentLibrary/CKD6_0.svg")));
-		addFrameAll(SVG::load(assetGlobal("res/ComponentLibrary/CKD6_1.svg")));
-		
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/CKD6b_0.svg")));
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/CKD6b_1.svg")));
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_0.svg")));
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_1.svg")));
+struct GeoPushButton : DynamicSVGSwitch, MomentarySwitch {
+	GeoPushButton() {// only one skin for now
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/PushButton1_0.svg")));
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/PushButton1_1.svg")));
+		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_0.svg"))); // no dark buttons in Geodesics for now
+		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_1.svg"))); // no dark buttons in Geodesics for now
 	}
 };
 
@@ -81,9 +69,8 @@ struct GeoKnob : DynamicSVGKnob {
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if know is small (taken from IMSmallKnob)
-
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/BlackKnobLargeWithMark.svg")));
-		addFrameAll(SVG::load(assetGlobal("res/ComponentLibrary/RoundBlackKnob.svg")));
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/Knob.svg")));
+		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/Knob.svg")));// no dark knobs in Geodesics for now
 	}
 };
 
@@ -112,17 +99,14 @@ struct OrangeLight : GrayModuleLightWidget {
 		addBaseColor(COLOR_ORANGE);
 	}
 };
+struct WhiteLight : GrayModuleLightWidget {
+	WhiteLight() {
+		addBaseColor(COLOR_WHITE);
+	}
+};
 
 
 
 // Other
-
-struct ScrewSilverRandomRot : FramebufferWidget {// location: include/app.hpp and src/app/SVGScrew.cpp [some code also from src/app/SVGKnob.cpp]
-	SVGWidget *sw;
-	TransformWidget *tw;
-	ScrewCircle *sc;
-	ScrewSilverRandomRot();
-};
-
 
 #endif

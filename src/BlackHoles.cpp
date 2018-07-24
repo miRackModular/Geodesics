@@ -1,5 +1,5 @@
 //***********************************************************************************************
-//Gravitational VCAs module for VCV Rack by Pierre Collard and Marc Boulé
+//Gravitational Attenumixer module for VCV Rack by Pierre Collard and Marc Boulé
 //
 //Based on code from the Fundamental plugins by Andrew Belt and graphics  
 //  from the Component Library by Wes Milholen. 
@@ -234,35 +234,88 @@ struct BlackHolesWidget : ModuleWidget {
 	BlackHolesWidget(BlackHoles *module) : ModuleWidget(module) {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles.svg")));
+        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHolesFull.svg")));
         panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles.svg")));
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;
         addChild(panel);
 
-		// Screws
-		addChild(createDynamicScrew<GeoScrew>(Vec(15, 0), &module->panelTheme));
-		addChild(createDynamicScrew<GeoScrew>(Vec(box.size.x-30, 0), &module->panelTheme));
-		addChild(createDynamicScrew<GeoScrew>(Vec(15, 365), &module->panelTheme));
-		addChild(createDynamicScrew<GeoScrew>(Vec(box.size.x-30, 365), &module->panelTheme));
-		
+		// Screws 
+		// part of svg panel, no code required
 		
 		float colRulerCenter = box.size.x / 2.0f;
-		float rowRulerBlack0 = 100.0f;
-		float rowRulerBlack1 = 280.0f;
-		float radiusIn = 40.0f;
-		float radiusOut = 80.0f;
-		
-		// BlackHole0 output
-		//addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 0, &module->panelTheme));
+		float rowRulerBlack0 = 108.5f;
+		float rowRulerBlack1 = 272.5f;
+		float radiusIn = 31.0f;
+		float radiusOut = 60.5f;
+		float offsetL = 53.0f;
+		float offsetS = 30.5f;
 		
 		// BlackHole0 knobs
-		//addParam(createParamCentered<GeoKnob>(Vec(colRulerCenter, rowRulerBlack0 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 0, -1.0f, 1.0f, 0.0f));
-		//addParam(createParamCentered<GeoKnobRight>(Vec(colRulerCenter + radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 1, -1.0f, 1.0f, 0.0f));
-		//addParam(createParamCentered<GeoKnobBottom>(Vec(colRulerCenter, rowRulerBlack0 + radiusOut), module, BlackHoles::LEVEL_PARAMS + 2, -1.0f, 1.0f, 0.0f));
-		//addParam(createParamCentered<GeoKnobLeft>(Vec(colRulerCenter - radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 3, -1.0f, 1.0f, 0.0f));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerBlack0 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 0, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 1, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter, rowRulerBlack0 + radiusOut), module, BlackHoles::LEVEL_PARAMS + 2, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobLeft>(Vec(colRulerCenter - radiusOut, rowRulerBlack0), module, BlackHoles::LEVEL_PARAMS + 3, -1.0f, 1.0f, 0.0f, &module->panelTheme));
 
-		//addChild(ModuleLightWidget::create<MediumLight<GreenRedLight>>(Vec(colRulerLedL, rowRuler0 + lightsOffsetY + i * lightsSpacingY), module, Tact::TACT_LIGHTS + i * 2));
+		// BlackHole0 level CV inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0 - radiusIn), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerBlack0), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0 + radiusIn), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 2, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerBlack0), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 3, &module->panelTheme));
+
+		// BlackHole0 inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetS, rowRulerBlack0 - offsetL), Port::INPUT, module, BlackHoles::IN_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetL, rowRulerBlack0 - offsetS), Port::INPUT, module, BlackHoles::IN_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetS, rowRulerBlack0 + offsetL), Port::INPUT, module, BlackHoles::IN_INPUTS + 2, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetL, rowRulerBlack0 + offsetS), Port::INPUT, module, BlackHoles::IN_INPUTS + 3, &module->panelTheme));
+		
+		// BlackHole0 outputs
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetS, rowRulerBlack0 - offsetL), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 0, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetL, rowRulerBlack0 + offsetS), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 1, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetS, rowRulerBlack0 + offsetL), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 2, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetL, rowRulerBlack0 - offsetS), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 3, &module->panelTheme));
+		// BlackHole0 center output
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 0, &module->panelTheme));
+
+		// BlackHole0 Exp button
+		addParam(createDynamicParam<GeoPushButton>(Vec(35.5f, 171.5f), module, BlackHoles::EXP_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+
+		// BlackHole0 light
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(44.5f, 159.5f), module, BlackHoles::EXP_LIGHTS + 0));
+		
+		
+				
+		// BlackHole1 knobs
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerBlack1 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 4, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + radiusOut, rowRulerBlack1), module, BlackHoles::LEVEL_PARAMS + 5, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter, rowRulerBlack1 + radiusOut), module, BlackHoles::LEVEL_PARAMS + 6, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobLeft>(Vec(colRulerCenter - radiusOut, rowRulerBlack1), module, BlackHoles::LEVEL_PARAMS + 7, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		
+		// BlackHole1 level CV inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack1 - radiusIn), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 4, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerBlack1), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 5, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack1 + radiusIn), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 6, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerBlack1), Port::INPUT, module, BlackHoles::LEVELCV_INPUTS + 7, &module->panelTheme));
+
+		// BlackHole1 inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetS, rowRulerBlack1 - offsetL), Port::INPUT, module, BlackHoles::IN_INPUTS + 4, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetL, rowRulerBlack1 - offsetS), Port::INPUT, module, BlackHoles::IN_INPUTS + 5, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetS, rowRulerBlack1 + offsetL), Port::INPUT, module, BlackHoles::IN_INPUTS + 6, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetL, rowRulerBlack1 + offsetS), Port::INPUT, module, BlackHoles::IN_INPUTS + 7, &module->panelTheme));
+		
+		// BlackHole1 outputs
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetS, rowRulerBlack1 - offsetL), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 4, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetL, rowRulerBlack1 + offsetS), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 5, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetS, rowRulerBlack1 + offsetL), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 6, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetL, rowRulerBlack1 - offsetS), Port::OUTPUT, module, BlackHoles::OUT_OUTPUTS + 7, &module->panelTheme));
+		// BlackHole1 center output
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack1), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 1, &module->panelTheme));
+		
+		// BlackHole1 Exp button
+		addParam(createDynamicParam<GeoPushButton>(Vec(160.5f, 209.5f), module, BlackHoles::EXP_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		
+		// BlackHole1 light
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(150.5f, 220.5f), module, BlackHoles::EXP_LIGHTS + 1));
 	}
 };
 
