@@ -12,7 +12,7 @@
 //1) right click option for 0 to 10 LFO CV vs -5 to 5
 //2) extra light to indicate that a crossover occurred
 //3) if LFOB is not connected, LFOA is used instead
-//4) if pulsarB has no inputs nor LFOB, then each output is the corresponding input in PulsarA
+//4) if pulsarB has no input nor LFOB, then each output is the corresponding input in PulsarA
 //   but attenuated according to LFOB
 
 #include "Geodesics.hpp"
