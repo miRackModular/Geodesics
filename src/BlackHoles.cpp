@@ -173,9 +173,9 @@ struct BlackHoles : Module {
 		// isExponential lights
 		for (int i = 0; i < 2; i++)
 			lights[EXP_LIGHTS + i].value = isExponential[i] ? 1.0f : 0.0f;
-	}
+	}// step()
 	
-	static float calcChannel(float in, Param &level, Input &levelCV, bool isExp) {
+	float calcChannel(float in, Param &level, Input &levelCV, bool isExp) {
 		float levCv = levelCV.active ? (levelCV.value / 5.0f - 1.0f) : 0.0f;
 		float lev = clamp(level.value + levCv, -1.0f, 1.0f);
 		if (isExp) {

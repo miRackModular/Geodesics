@@ -51,7 +51,7 @@ struct Pulsars : Module {
 	int panelTheme;
 	
 	// No need to save, with reset
-	// none
+	int posA;// always between 0 and 7
 	
 	// No need to save, no reset
 	SchmittTrigger voidTriggers[2];
@@ -83,7 +83,7 @@ struct Pulsars : Module {
 			isReverse[i] = false;
 		}
 		// No need to save, with reset
-		// none
+		posA = 0;
 	}
 
 	
@@ -96,7 +96,7 @@ struct Pulsars : Module {
 			isReverse[i] = (randomu32() % 2) > 0;
 		}
 		// No need to save, with reset
-		// none
+		posA = randomu32() % 8;
 	}
 
 	
@@ -153,26 +153,74 @@ struct Pulsars : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
-		// Exponential buttons
+		// Void and Reverse buttons
 		for (int i = 0; i < 2; i++) {
-			if (voidTriggers[i].process(params[VOID_PARAMS + i].value)) {
+			if (voidTriggers[i].process(params[VOID_PARAMS + i].value + inputs[VOID_INPUTS + i].value)) {
 				isVoid[i] = !isVoid[i];
 			}
-			if (revTriggers[i].process(params[REV_PARAMS + i].value)) {
+			if (revTriggers[i].process(params[REV_PARAMS + i].value + inputs[REV_INPUTS + i].value)) {
 				isReverse[i] = !isReverse[i];
 			}
 		}
 		
+		// Pulsar A
+		bool active8[8];
+		float values8[8];
+		for (int i = 0; i < 8; i++) {
+			active8[i] = inputs[INA_INPUTS + i].active;
+			values8[i] = inputs[INA_INPUTS + i].value;
+		}
+		int newPosA = getClosestActive(posA, active8, false);
+		if (newPosA != -1) {// if at least one active input
+			posA = newPosA;
+			int posAnext = (posA + 1) % 8;
+			if (!isVoid[0])
+				posAnext = getClosestActive(posAnext, active8, isReverse[0]);
+			
+			float lfo01 = (inputs[LFO_INPUTS + 0].value + 5.0f) / 10.0f;
+			outputs[OUTA_OUTPUT].value = lfo01 * values8[posA] + (1.0f - lfo01) * values8[posAnext];
+			for (int i = 0; i < 8; i++)
+				lights[MIXA_LIGHTS + i].value = (i == posA) ? lfo01 : (i == posAnext ? (1.0f - lfo01) : 0.0f);
+		}
+		else {
+			outputs[OUTA_OUTPUT].value = 0.0f;
+			for (int i = 0; i < 8; i++)
+				lights[MIXA_LIGHTS + i].value = 0.0f;
+		}
 		
 
 
 				
-		// isVoid and isReverse lights
+		// Void and Reverse lights
 		for (int i = 0; i < 2; i++) {
 			lights[VOID_LIGHTS + i].value = isVoid[i] ? 1.0f : 0.0f;
 			lights[REV_LIGHTS + i].value = isReverse[i] ? 1.0f : 0.0f;
 		}
 	}// step()
+	
+	int getClosestActive(int pos, bool* active8, bool reverse) {
+		// finds the closest active position (including current if active), returns -1 if none are active
+		// starts in current pos and looks at 8 positions starting here (loops over if given pos > 1)
+		int ret = -1;
+		if (!reverse) {
+			for (int i = pos; i < pos + 8; i++) {
+				if (active8[i % 8]) {
+					ret = i % 8;
+					break;
+				}
+			}
+		}
+		else {
+			for (int i = pos + 8; i > pos; i--) {
+				if (active8[i % 8]) {
+					ret = i % 8;
+					break;
+				}
+			}
+		}
+		return ret;
+	}
+
 };
 
 
