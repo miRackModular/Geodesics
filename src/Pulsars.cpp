@@ -41,7 +41,9 @@ struct Pulsars : Module {
 	
 	
 	// Constants
-	// none
+	static const int epsilon = 0.001f;// pulsar crossovers at 5-epsilon and -5+epsilon
+	static const int topCrossoverLevel = 5.0f - epsilon;
+	static const int botCrossoverLevel = -5.0f + epsilon;
 
 	// Need to save, with reset
 	bool isVoid[2];
@@ -51,7 +53,9 @@ struct Pulsars : Module {
 	int panelTheme;
 	
 	// No need to save, with reset
-	int posA;// always between 0 and 7
+	int posA, posB;// always between 0 and 7
+	float lfoLast[2];
+	bool topCross[2];
 	
 	// No need to save, no reset
 	SchmittTrigger voidTriggers[2];
@@ -81,9 +85,12 @@ struct Pulsars : Module {
 		for (int i = 0; i < 2; i++) {
 			isVoid[i] = false;
 			isReverse[i] = false;
+			lfoLast[i] = 0.0f;
+			topCross[i] = false;
 		}
 		// No need to save, with reset
 		posA = 0;
+		posB = 0;
 	}
 
 	
@@ -97,6 +104,7 @@ struct Pulsars : Module {
 		}
 		// No need to save, with reset
 		posA = randomu32() % 8;
+		posB = randomu32() % 8;
 	}
 
 	
@@ -163,39 +171,102 @@ struct Pulsars : Module {
 			}
 		}
 		
+		// LFO values
+		float lfoVal[2];
+		lfoVal[0] = inputs[LFO_INPUTS + 0].value;
+		lfoVal[1] = inputs[LFO_INPUTS + 1].value;
+		
+		
 		// Pulsar A
 		bool active8[8];
-		float values8[8];
+		bool atLeastOneActive = false;
 		for (int i = 0; i < 8; i++) {
 			active8[i] = inputs[INA_INPUTS + i].active;
-			values8[i] = inputs[INA_INPUTS + i].value;
+			if (active8[i]) 
+				atLeastOneActive = true;
 		}
-		int newPosA = getClosestActive(posA, active8, false);
-		if (newPosA != -1) {// if at least one active input
-			posA = newPosA;
-			int posAnext = (posA + 1) % 8;
-			if (!isVoid[0])
-				posAnext = getClosestActive(posAnext, active8, isReverse[0]);
+		if (atLeastOneActive) {
+			if (!isVoid[0] && !active8[posA])// ensure start on valid input when no void
+				posA = getClosestActive(posA, active8, false);
 			
-			float lfo01 = (inputs[LFO_INPUTS + 0].value + 5.0f) / 10.0f;
-			outputs[OUTA_OUTPUT].value = lfo01 * values8[posA] + (1.0f - lfo01) * values8[posAnext];
+			int posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// void approach by default (grab slot whether active of not)
+			if (!isVoid[0])
+				posAnext = getClosestActive(posAnext, active8, isReverse[0]);// no problem if only one active, will reach posA
+			
+			float lfo01 = (lfoVal[0] + 5.0f) / 10.0f;
+			float posPercent = topCross[0] ? (1.0f - lfo01) : lfo01;
+			float nextPosPercent = 1.0f - posPercent;
+			outputs[OUTA_OUTPUT].value = posPercent * inputs[INA_INPUTS + posA].value + nextPosPercent * inputs[INA_INPUTS + posAnext].value;
 			for (int i = 0; i < 8; i++)
-				lights[MIXA_LIGHTS + i].value = (i == posA) ? lfo01 : (i == posAnext ? (1.0f - lfo01) : 0.0f);
+				lights[MIXA_LIGHTS + i].value = 0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f);
+			
+			// PulsarA crossover (LFO detection)
+			if (topCross[0] && lfoVal[0] > topCrossoverLevel && lfoLast[0] < topCrossoverLevel) {
+				topCross[0] = false;// switch to bottom detection now
+				posA = posAnext;
+			}
+			if (!topCross[0] && lfoVal[0] < botCrossoverLevel && lfoLast[0] > botCrossoverLevel) {
+				topCross[0] = true;// switch to top detection now
+				posA = posAnext;
+			}
 		}
 		else {
 			outputs[OUTA_OUTPUT].value = 0.0f;
 			for (int i = 0; i < 8; i++)
 				lights[MIXA_LIGHTS + i].value = 0.0f;
 		}
+
+
+		// Pulsar B
+		atLeastOneActive = false;
+		for (int i = 0; i < 8; i++) {
+			active8[i] = outputs[OUTB_OUTPUTS + i].active;
+			if (active8[i]) 
+				atLeastOneActive = true;
+		}
+		if (atLeastOneActive) {
+			if (!isVoid[1] && !active8[posB])// ensure start on valid output when no void
+				posB = getClosestActive(posB, active8, false);
+			
+			int posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// void approach by default (write to slot whether active of not)
+			if (!isVoid[1])
+				posBnext = getClosestActive(posBnext, active8, isReverse[1]);// no problem if only one active, will reach posB
+			
+			float lfo01 = (lfoVal[1] + 5.0f) / 10.0f;
+			float posPercent = topCross[1] ? (1.0f - lfo01) : lfo01;
+			float nextPosPercent = 1.0f - posPercent;
+			for (int i = 0; i < 8; i++) {
+				outputs[OUTB_OUTPUTS].value = 0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].value) : 0.0f);
+				lights[MIXB_LIGHTS + i].value = 0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f);
+			}
+			
+			// PulsarB crossover (LFO detection)
+			if (topCross[1] && lfoVal[1] > topCrossoverLevel && lfoLast[1] < topCrossoverLevel) {
+				topCross[1] = false;// switch to bottom detection now
+				posB = posBnext;
+			}
+			if (!topCross[1] && lfoVal[1] < botCrossoverLevel && lfoLast[1] > botCrossoverLevel) {
+				topCross[1] = true;// switch to top detection now
+				posB = posBnext;
+			}
+		}
+		else {
+			for (int i = 0; i < 8; i++) {
+				outputs[OUTB_OUTPUTS + i].value = 0.0f;
+				lights[MIXB_LIGHTS + i].value = 0.0f;
+			}
+		}
+
 		
-
-
-				
 		// Void and Reverse lights
 		for (int i = 0; i < 2; i++) {
 			lights[VOID_LIGHTS + i].value = isVoid[i] ? 1.0f : 0.0f;
 			lights[REV_LIGHTS + i].value = isReverse[i] ? 1.0f : 0.0f;
 		}
+		
+		// LFO values last
+		lfoLast[0] = lfoVal[0];			
+		lfoLast[1] = lfoVal[1];			
 	}// step()
 	
 	int getClosestActive(int pos, bool* active8, bool reverse) {
@@ -283,7 +354,9 @@ struct PulsarsWidget : ModuleWidget {
 		float radiusJacks = 50.0f;
 		float offsetLeds = radiusLeds / 1.4142135f;
 		float offsetJacks = radiusJacks / 1.4142135f;
-		float offsetLFO = 25.0f;
+		float offsetLFO = 25.0f;// used also for void and reverse CV input jacks
+		float offsetLed = 15.0f;// adds/subs to offsetLFO for void and reverse lights
+		float offsetButton = 25.0f;// adds/subs to offsetLFO for void and reverse buttons
 		
 
 		// PulsarA center output
@@ -309,6 +382,16 @@ struct PulsarsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - radiusLeds, rowRulerPulsarA), module, Pulsars::MIXA_LIGHTS + 6));
 		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - offsetLeds, rowRulerPulsarA - offsetLeds), module, Pulsars::MIXA_LIGHTS + 7));
 		
+		// PulsarA void (jack, light and button)
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::VOID_INPUTS + 0, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetLed, rowRulerPulsarA - offsetJacks - offsetLFO - offsetLed), module, Pulsars::VOID_LIGHTS + 0));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetButton, rowRulerPulsarA - offsetJacks - offsetLFO - offsetButton), module, Pulsars::VOID_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+
+		// PulsarA reverse (jack, light and button)
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarA - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::REV_INPUTS + 0, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLed, rowRulerPulsarA - offsetJacks - offsetLFO - offsetLed), module, Pulsars::REV_LIGHTS + 0));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButton, rowRulerPulsarA - offsetJacks - offsetLFO - offsetButton), module, Pulsars::REV_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		
 		// PulsarA LFO input
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 0, &module->panelTheme));
 		
@@ -328,14 +411,24 @@ struct PulsarsWidget : ModuleWidget {
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks, rowRulerPulsarB - offsetJacks), Port::OUTPUT, module, Pulsars::OUTB_OUTPUTS + 7, &module->panelTheme));
 
 		// PulsarB lights
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter, rowRulerPulsarB - radiusLeds), module, Pulsars::MIXA_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + offsetLeds, rowRulerPulsarB - offsetLeds), module, Pulsars::MIXA_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + radiusLeds, rowRulerPulsarB), module, Pulsars::MIXA_LIGHTS + 2));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + offsetLeds, rowRulerPulsarB + offsetLeds), module, Pulsars::MIXA_LIGHTS + 3));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter, rowRulerPulsarB + radiusLeds), module, Pulsars::MIXA_LIGHTS + 4));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - offsetLeds, rowRulerPulsarB + offsetLeds), module, Pulsars::MIXA_LIGHTS + 5));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - radiusLeds, rowRulerPulsarB), module, Pulsars::MIXA_LIGHTS + 6));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - offsetLeds, rowRulerPulsarB - offsetLeds), module, Pulsars::MIXA_LIGHTS + 7));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter, rowRulerPulsarB - radiusLeds), module, Pulsars::MIXB_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + offsetLeds, rowRulerPulsarB - offsetLeds), module, Pulsars::MIXB_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + radiusLeds, rowRulerPulsarB), module, Pulsars::MIXB_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + offsetLeds, rowRulerPulsarB + offsetLeds), module, Pulsars::MIXB_LIGHTS + 3));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter, rowRulerPulsarB + radiusLeds), module, Pulsars::MIXB_LIGHTS + 4));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - offsetLeds, rowRulerPulsarB + offsetLeds), module, Pulsars::MIXB_LIGHTS + 5));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - radiusLeds, rowRulerPulsarB), module, Pulsars::MIXB_LIGHTS + 6));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - offsetLeds, rowRulerPulsarB - offsetLeds), module, Pulsars::MIXB_LIGHTS + 7));
+		
+		// PulsarB void (jack, light and button)
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarB + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::VOID_INPUTS + 1, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetLed, rowRulerPulsarB + offsetJacks + offsetLFO + offsetLed), module, Pulsars::VOID_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetButton, rowRulerPulsarB + offsetJacks + offsetLFO + offsetButton), module, Pulsars::VOID_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+
+		// PulsarB reverse (jack, light and button)
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::REV_INPUTS + 1, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLed, rowRulerPulsarB + offsetJacks + offsetLFO + offsetLed), module, Pulsars::REV_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButton, rowRulerPulsarB + offsetJacks + offsetLFO + offsetButton), module, Pulsars::REV_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
 		// PulsarA LFO input
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 1, &module->panelTheme));		
