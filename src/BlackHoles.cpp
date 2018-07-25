@@ -234,7 +234,7 @@ struct BlackHolesWidget : ModuleWidget {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
         panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles.svg")));
-        //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles_dark.svg")));// no dark pannel for now
+        //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHolesFull.svg")));// no dark pannel for now
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;
         addChild(panel);
@@ -246,8 +246,8 @@ struct BlackHolesWidget : ModuleWidget {
 		float rowRulerBlack0 = 108.5f;
 		float rowRulerBlack1 = 272.5f;
 		float radiusIn = 30.0f;
-		float radiusOut = 60.5f;
-		float offsetL = 52.0f;
+		float radiusOut = 61.0f;
+		float offsetL = 53.0f;
 		float offsetS = 30.0f;
 		
 		
