@@ -8,6 +8,12 @@
 //
 //***********************************************************************************************
 
+//TODO:
+//1) right click option for 0 to 10 LFO CV vs -5 to 5
+//2) extra light to indicate that a crossover occurred
+//3) if LFOB is not connected, LFOA is used instead
+//4) if pulsarB has no inputs nor LFOB, then each output is the corresponding input in PulsarA
+//   but attenuated according to LFOB
 
 #include "Geodesics.hpp"
 
@@ -41,9 +47,9 @@ struct Pulsars : Module {
 	
 	
 	// Constants
-	static const int epsilon = 0.001f;// pulsar crossovers at 5-epsilon and -5+epsilon
-	static const int topCrossoverLevel = 5.0f - epsilon;
-	static const int botCrossoverLevel = -5.0f + epsilon;
+	static constexpr float epsilon = 0.001f;// pulsar crossovers at 5-epsilon and -5+epsilon
+	static constexpr float topCrossoverLevel = 5.0f - epsilon;
+	static constexpr float botCrossoverLevel = -5.0f + epsilon;
 
 	// Need to save, with reset
 	bool isVoid[2];
@@ -54,7 +60,6 @@ struct Pulsars : Module {
 	
 	// No need to save, with reset
 	int posA, posB;// always between 0 and 7
-	float lfoLast[2];
 	bool topCross[2];
 	
 	// No need to save, no reset
@@ -85,7 +90,6 @@ struct Pulsars : Module {
 		for (int i = 0; i < 2; i++) {
 			isVoid[i] = false;
 			isReverse[i] = false;
-			lfoLast[i] = 0.0f;
 			topCross[i] = false;
 		}
 		// No need to save, with reset
@@ -201,11 +205,11 @@ struct Pulsars : Module {
 				lights[MIXA_LIGHTS + i].value = 0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f);
 			
 			// PulsarA crossover (LFO detection)
-			if (topCross[0] && lfoVal[0] > topCrossoverLevel && lfoLast[0] < topCrossoverLevel) {
+			if (topCross[0] && lfoVal[0] > topCrossoverLevel) {
 				topCross[0] = false;// switch to bottom detection now
 				posA = posAnext;
 			}
-			if (!topCross[0] && lfoVal[0] < botCrossoverLevel && lfoLast[0] > botCrossoverLevel) {
+			else if (!topCross[0] && lfoVal[0] < botCrossoverLevel) {
 				topCross[0] = true;// switch to top detection now
 				posA = posAnext;
 			}
@@ -236,16 +240,16 @@ struct Pulsars : Module {
 			float posPercent = topCross[1] ? (1.0f - lfo01) : lfo01;
 			float nextPosPercent = 1.0f - posPercent;
 			for (int i = 0; i < 8; i++) {
-				outputs[OUTB_OUTPUTS].value = 0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].value) : 0.0f);
+				outputs[OUTB_OUTPUTS + i].value = 0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].value) : 0.0f);
 				lights[MIXB_LIGHTS + i].value = 0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f);
 			}
 			
 			// PulsarB crossover (LFO detection)
-			if (topCross[1] && lfoVal[1] > topCrossoverLevel && lfoLast[1] < topCrossoverLevel) {
+			if (topCross[1] && lfoVal[1] > topCrossoverLevel) {
 				topCross[1] = false;// switch to bottom detection now
 				posB = posBnext;
 			}
-			if (!topCross[1] && lfoVal[1] < botCrossoverLevel && lfoLast[1] > botCrossoverLevel) {
+			else if (!topCross[1] && lfoVal[1] < botCrossoverLevel) {
 				topCross[1] = true;// switch to top detection now
 				posB = posBnext;
 			}
@@ -263,10 +267,6 @@ struct Pulsars : Module {
 			lights[VOID_LIGHTS + i].value = isVoid[i] ? 1.0f : 0.0f;
 			lights[REV_LIGHTS + i].value = isReverse[i] ? 1.0f : 0.0f;
 		}
-		
-		// LFO values last
-		lfoLast[0] = lfoVal[0];			
-		lfoLast[1] = lfoVal[1];			
 	}// step()
 	
 	int getClosestActive(int pos, bool* active8, bool reverse) {
