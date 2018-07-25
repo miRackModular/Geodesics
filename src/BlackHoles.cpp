@@ -55,6 +55,7 @@ struct BlackHoles : Module {
 		panelTheme = 0;
 		// No need to save, no reset		
 		expTriggers[0].reset();
+		expTriggers[1].reset();
 		
 		onReset();
 	}
@@ -67,9 +68,8 @@ struct BlackHoles : Module {
 	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
 		// Need to save, with reset
-		for (int i = 0; i < 2; i++) {
-			isExponential[i] = false;
-		}
+		isExponential[0] = false;
+		isExponential[1] = false;
 		// No need to save, with reset
 		// none
 	}
@@ -234,7 +234,7 @@ struct BlackHolesWidget : ModuleWidget {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
         panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles.svg")));
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHolesFull.svg")));
+        //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles_dark.svg")));// no dark pannel for now
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;
         addChild(panel);

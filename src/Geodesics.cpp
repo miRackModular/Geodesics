@@ -20,4 +20,5 @@ void init(rack::Plugin *p) {
 	p->version = TOSTRING(VERSION);
 
 	p->addModel(modelBlackHoles);
+	p->addModel(modelPulsars);
 }

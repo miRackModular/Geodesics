@@ -54,10 +54,12 @@ void DynamicSVGPanel::step() { // all code except middle if() from SVGPanel::ste
         oversample = 2.f;
     }
     if(mode != nullptr && *mode != oldMode) {
-        visiblePanel->setSVG(panels[*mode]);
-        oldMode = *mode;
-        dirty = true;
-    }
+        if ((unsigned)(*mode) < panels.size()) {
+			visiblePanel->setSVG(panels[*mode]);
+			dirty = true;
+		}
+		oldMode = *mode;
+   }
 	FramebufferWidget::step();
 }
 

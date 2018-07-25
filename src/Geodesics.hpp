@@ -23,6 +23,7 @@ extern Plugin *plugin;
 
 // All modules that are part of plugin go here
 extern Model *modelBlackHoles;
+extern Model *modelPulsars;
 
 
 
