@@ -42,6 +42,7 @@ struct Pulsars : Module {
 		ENUMS(MIXB_LIGHTS, 8),
 		ENUMS(VOID_LIGHTS, 2),
 		ENUMS(REV_LIGHTS, 2),
+		ENUMS(LFO_LIGHTS, 2),
 		NUM_LIGHTS
 	};
 	
@@ -65,6 +66,7 @@ struct Pulsars : Module {
 	// No need to save, no reset
 	SchmittTrigger voidTriggers[2];
 	SchmittTrigger revTriggers[2];
+	float lfoLights[2];
 
 	
 	Pulsars() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -74,6 +76,7 @@ struct Pulsars : Module {
 		for (int i = 0; i < 2; i++) {
 			voidTriggers[i].reset();
 			revTriggers[i].reset();
+			lfoLights[i] = 0.0f;
 		}
 		
 		onReset();
@@ -208,10 +211,12 @@ struct Pulsars : Module {
 			if (topCross[0] && lfoVal[0] > topCrossoverLevel) {
 				topCross[0] = false;// switch to bottom detection now
 				posA = posAnext;
+				lfoLights[0] = 1.0f;
 			}
 			else if (!topCross[0] && lfoVal[0] < botCrossoverLevel) {
 				topCross[0] = true;// switch to top detection now
 				posA = posAnext;
+				lfoLights[0] = 1.0f;
 			}
 		}
 		else {
@@ -248,10 +253,12 @@ struct Pulsars : Module {
 			if (topCross[1] && lfoVal[1] > topCrossoverLevel) {
 				topCross[1] = false;// switch to bottom detection now
 				posB = posBnext;
+				lfoLights[1] = 1.0f;
 			}
 			else if (!topCross[1] && lfoVal[1] < botCrossoverLevel) {
 				topCross[1] = true;// switch to top detection now
 				posB = posBnext;
+				lfoLights[1] = 1.0f;
 			}
 		}
 		else {
@@ -266,6 +273,12 @@ struct Pulsars : Module {
 		for (int i = 0; i < 2; i++) {
 			lights[VOID_LIGHTS + i].value = isVoid[i] ? 1.0f : 0.0f;
 			lights[REV_LIGHTS + i].value = isReverse[i] ? 1.0f : 0.0f;
+		}
+		
+		// LFO lights
+		for (int i = 0; i < 2; i++) {
+			lights[LFO_LIGHTS + i].value = lfoLights[i];
+			lfoLights[i] -= (lfoLights[i] / lightLambda) * (float)engineGetSampleTime();
 		}
 	}// step()
 	
@@ -348,15 +361,19 @@ struct PulsarsWidget : ModuleWidget {
 		// part of svg panel, no code required
 		
 		float colRulerCenter = box.size.x / 2.0f;
-		float rowRulerPulsarA = 108.5f;
-		float rowRulerPulsarB = 272.5f;
-		float radiusLeds = 25.0f;
-		float radiusJacks = 50.0f;
-		float offsetLeds = radiusLeds / 1.4142135f;
-		float offsetJacks = radiusJacks / 1.4142135f;
-		float offsetLFO = 25.0f;// used also for void and reverse CV input jacks
-		float offsetLed = 15.0f;// adds/subs to offsetLFO for void and reverse lights
-		float offsetButton = 25.0f;// adds/subs to offsetLFO for void and reverse buttons
+		static constexpr float rowRulerPulsarA = 127.5;
+		static constexpr float rowRulerPulsarB = 261.5f;
+		float rowRulerLFOlights = (rowRulerPulsarA + rowRulerPulsarB) / 2.0f;
+		static constexpr float offsetLFOlightsX = 25.0f;
+		static constexpr float radiusLeds = 23.0f;
+		static constexpr float radiusJacks = 46.0f;
+		static constexpr float offsetLeds = 17.0f;
+		static constexpr float offsetJacks = 33.0f;
+		static constexpr float offsetLFO = 24.0f;// used also for void and reverse CV input jacks
+		static constexpr float offsetLedX = 13.0f;// adds/subs to offsetLFO for void and reverse lights
+		static constexpr float offsetButtonX = 26.0f;// adds/subs to offsetLFO for void and reverse buttons
+		static constexpr float offsetLedY = 11.0f;// adds/subs to offsetLFO for void and reverse lights
+		static constexpr float offsetButtonY = 18.0f;// adds/subs to offsetLFO for void and reverse buttons
 		
 
 		// PulsarA center output
@@ -384,17 +401,17 @@ struct PulsarsWidget : ModuleWidget {
 		
 		// PulsarA void (jack, light and button)
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::VOID_INPUTS + 0, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetLed, rowRulerPulsarA - offsetJacks - offsetLFO - offsetLed), module, Pulsars::VOID_LIGHTS + 0));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetButton, rowRulerPulsarA - offsetJacks - offsetLFO - offsetButton), module, Pulsars::VOID_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetLedX, rowRulerPulsarA - offsetJacks - offsetLFO - offsetLedY), module, Pulsars::VOID_LIGHTS + 0));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetButtonX, rowRulerPulsarA - offsetJacks - offsetLFO - offsetButtonY), module, Pulsars::VOID_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 
 		// PulsarA reverse (jack, light and button)
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarA - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::REV_INPUTS + 0, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLed, rowRulerPulsarA - offsetJacks - offsetLFO - offsetLed), module, Pulsars::REV_LIGHTS + 0));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButton, rowRulerPulsarA - offsetJacks - offsetLFO - offsetButton), module, Pulsars::REV_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLedX, rowRulerPulsarA - offsetJacks - offsetLFO - offsetLedY), module, Pulsars::REV_LIGHTS + 0));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButtonX, rowRulerPulsarA - offsetJacks - offsetLFO - offsetButtonY), module, Pulsars::REV_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
-		// PulsarA LFO input
+		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 0, &module->panelTheme));
-		
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter - offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 0));
 		
 		
 		// PulsarB center input
@@ -422,17 +439,17 @@ struct PulsarsWidget : ModuleWidget {
 		
 		// PulsarB void (jack, light and button)
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarB + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::VOID_INPUTS + 1, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetLed, rowRulerPulsarB + offsetJacks + offsetLFO + offsetLed), module, Pulsars::VOID_LIGHTS + 1));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetButton, rowRulerPulsarB + offsetJacks + offsetLFO + offsetButton), module, Pulsars::VOID_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetLedX, rowRulerPulsarB + offsetJacks + offsetLFO + offsetLedY), module, Pulsars::VOID_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetJacks - offsetLFO + offsetButtonX, rowRulerPulsarB + offsetJacks + offsetLFO + offsetButtonY), module, Pulsars::VOID_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 
 		// PulsarB reverse (jack, light and button)
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::REV_INPUTS + 1, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLed, rowRulerPulsarB + offsetJacks + offsetLFO + offsetLed), module, Pulsars::REV_LIGHTS + 1));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButton, rowRulerPulsarB + offsetJacks + offsetLFO + offsetButton), module, Pulsars::REV_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLedX, rowRulerPulsarB + offsetJacks + offsetLFO + offsetLedY), module, Pulsars::REV_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButtonX, rowRulerPulsarB + offsetJacks + offsetLFO + offsetButtonY), module, Pulsars::REV_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
-		// PulsarA LFO input
+		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 1, &module->panelTheme));		
-	
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 1));
 	}
 };
 

@@ -28,8 +28,9 @@ extern Model *modelPulsars;
 
 
 // General constants
-static const std::string lightPanelID = "Light";
-static const std::string darkPanelID = "Dark";
+static const float lightLambda = 0.075f;
+static const std::string lightPanelID = "White light";
+static const std::string darkPanelID = "Dark copper";
 
 
 
