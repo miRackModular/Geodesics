@@ -8,12 +8,6 @@
 //
 //***********************************************************************************************
 
-//TODO:
-//1) right click option for 0 to 10 LFO CV vs -5 to 5
-//2) extra light to indicate that a crossover occurred
-//3) if LFOB is not connected, LFOA is used instead
-//4) if pulsarB has no input nor LFOB, then each output is the corresponding input in PulsarA
-//   but attenuated according to LFOB
 
 #include "Geodesics.hpp"
 
@@ -50,9 +44,7 @@ struct Pulsars : Module {
 	
 	
 	// Constants
-	static constexpr float epsilon = 0.001f;// pulsar crossovers at 5-epsilon and -5+epsilon
-	static constexpr float topCrossoverLevel = 5.0f - epsilon;
-	static constexpr float botCrossoverLevel = -5.0f + epsilon;
+	static constexpr float epsilon = 0.0001f;// pulsar crossovers at epsilon and 1-epsilon in 0.0f to 1.0f space
 
 	// Need to save, with reset
 	bool isVoid[2];
@@ -61,6 +53,7 @@ struct Pulsars : Module {
 	
 	// Need to save, no reset
 	int panelTheme;
+	int cvMode;
 	
 	// No need to save, with reset
 	int posA;// always between 0 and 7
@@ -79,6 +72,8 @@ struct Pulsars : Module {
 	Pulsars() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
+		cvMode = 0;// 0 is -5v to 5v, 1 is 0v to 10v
+		
 		// No need to save, no reset		
 		for (int i = 0; i < 2; i++) {
 			lfoLights[i] = 0.0f;
@@ -149,6 +144,9 @@ struct Pulsars : Module {
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
+		// cvMode
+		json_object_set_new(rootJ, "cvMode", json_integer(cvMode));
+
 		return rootJ;
 	}
 
@@ -187,6 +185,11 @@ struct Pulsars : Module {
 		if (panelThemeJ)
 			panelTheme = json_integer_value(panelThemeJ);
 
+		// cvMode
+		json_t *cvModeJ = json_object_get(rootJ, "cvMode");
+		if (cvModeJ)
+			cvMode = json_integer_value(cvModeJ);
+
 		// No need to save, with reset
 		posA = 0;// no need to check isVoid here, will be checked in step()
 		posB = 0;// no need to check isVoid here, will be checked in step()
@@ -210,11 +213,12 @@ struct Pulsars : Module {
 			}
 		}
 		
-		// LFO values
+		// LFO values (normalized to 0.0f to 1.0f space, clamped and offset adjusted depending cvMode)
 		float lfoVal[2];
 		lfoVal[0] = inputs[LFO_INPUTS + 0].value;
-		lfoVal[1] = inputs[LFO_INPUTS + 1].value;
-		
+		lfoVal[1] = inputs[LFO_INPUTS + 1].active ? inputs[LFO_INPUTS + 1].value : lfoVal[0];
+		for (int i = 0; i < 2; i++)
+			lfoVal[i] = clamp( (lfoVal[i] + (cvMode == 0 ? 5.0f : 0.0f)) / 10.0f , 0.0f , 1.0f);
 		
 		// Pulsar A
 		bool active8[8];
@@ -232,15 +236,14 @@ struct Pulsars : Module {
 					posAnext = getNextClosestActive(posA, active8, false, isReverse[0], isRandom[0]);
 			}			
 			
-			float lfo01 = (lfoVal[0] + 5.0f) / 10.0f;
-			float posPercent = topCross[0] ? (1.0f - lfo01) : lfo01;
+			float posPercent = topCross[0] ? (1.0f - lfoVal[0]) : lfoVal[0];
 			float nextPosPercent = 1.0f - posPercent;
 			outputs[OUTA_OUTPUT].value = posPercent * inputs[INA_INPUTS + posA].value + nextPosPercent * inputs[INA_INPUTS + posAnext].value;
 			for (int i = 0; i < 8; i++)
 				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f));
 			
 			// PulsarA crossover (LFO detection)
-			if ( (topCross[0] && lfoVal[0] > topCrossoverLevel) || (!topCross[0] && lfoVal[0] < botCrossoverLevel) ) {
+			if ( (topCross[0] && lfoVal[0] > (1.0f - epsilon)) || (!topCross[0] && lfoVal[0] < epsilon) ) {
 				topCross[0] = !topCross[0];// switch to opposite detection
 				posA = posAnext;
 				posAnext = getNextClosestActive(posA, active8, isVoid[0], isReverse[0], isRandom[0]);
@@ -269,16 +272,18 @@ struct Pulsars : Module {
 					posBnext = getNextClosestActive(posB, active8, false, isReverse[1], isRandom[1]);
 			}			
 			
-			float lfo01 = (lfoVal[1] + 5.0f) / 10.0f;
-			float posPercent = topCross[1] ? (1.0f - lfo01) : lfo01;
+			float posPercent = topCross[1] ? (1.0f - lfoVal[1]) : lfoVal[1];
 			float nextPosPercent = 1.0f - posPercent;
 			for (int i = 0; i < 8; i++) {
-				outputs[OUTB_OUTPUTS + i].value = 0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].value) : 0.0f);
+				if (inputs[INB_INPUT].active)
+					outputs[OUTB_OUTPUTS + i].value = 0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].value) : 0.0f);
+				else// mutidimentional trick
+					outputs[OUTB_OUTPUTS + i].value = 0.0f + ((i == posB) ? (posPercent * inputs[INA_INPUTS + i].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INA_INPUTS + i].value) : 0.0f);
 				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f));
 			}
 			
 			// PulsarB crossover (LFO detection)
-			if ( (topCross[1] && lfoVal[1] > topCrossoverLevel) || (!topCross[1] && lfoVal[1] < botCrossoverLevel) ) {
+			if ( (topCross[1] && lfoVal[1] > (1.0f - epsilon)) || (!topCross[1] && lfoVal[1] < epsilon) ) {
 				topCross[1] = !topCross[1];// switch to opposite detection
 				posB = posBnext;
 				posBnext = getNextClosestActive(posB, active8, isVoid[1], isReverse[1], isRandom[1]);
@@ -368,6 +373,16 @@ struct PulsarsWidget : ModuleWidget {
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
 		}
+	};	
+	struct CVModeItem : MenuItem {
+		Pulsars *module;
+		int modecv;
+		void onAction(EventAction &e) override {
+			module->cvMode = modecv;
+		}
+		void step() override {
+			rightText = (module->cvMode == modecv) ? "✔" : "";
+		}
 	};
 	Menu *createContextMenu() override {
 		Menu *menu = ModuleWidget::createContextMenu();
@@ -394,6 +409,24 @@ struct PulsarsWidget : ModuleWidget {
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
 
+		menu->addChild(new MenuLabel());// empty line
+		
+		MenuLabel *settingsLabel = new MenuLabel();
+		settingsLabel->text = "MC2 input CV levels";
+		menu->addChild(settingsLabel);
+		
+		CVModeItem *bipolItem = new CVModeItem();
+		bipolItem->text = "Bipolar: -5V to 5V";
+		bipolItem->module = module;
+		bipolItem->modecv = 0;
+		menu->addChild(bipolItem);
+
+		CVModeItem *unipolItem = new CVModeItem();
+		unipolItem->text = "Unipolar: 0V to 10V";
+		unipolItem->module = module;
+		unipolItem->modecv = 1;
+		menu->addChild(unipolItem);
+		
 		return menu;
 	}	
 	

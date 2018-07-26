@@ -21,4 +21,5 @@ void init(rack::Plugin *p) {
 
 	p->addModel(modelBlackHoles);
 	p->addModel(modelPulsars);
+	p->addModel(modelBranes);
 }
