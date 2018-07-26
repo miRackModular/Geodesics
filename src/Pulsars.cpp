@@ -22,14 +22,15 @@ struct Pulsars : Module {
 	enum ParamIds {
 		ENUMS(VOID_PARAMS, 2),// push-button
 		ENUMS(REV_PARAMS, 2),// push-button
+		ENUMS(RND_PARAMS, 2),// push-button
 		NUM_PARAMS
 	};
 	enum InputIds {
 		ENUMS(INA_INPUTS, 8),
 		INB_INPUT,
+		ENUMS(LFO_INPUTS, 2),
 		ENUMS(VOID_INPUTS, 2),
 		ENUMS(REV_INPUTS, 2),
-		ENUMS(LFO_INPUTS, 2),
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -38,11 +39,12 @@ struct Pulsars : Module {
 		NUM_OUTPUTS
 	};
 	enum LightIds {
+		ENUMS(LFO_LIGHTS, 2),
 		ENUMS(MIXA_LIGHTS, 8),
 		ENUMS(MIXB_LIGHTS, 8),
 		ENUMS(VOID_LIGHTS, 2),
 		ENUMS(REV_LIGHTS, 2),
-		ENUMS(LFO_LIGHTS, 2),
+		ENUMS(RND_LIGHTS, 2),
 		NUM_LIGHTS
 	};
 	
@@ -55,6 +57,7 @@ struct Pulsars : Module {
 	// Need to save, with reset
 	bool isVoid[2];
 	bool isReverse[2];
+	bool isRandom[2];
 	
 	// Need to save, no reset
 	int panelTheme;
@@ -66,6 +69,7 @@ struct Pulsars : Module {
 	// No need to save, no reset
 	SchmittTrigger voidTriggers[2];
 	SchmittTrigger revTriggers[2];
+	SchmittTrigger rndTriggers[2];
 	float lfoLights[2];
 
 	
@@ -74,9 +78,10 @@ struct Pulsars : Module {
 		panelTheme = 0;
 		// No need to save, no reset		
 		for (int i = 0; i < 2; i++) {
+			lfoLights[i] = 0.0f;
 			voidTriggers[i].reset();
 			revTriggers[i].reset();
-			lfoLights[i] = 0.0f;
+			rndTriggers[i].reset();
 		}
 		
 		onReset();
@@ -91,9 +96,10 @@ struct Pulsars : Module {
 	void onReset() override {
 		// Need to save, with reset
 		for (int i = 0; i < 2; i++) {
+			topCross[i] = false;
 			isVoid[i] = false;
 			isReverse[i] = false;
-			topCross[i] = false;
+			isRandom[i] = false;
 		}
 		// No need to save, with reset
 		posA = 0;
@@ -108,6 +114,7 @@ struct Pulsars : Module {
 		for (int i = 0; i < 2; i++) {
 			isVoid[i] = (randomu32() % 2) > 0;
 			isReverse[i] = (randomu32() % 2) > 0;
+			isRandom[i] = (randomu32() % 2) > 0;
 		}
 		// No need to save, with reset
 		posA = randomu32() % 8;
@@ -127,6 +134,10 @@ struct Pulsars : Module {
 		// isReverse
 		json_object_set_new(rootJ, "isReverse0", json_real(isReverse[0]));
 		json_object_set_new(rootJ, "isReverse1", json_real(isReverse[1]));
+		
+		// isRandom
+		json_object_set_new(rootJ, "isRandom0", json_real(isRandom[0]));
+		json_object_set_new(rootJ, "isRandom1", json_real(isRandom[1]));
 		
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
@@ -156,6 +167,14 @@ struct Pulsars : Module {
 		if (isReverse1J)
 			isReverse[1] = json_real_value(isReverse1J);
 
+		// isRandom
+		json_t *isRandom0J = json_object_get(rootJ, "isRandom0");
+		if (isRandom0J)
+			isRandom[0] = json_real_value(isRandom0J);
+		json_t *isRandom1J = json_object_get(rootJ, "isRandom1");
+		if (isRandom1J)
+			isRandom[1] = json_real_value(isRandom1J);
+
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -168,13 +187,16 @@ struct Pulsars : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
-		// Void and Reverse buttons
+		// Void, Reverse and Random buttons
 		for (int i = 0; i < 2; i++) {
 			if (voidTriggers[i].process(params[VOID_PARAMS + i].value + inputs[VOID_INPUTS + i].value)) {
 				isVoid[i] = !isVoid[i];
 			}
 			if (revTriggers[i].process(params[REV_PARAMS + i].value + inputs[REV_INPUTS + i].value)) {
 				isReverse[i] = !isReverse[i];
+			}
+			if (rndTriggers[i].process(params[RND_PARAMS + i].value)) {// + inputs[RND_INPUTS + i].value)) {
+				isRandom[i] = !isRandom[i];
 			}
 		}
 		
@@ -194,11 +216,9 @@ struct Pulsars : Module {
 		}
 		if (atLeastOneActive) {
 			if (!isVoid[0] && !active8[posA])// ensure start on valid input when no void
-				posA = getClosestActive(posA, active8, false);
+				posA = getClosestActive(posA, active8, false, false, false);
 			
-			int posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// void approach by default (grab slot whether active of not)
-			if (!isVoid[0])
-				posAnext = getClosestActive(posAnext, active8, isReverse[0]);// no problem if only one active, will reach posA
+			int posAnext = getClosestActive(posA, active8, isVoid[0], isReverse[0], isRandom[0]);
 			
 			float lfo01 = (lfoVal[0] + 5.0f) / 10.0f;
 			float posPercent = topCross[0] ? (1.0f - lfo01) : lfo01;
@@ -235,11 +255,9 @@ struct Pulsars : Module {
 		}
 		if (atLeastOneActive) {
 			if (!isVoid[1] && !active8[posB])// ensure start on valid output when no void
-				posB = getClosestActive(posB, active8, false);
+				posB = getClosestActive(posB, active8, false, false, false);
 			
-			int posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// void approach by default (write to slot whether active of not)
-			if (!isVoid[1])
-				posBnext = getClosestActive(posBnext, active8, isReverse[1]);// no problem if only one active, will reach posB
+			int posBnext = getClosestActive(posB, active8, isVoid[1], isReverse[1], isRandom[1]);
 			
 			float lfo01 = (lfoVal[1] + 5.0f) / 10.0f;
 			float posPercent = topCross[1] ? (1.0f - lfo01) : lfo01;
@@ -269,10 +287,11 @@ struct Pulsars : Module {
 		}
 
 		
-		// Void and Reverse lights
+		// Void, Reverse and Random lights
 		for (int i = 0; i < 2; i++) {
 			lights[VOID_LIGHTS + i].value = isVoid[i] ? 1.0f : 0.0f;
 			lights[REV_LIGHTS + i].value = isReverse[i] ? 1.0f : 0.0f;
+			lights[RND_LIGHTS + i].value = isRandom[i] ? 1.0f : 0.0f;
 		}
 		
 		// LFO lights
@@ -282,23 +301,34 @@ struct Pulsars : Module {
 		}
 	}// step()
 	
-	int getClosestActive(int pos, bool* active8, bool reverse) {
+	int getClosestActive(int pos, bool* active8, bool voidd, bool reverse, bool random) {
 		// finds the closest active position (including current if active), returns -1 if none are active
 		// starts in current pos and looks at 8 positions starting here (loops over if given pos > 1)
 		int ret = -1;
-		if (!reverse) {
-			for (int i = pos; i < pos + 8; i++) {
-				if (active8[i % 8]) {
-					ret = i % 8;
-					break;
-				}
-			}
+		if (random) {
+			if (voidd)
+				ret = randomu32() % 8;
+			else
+				ret = 1;//temp
 		}
-		else {
-			for (int i = pos + 8; i > pos; i--) {
-				if (active8[i % 8]) {
-					ret = i % 8;
-					break;
+		else { 
+			ret = (pos + (reverse ? 7 : 1)) % 8;// void approach by default (write to slot whether active of not)
+			if (!voidd) {
+				if (reverse) {
+					for (int i = ret + 8; i > ret; i--) {
+						if (active8[i % 8]) {
+							ret = i % 8;
+							break;
+						}
+					}
+				}
+				else {
+					for (int i = ret; i < ret + 8; i++) {
+						if (active8[i % 8]) {
+							ret = i % 8;
+							break;
+						}
+					}
 				}
 			}
 		}
@@ -374,7 +404,10 @@ struct PulsarsWidget : ModuleWidget {
 		static constexpr float offsetButtonX = 26.0f;// adds/subs to offsetLFO for void and reverse buttons
 		static constexpr float offsetLedY = 11.0f;// adds/subs to offsetLFO for void and reverse lights
 		static constexpr float offsetButtonY = 18.0f;// adds/subs to offsetLFO for void and reverse buttons
-		
+		static constexpr float offsetRndButtonX = 58.0f;// from center of pulsar
+		static constexpr float offsetRndButtonY = 24.0f;// from center of pulsar
+		static constexpr float offsetRndLedX = 63.0f;// from center of pulsar
+		static constexpr float offsetRndLedY = 11.0f;// from center of pulsar
 
 		// PulsarA center output
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerPulsarA), Port::OUTPUT, module, Pulsars::OUTA_OUTPUT, &module->panelTheme));
@@ -409,6 +442,10 @@ struct PulsarsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLedX, rowRulerPulsarA - offsetJacks - offsetLFO - offsetLedY), module, Pulsars::REV_LIGHTS + 0));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButtonX, rowRulerPulsarA - offsetJacks - offsetLFO - offsetButtonY), module, Pulsars::REV_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
+		// PulsarA random (light and button)
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetRndLedX, rowRulerPulsarA + offsetRndLedY), module, Pulsars::RND_LIGHTS + 0));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRndButtonX, rowRulerPulsarA + offsetRndButtonY), module, Pulsars::RND_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+
 		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 0, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter - offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 0));
@@ -446,6 +483,10 @@ struct PulsarsWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::REV_INPUTS + 1, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetLedX, rowRulerPulsarB + offsetJacks + offsetLFO + offsetLedY), module, Pulsars::REV_LIGHTS + 1));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetJacks + offsetLFO - offsetButtonX, rowRulerPulsarB + offsetJacks + offsetLFO + offsetButtonY), module, Pulsars::REV_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		
+		// PulsarB random (light and button)
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(colRulerCenter - offsetRndLedX, rowRulerPulsarB - offsetRndLedY), module, Pulsars::RND_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRndButtonX, rowRulerPulsarB - offsetRndButtonY), module, Pulsars::RND_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
 		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 1, &module->panelTheme));		
