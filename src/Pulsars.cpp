@@ -63,7 +63,10 @@ struct Pulsars : Module {
 	int panelTheme;
 	
 	// No need to save, with reset
-	int posA, posB;// always between 0 and 7
+	int posA;// always between 0 and 7
+	int posB;// always between 0 and 7
+	int posAnext;// always between 0 and 7
+	int posBnext;// always between 0 and 7
 	bool topCross[2];
 	
 	// No need to save, no reset
@@ -102,8 +105,10 @@ struct Pulsars : Module {
 			isRandom[i] = false;
 		}
 		// No need to save, with reset
-		posA = 0;
-		posB = 0;
+		posA = 0;// no need to check isVoid here, will be checked in step()
+		posB = 0;// no need to check isVoid here, will be checked in step()
+		posAnext = 1;// no need to check isVoid here, will be checked in step()
+		posBnext = 1;// no need to check isVoid here, will be checked in step()
 	}
 
 	
@@ -117,8 +122,10 @@ struct Pulsars : Module {
 			isRandom[i] = (randomu32() % 2) > 0;
 		}
 		// No need to save, with reset
-		posA = randomu32() % 8;
-		posB = randomu32() % 8;
+		posA = randomu32() % 8;// no need to check isVoid here, will be checked in step()
+		posB = randomu32() % 8;// no need to check isVoid here, will be checked in step()
+		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
+		posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
 	}
 
 	
@@ -181,7 +188,10 @@ struct Pulsars : Module {
 			panelTheme = json_integer_value(panelThemeJ);
 
 		// No need to save, with reset
-		// none
+		posA = 0;// no need to check isVoid here, will be checked in step()
+		posB = 0;// no need to check isVoid here, will be checked in step()
+		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
+		posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
 	}
 
 	
@@ -215,27 +225,25 @@ struct Pulsars : Module {
 				atLeastOneActive = true;
 		}
 		if (atLeastOneActive) {
-			if (!isVoid[0] && !active8[posA])// ensure start on valid input when no void
-				posA = getClosestActive(posA, active8, false, false, false);
-			
-			int posAnext = getClosestActive(posA, active8, isVoid[0], isReverse[0], isRandom[0]);
+			if (!isVoid[0]) {
+				if (!active8[posA])// ensure start on valid input when no void
+					posA = getNextClosestActive(posA, active8, false, false, false);
+				if (!active8[posAnext])
+					posAnext = getNextClosestActive(posA, active8, false, isReverse[0], isRandom[0]);
+			}			
 			
 			float lfo01 = (lfoVal[0] + 5.0f) / 10.0f;
 			float posPercent = topCross[0] ? (1.0f - lfo01) : lfo01;
 			float nextPosPercent = 1.0f - posPercent;
 			outputs[OUTA_OUTPUT].value = posPercent * inputs[INA_INPUTS + posA].value + nextPosPercent * inputs[INA_INPUTS + posAnext].value;
 			for (int i = 0; i < 8; i++)
-				lights[MIXA_LIGHTS + i].value = 0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f);
+				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f));
 			
 			// PulsarA crossover (LFO detection)
-			if (topCross[0] && lfoVal[0] > topCrossoverLevel) {
-				topCross[0] = false;// switch to bottom detection now
+			if ( (topCross[0] && lfoVal[0] > topCrossoverLevel) || (!topCross[0] && lfoVal[0] < botCrossoverLevel) ) {
+				topCross[0] = !topCross[0];// switch to opposite detection
 				posA = posAnext;
-				lfoLights[0] = 1.0f;
-			}
-			else if (!topCross[0] && lfoVal[0] < botCrossoverLevel) {
-				topCross[0] = true;// switch to top detection now
-				posA = posAnext;
+				posAnext = getNextClosestActive(posA, active8, isVoid[0], isReverse[0], isRandom[0]);
 				lfoLights[0] = 1.0f;
 			}
 		}
@@ -254,28 +262,26 @@ struct Pulsars : Module {
 				atLeastOneActive = true;
 		}
 		if (atLeastOneActive) {
-			if (!isVoid[1] && !active8[posB])// ensure start on valid output when no void
-				posB = getClosestActive(posB, active8, false, false, false);
-			
-			int posBnext = getClosestActive(posB, active8, isVoid[1], isReverse[1], isRandom[1]);
+			if (!isVoid[1]) {
+				if (!active8[posB])// ensure start on valid output when no void
+					posB = getNextClosestActive(posB, active8, false, false, false);
+				if (!active8[posBnext])
+					posBnext = getNextClosestActive(posB, active8, false, isReverse[1], isRandom[1]);
+			}			
 			
 			float lfo01 = (lfoVal[1] + 5.0f) / 10.0f;
 			float posPercent = topCross[1] ? (1.0f - lfo01) : lfo01;
 			float nextPosPercent = 1.0f - posPercent;
 			for (int i = 0; i < 8; i++) {
 				outputs[OUTB_OUTPUTS + i].value = 0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].value) : 0.0f);
-				lights[MIXB_LIGHTS + i].value = 0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f);
+				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f));
 			}
 			
 			// PulsarB crossover (LFO detection)
-			if (topCross[1] && lfoVal[1] > topCrossoverLevel) {
-				topCross[1] = false;// switch to bottom detection now
+			if ( (topCross[1] && lfoVal[1] > topCrossoverLevel) || (!topCross[1] && lfoVal[1] < botCrossoverLevel) ) {
+				topCross[1] = !topCross[1];// switch to opposite detection
 				posB = posBnext;
-				lfoLights[1] = 1.0f;
-			}
-			else if (!topCross[1] && lfoVal[1] < botCrossoverLevel) {
-				topCross[1] = true;// switch to top detection now
-				posB = posBnext;
+				posBnext = getNextClosestActive(posB, active8, isVoid[1], isReverse[1], isRandom[1]);
 				lfoLights[1] = 1.0f;
 			}
 		}
@@ -301,38 +307,51 @@ struct Pulsars : Module {
 		}
 	}// step()
 	
-	int getClosestActive(int pos, bool* active8, bool voidd, bool reverse, bool random) {
-		// finds the closest active position (including current if active), returns -1 if none are active
-		// starts in current pos and looks at 8 positions starting here (loops over if given pos > 1)
-		int ret = -1;
+	
+	int getNextClosestActive(int pos, bool* active8, bool voidd, bool reverse, bool random) {
+		// finds the next closest active position (excluding current if active)
+		// assumes at least one active, but may not be given pos; will always return an active pos
+		// scans all 8 positions
+		int posNext = -1;// should never be returned
 		if (random) {
 			if (voidd)
-				ret = randomu32() % 8;
-			else
-				ret = 1;//temp
+				posNext = (pos + 1 + randomu32() % 7) % 8;
+			else {
+				posNext = pos;
+				int activeIndexes[8];// room for all indexes of active positions except current if active(max size is guaranteed to be < 8)
+				int activeIndexesI = 0;
+				for (int i = 0; i < 8; i++) {
+					if (active8[i] && i != pos) {
+						activeIndexes[activeIndexesI] = i;
+						activeIndexesI++;
+					}
+				}
+				if (activeIndexesI > 0)
+					posNext = activeIndexes[randomu32()%activeIndexesI];
+			}	
 		}
 		else { 
-			ret = (pos + (reverse ? 7 : 1)) % 8;// void approach by default (write to slot whether active of not)
+			posNext = (pos + (reverse ? 7 : 1)) % 8;// void approach by default (choose slot whether active of not)
 			if (!voidd) {
 				if (reverse) {
-					for (int i = ret + 8; i > ret; i--) {
+					for (int i = posNext + 8; i > posNext; i--) {
 						if (active8[i % 8]) {
-							ret = i % 8;
+							posNext = i % 8;
 							break;
 						}
 					}
 				}
 				else {
-					for (int i = ret; i < ret + 8; i++) {
+					for (int i = posNext; i < posNext + 8; i++) {
 						if (active8[i % 8]) {
-							ret = i % 8;
+							posNext = i % 8;
 							break;
 						}
 					}
 				}
 			}
 		}
-		return ret;
+		return posNext;
 	}
 
 };
