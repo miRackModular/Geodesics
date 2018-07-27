@@ -43,7 +43,11 @@ struct Branes : Module {
 	
 	
 	// Constants
-	// none
+	// S&H are numbered 0 to 6 in BraneA from lower left to lower right
+	// S&H are numbered 7 to 13 in BraneB from top right to top left
+	enum NoiseId {NONE, WHITE, PINK, RED, BLUE};//use negative value for inv phase
+	int noiseSources[14] = {PINK, RED, BLUE, WHITE, -BLUE, -RED, -PINK,   -PINK, -RED, -BLUE, WHITE, BLUE, RED, PINK};
+	static constexpr float nullNoise = 100.0f;// when a noise has not been generated for the current step
 
 	// Need to save, with reset
 	// none
@@ -52,10 +56,10 @@ struct Branes : Module {
 	int panelTheme;
 	
 	// No need to save, with reset
-	// none
+	float heldOuts[14];
 	
 	// No need to save, no reset
-	// none
+	SchmittTrigger sampleTriggers[2];
 
 	
 	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -63,7 +67,8 @@ struct Branes : Module {
 		panelTheme = 0;
 		
 		// No need to save, no reset		
-		// none
+		sampleTriggers[0].reset();
+		sampleTriggers[1].reset();
 		
 		onReset();
 	}
@@ -79,7 +84,8 @@ struct Branes : Module {
 		// none
 		
 		// No need to save, with reset
-		// none
+		for (int i = 0; i < 14; i++)
+			heldOuts[i] = 0.0f;
 	}
 
 	
@@ -90,7 +96,8 @@ struct Branes : Module {
 		// none 
 		
 		// No need to save, with reset
-		// none
+		for (int i = 0; i < 14; i++)
+			heldOuts[i] = 0.0f;
 	}
 
 	
@@ -117,12 +124,44 @@ struct Branes : Module {
 			panelTheme = json_integer_value(panelThemeJ);
 
 		// No need to save, with reset
-		// none
+		for (int i = 0; i < 14; i++)
+			heldOuts[i] = 0.0f;
 	}
 
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
+		float noises[5] = {nullNoise, nullNoise, nullNoise, nullNoise, nullNoise};// order is none, white, pink, red, blue
+		
+		bool trigs[2];
+		for (int i = 0; i < 2; i++)		
+			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].value);
+		
+		for (int sh = 0; sh < 14; sh++) {
+			// TODO crosstrig mechanism for SH6 and SH13
+			if (inputs[TRIG_INPUTS + sh / 7].active) {
+				if (trigs[sh / 7]) {
+					if (inputs[IN_INPUTS + sh].active)
+						heldOuts[sh] = inputs[IN_INPUTS + sh].value;
+					else {
+						int noiseIndex = abs( noiseSources[sh] );
+						if (noises[noiseIndex] == nullNoise) {
+							noises[noiseIndex] = randomUniform() * 10.0f - 5.0f; // TODO: support other noises (is white ok using randomUniform()?)
+						}
+						heldOuts[sh] = noises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
+					}
+				}
+			}
+			else { // no trig connected
+				if (inputs[IN_INPUTS + sh].active) {
+					// ?? (not specified in documentation
+				}
+				else {
+					// Same code as the else active above (get a noise sample)
+				}
+			}
+			outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
+		}
 		
 	}// step()
 
@@ -184,7 +223,55 @@ struct BranesWidget : ModuleWidget {
 		float colRulerCenter = box.size.x / 2.0f;
 		static constexpr float rowRulerHoldA = 125.5;
 		static constexpr float rowRulerHoldB = 254.5f;
+		static constexpr float radiusIn = 35.0f;
+		static constexpr float radiusOut = 64.0f;
+		static constexpr float offsetIn = 25.0f;
+		static constexpr float offsetOut = 46.0f;
+		
+		
+		// BraneA trig intput
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA), Port::INPUT, module, Branes::TRIG_INPUTS + 0, &module->panelTheme));
+		
+		// BraneA inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldA + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerHoldA), Port::INPUT, module, Branes::IN_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldA - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 2, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA - radiusIn), Port::INPUT, module, Branes::IN_INPUTS + 3, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldA - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 4, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerHoldA), Port::INPUT, module, Branes::IN_INPUTS + 5, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldA + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 6, &module->panelTheme));
 
+		// BraneA outputs
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldA + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 0, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusOut, rowRulerHoldA), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 1, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldA - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 2, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA - radiusOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 3, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldA - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 4, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusOut, rowRulerHoldA), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 5, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldA + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 6, &module->panelTheme));
+		
+		
+		// BraneB trig intput
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB), Port::INPUT, module, Branes::TRIG_INPUTS + 1, &module->panelTheme));
+		
+		// BraneB inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldB - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 7, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerHoldB), Port::INPUT, module, Branes::IN_INPUTS + 8, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldB + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 9, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB + radiusIn), Port::INPUT, module, Branes::IN_INPUTS + 10, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldB + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 11, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerHoldB), Port::INPUT, module, Branes::IN_INPUTS + 12, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldB - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 13, &module->panelTheme));
+
+
+		// BraneB outputs
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldB - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 7, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusOut, rowRulerHoldB), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 8, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldB + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 9, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB + radiusOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 10, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 11, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusOut, rowRulerHoldB), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 12, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 13, &module->panelTheme));
 	}
 };
 
