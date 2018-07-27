@@ -16,7 +16,13 @@ Based on code from the Fundamental plugins by Andrew Belt and graphics from the 
 
 Here are the modules.
 
-* [Black Holes](#blackholes): Gravitational voltage controlled amplifiers.
+* [Black Holes](#blackholes): Gravitational Attenumixer.
+
+* [Pulsars](#pulsars): Neutron-Powered Crossfader.
+
+* [Branes](#branes): Colliding Sample-and-Hold.
+
+* [Ions](#ions): Atomic Dual Sequencer.
 
 Details about each module are given below.
 
@@ -24,6 +30,30 @@ Details about each module are given below.
 
 ## Black Holes <a id="blackholes"></a>
 
-![IM](res/img/BlackHoles.jpg)
+![Geodesics](res/img/BlackHoles.jpg)
+
+TODO
+
+
+
+## Pulsars <a id="pulsars"></a>
+
+![Geodesics](res/img/Pulsars.jpg)
+
+TODO
+
+
+
+## Branes <a id="branes"></a>
+
+![Geodesics](res/img/Branes.jpg)
+
+TODO
+
+
+
+## Ions <a id="ions"></a>
+
+![Geodesics](res/img/Ions.jpg)
 
 TODO

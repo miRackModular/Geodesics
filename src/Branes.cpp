@@ -8,18 +8,6 @@
 //
 //***********************************************************************************************
 
-//Extra design notes:
-/*
-Tout fonctionne comme dans le manuel amis j’ai précisé ici les différente type de buits :
-IL n’y aurai que 4 generateurs :
-1 bruit blanc avec 2 sorties identiques dans la brane inférieure et supérieure
-1 bruit bleu avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté gauche et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit 
-1 bruit rouge avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté gauche et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit
-1 bruit rose avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté gauche et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit
-
-Pour les deux sorties « en collision », il faudra qu’elle reçoive un mélange des deux triggers sources. Je ne sais pas quelle est la meilleure technique pour faire ça. Peut-être de la logique booléenne « and » ?
-*/
-
 
 #include <dsp/filter.hpp>
 #include <random>
@@ -182,31 +170,33 @@ struct Branes : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
-		float stepNoises[5] = {whiteNoise.white(), nullNoise ,nullNoise, nullNoise, nullNoise};// order is white -1 to 1 reference, white, pink, red, blue
+		float stepNoises[6] = {nullNoise, nullNoise, nullNoise, nullNoise, nullNoise, 0.0f};// order is whiteBase (-1 to 1), white, pink, red, blue, pink_processed (1.0f or 0.0f)
 		
 		bool trigs[2];
 		for (int i = 0; i < 2; i++)		
 			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].value);
 		
 		for (int sh = 0; sh < 14; sh++) {
-			// TODO crosstrig mechanism for SH6 and SH13
-			if (inputs[TRIG_INPUTS + sh / 7].active) {
-				if (trigs[sh / 7]) {
-					if (inputs[IN_INPUTS + sh].active)
-						heldOuts[sh] = inputs[IN_INPUTS + sh].value;
+			if (inputs[TRIG_INPUTS + sh / 7].active || (sh == 13 && inputs[TRIG_INPUTS + 0].active) || (sh == 6 && inputs[TRIG_INPUTS + 1].active)) {// trig connected (with crosstrigger mechanism)
+				if (trigs[sh / 7] || (sh == 13 && trigs[0]) || (sh == 6 && trigs[1])) {
+					if (inputs[IN_INPUTS + sh].active)// if input cable
+						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
 					else {
-						int noiseIndex = prepareNoise(stepNoises, sh);
+						int noiseIndex = prepareNoise(stepNoises, sh);// sample and hold noise
 						heldOuts[sh] = stepNoises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
 					}
 				}
 			}
 			else { // no trig connected
 				if (inputs[IN_INPUTS + sh].active) {
-					heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig
+					heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig and no input
 				}
 				else {
-					int noiseIndex = prepareNoise(stepNoises, sh);
-					heldOuts[sh] = stepNoises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
+					heldOuts[sh] = 0.0f;
+					if (outputs[OUT_OUTPUTS + sh].active) {
+						int noiseIndex = prepareNoise(stepNoises, sh);
+						heldOuts[sh] = stepNoises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
+					}
 				}
 			}
 			outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
@@ -217,7 +207,14 @@ struct Branes : Module {
 	int prepareNoise(float* stepNoises, int sh) {
 		int noiseIndex = abs( noiseSources[sh] );
 		if (stepNoises[noiseIndex] == nullNoise) {
+			if (stepNoises[0] == nullNoise)
+				stepNoises[0] = whiteNoise.white();
+			if ((noiseIndex == PINK || noiseIndex == BLUE) && stepNoises[5] == 0.0f) {
+				pinkFilter.process(stepNoises[0]);
+				stepNoises[5] = 1.0f;
+			}
 			switch (noiseIndex) {
+				// most of the code in here is from Joel Robichaud - Nohmad Noise module
 				case (PINK) :
 					stepNoises[noiseIndex] = 5.0f * clamp(0.18f * pinkFilter.pink(), -1.0f, 1.0f);
 				break;
@@ -230,7 +227,7 @@ struct Branes : Module {
 					stepNoises[noiseIndex] = 5.0f * clamp(0.64f * blueFilter.highpass(), -1.0f, 1.0f);
 				break;
 				default ://(WHITE)
-					stepNoises[noiseIndex] = stepNoises[0] * 5.0f;
+					stepNoises[noiseIndex] = 5.0f * stepNoises[0];
 				break;
 			}
 		}
