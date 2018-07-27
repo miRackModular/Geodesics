@@ -59,11 +59,13 @@ struct PinkFilter {
 
 struct Branes : Module {
 	enum ParamIds {
+		ENUMS(TRIG_BYPASS_PARAMS, 2),
 		NUM_PARAMS
 	};
 	enum InputIds {
 		ENUMS(IN_INPUTS, 14),
 		ENUMS(TRIG_INPUTS, 2),
+		ENUMS(TRIG_BYPASS_INPUTS, 2),
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -83,7 +85,7 @@ struct Branes : Module {
 	static constexpr float nullNoise = 100.0f;// when a noise has not been generated for the current step
 
 	// Need to save, with reset
-	// none
+	bool trigBypass[2];
 	
 	// Need to save, no reset
 	int panelTheme;
@@ -93,6 +95,7 @@ struct Branes : Module {
 	
 	// No need to save, no reset
 	SchmittTrigger sampleTriggers[2];
+	SchmittTrigger trigBypassTriggers[2];
 	NoiseGenerator whiteNoise;
 	PinkFilter pinkFilter;
 	RCFilter redFilter;
@@ -104,8 +107,10 @@ struct Branes : Module {
 		panelTheme = 0;
 		
 		// No need to save, no reset		
-		sampleTriggers[0].reset();
-		sampleTriggers[1].reset();
+		for (int i = 0; i < 2; i++) {
+			sampleTriggers[i].reset();
+			trigBypassTriggers[i].reset();
+		}
 		redFilter.setCutoff(441.0f / engineGetSampleRate());
 		blueFilter.setCutoff(44100.0f / engineGetSampleRate());
 		
@@ -120,7 +125,8 @@ struct Branes : Module {
 	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
 		// Need to save, with reset
-		// none
+		for (int i = 0; i < 2; i++)
+			trigBypass[i] = false;
 		
 		// No need to save, with reset
 		for (int i = 0; i < 14; i++)
@@ -132,7 +138,8 @@ struct Branes : Module {
 	// called by engine thread if right-click randomize
 	void onRandomize() override {
 		// Need to save, with reset
-		// none 
+		for (int i = 0; i < 2; i++)
+			trigBypass[i] = (randomu32() % 2) > 0;
 		
 		// No need to save, with reset
 		for (int i = 0; i < 14; i++)
@@ -145,6 +152,10 @@ struct Branes : Module {
 		json_t *rootJ = json_object();
 		// Need to save (reset or not)
 
+		// trigBypass
+		json_object_set_new(rootJ, "trigBypass0", json_real(trigBypass[0]));
+		json_object_set_new(rootJ, "trigBypass1", json_real(trigBypass[1]));
+
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
@@ -156,6 +167,14 @@ struct Branes : Module {
 	// called by main thread
 	void fromJson(json_t *rootJ) override {
 		// Need to save (reset or not)
+
+		// trigBypass
+		json_t *trigBypass0J = json_object_get(rootJ, "trigBypass0");
+		if (trigBypass0J)
+			trigBypass[0] = json_real_value(trigBypass0J);
+		json_t *trigBypass1J = json_object_get(rootJ, "trigBypass1");
+		if (trigBypass1J)
+			trigBypass[1] = json_real_value(trigBypass1J);
 
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
@@ -172,12 +191,24 @@ struct Branes : Module {
 	void step() override {		
 		float stepNoises[6] = {nullNoise, nullNoise, nullNoise, nullNoise, nullNoise, 0.0f};// order is whiteBase (-1 to 1), white, pink, red, blue, pink_processed (1.0f or 0.0f)
 		
+		// trigBypass buttons and cv inputs
+		for (int i = 0; i < 2; i++) {
+			if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].value)) {
+				trigBypass[i] = !trigBypass[i];
+			}
+		}
+
+		// trig inputs
 		bool trigs[2];
-		for (int i = 0; i < 2; i++)		
+		bool trigInputsActive[2];
+		for (int i = 0; i < 2; i++)	{	
 			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].value);
+			trigInputsActive[i] = trigBypass[i] ? false : inputs[TRIG_INPUTS + i].active;
+		}
 		
+		// sample and hold outputs
 		for (int sh = 0; sh < 14; sh++) {
-			if (inputs[TRIG_INPUTS + sh / 7].active || (sh == 13 && inputs[TRIG_INPUTS + 0].active) || (sh == 6 && inputs[TRIG_INPUTS + 1].active)) {// trig connected (with crosstrigger mechanism)
+			if (trigInputsActive[sh / 7] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// trig connected (with crosstrigger mechanism)
 				if (trigs[sh / 7] || (sh == 13 && trigs[0]) || (sh == 6 && trigs[1])) {
 					if (inputs[IN_INPUTS + sh].active)// if input cable
 						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
@@ -340,6 +371,12 @@ struct BranesWidget : ModuleWidget {
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 11, &module->panelTheme));
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusOut, rowRulerHoldB), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 12, &module->panelTheme));
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 13, &module->panelTheme));
+		
+		
+		// Trigger bypass
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 50, 350), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 50, 350), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+
 	}
 };
 

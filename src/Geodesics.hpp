@@ -97,14 +97,26 @@ struct GeoKnobBottom : GeoKnob {
 
 // Lights
 
-struct OrangeLight : GrayModuleLightWidget {
-	OrangeLight() {
-		addBaseColor(COLOR_ORANGE);
+struct GeoGrayModuleLight : ModuleLightWidget {
+	GeoGrayModuleLight() {
+		bgColor = nvgRGB(0x8e, 0x8e, 0x8e);
+		borderColor = nvgRGBA(0, 0, 0, 0x60);
 	}
 };
-struct WhiteLight : GrayModuleLightWidget {
-	WhiteLight() {
+
+struct GeoWhiteLight : GeoGrayModuleLight {
+	GeoWhiteLight() {
 		addBaseColor(COLOR_WHITE);
+	}
+};
+struct GeoBlueLight : GeoGrayModuleLight {
+	GeoBlueLight() {
+		addBaseColor(COLOR_BLUE);
+	}
+};
+struct GeoRedLight : GeoGrayModuleLight {
+	GeoRedLight() {
+		addBaseColor(COLOR_RED);
 	}
 };
 

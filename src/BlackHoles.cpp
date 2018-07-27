@@ -279,7 +279,7 @@ struct BlackHolesWidget : ModuleWidget {
 
 		// BlackHole0 Exp button and light
 		addParam(createDynamicParam<GeoPushButton>(Vec(24.5f, 189.5f), module, BlackHoles::EXP_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(34.5f, 178.5f), module, BlackHoles::EXP_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(34.5f, 178.5f), module, BlackHoles::EXP_LIGHTS + 0));
 		
 		
 				
@@ -311,7 +311,7 @@ struct BlackHolesWidget : ModuleWidget {
 		
 		// BlackHole1 Exp button and light
 		addParam(createDynamicParam<GeoPushButton>(Vec(140.5f, 191.5f), module, BlackHoles::EXP_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(129.5f, 201.5f), module, BlackHoles::EXP_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(129.5f, 201.5f), module, BlackHoles::EXP_LIGHTS + 1));
 	}
 };
 
