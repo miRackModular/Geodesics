@@ -3,8 +3,8 @@
 //
 //Based on code from the Fundamental plugins by Andrew Belt and graphics  
 //  from the Component Library by Wes Milholen. 
+//Also based on code from Joel Robichaud's Nohmad Noise module
 //See ./LICENSE.txt for all licenses
-//See ./res/fonts/ for font licenses
 //
 //***********************************************************************************************
 
@@ -13,15 +13,60 @@
 Tout fonctionne comme dans le manuel amis j’ai précisé ici les différente type de buits :
 IL n’y aurai que 4 generateurs :
 1 bruit blanc avec 2 sorties identiques dans la brane inférieure et supérieure
-1 bruit bleu avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté droit et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit 
-1 bruit rouge avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté droit et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit
-1 bruit rose avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté droit et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit
+1 bruit bleu avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté gauche et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit 
+1 bruit rouge avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté gauche et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit
+1 bruit rose avec 4 sorties : 2 identiques dans la brane inférieure et supérieure coté gauche et  2 identiques en phase inversée dans la brane inférieure et supérieure coté droit
 
 Pour les deux sorties « en collision », il faudra qu’elle reçoive un mélange des deux triggers sources. Je ne sais pas quelle est la meilleure technique pour faire ça. Peut-être de la logique booléenne « and » ?
 */
 
 
+#include <dsp/filter.hpp>
+#include <random>
 #include "Geodesics.hpp"
+
+
+// By Joel Robichaud - Nohmad Noise module
+struct NoiseGenerator {
+	std::mt19937 rng;
+	std::uniform_real_distribution<float> uniform;
+
+	NoiseGenerator() : uniform(-1.0f, 1.0f) {
+		rng.seed(std::random_device()());
+	}
+
+	float white() {
+		return uniform(rng);
+	}
+};
+
+
+//*****************************************************************************
+
+
+// By Joel Robichaud - Nohmad Noise module
+struct PinkFilter {
+	float b0, b1, b2, b3, b4, b5, b6; // Coefficients
+	float y; // Out
+
+	void process(float x) {
+		b0 = 0.99886f * b0 + x * 0.0555179f;
+		b1 = 0.99332f * b1 + x * 0.0750759f;
+		b2 = 0.96900f * b2 + x * 0.1538520f;
+		b3 = 0.86650f * b3 + x * 0.3104856f;
+		b4 = 0.55000f * b4 + x * 0.5329522f;
+		b5 = -0.7616f * b5 - x * 0.0168980f;
+		y = b0 + b1 + b2 + b3 + b4 + b5 + b6 + x * 0.5362f;
+		b6 = x * 0.115926f;
+	}
+
+	float pink() {
+		return y;
+	}
+};
+
+
+//*****************************************************************************
 
 
 struct Branes : Module {
@@ -60,6 +105,10 @@ struct Branes : Module {
 	
 	// No need to save, no reset
 	SchmittTrigger sampleTriggers[2];
+	NoiseGenerator whiteNoise;
+	PinkFilter pinkFilter;
+	RCFilter redFilter;
+	RCFilter blueFilter;
 
 	
 	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -69,6 +118,8 @@ struct Branes : Module {
 		// No need to save, no reset		
 		sampleTriggers[0].reset();
 		sampleTriggers[1].reset();
+		redFilter.setCutoff(441.0f / engineGetSampleRate());
+		blueFilter.setCutoff(44100.0f / engineGetSampleRate());
 		
 		onReset();
 	}
@@ -131,7 +182,7 @@ struct Branes : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
-		float noises[5] = {nullNoise, nullNoise, nullNoise, nullNoise, nullNoise};// order is none, white, pink, red, blue
+		float stepNoises[5] = {whiteNoise.white(), nullNoise ,nullNoise, nullNoise, nullNoise};// order is white -1 to 1 reference, white, pink, red, blue
 		
 		bool trigs[2];
 		for (int i = 0; i < 2; i++)		
@@ -144,27 +195,47 @@ struct Branes : Module {
 					if (inputs[IN_INPUTS + sh].active)
 						heldOuts[sh] = inputs[IN_INPUTS + sh].value;
 					else {
-						int noiseIndex = abs( noiseSources[sh] );
-						if (noises[noiseIndex] == nullNoise) {
-							noises[noiseIndex] = randomUniform() * 10.0f - 5.0f; // TODO: support other noises (is white ok using randomUniform()?)
-						}
-						heldOuts[sh] = noises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
+						int noiseIndex = prepareNoise(stepNoises, sh);
+						heldOuts[sh] = stepNoises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
 					}
 				}
 			}
 			else { // no trig connected
 				if (inputs[IN_INPUTS + sh].active) {
-					// ?? (not specified in documentation
+					heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig
 				}
 				else {
-					// Same code as the else active above (get a noise sample)
+					int noiseIndex = prepareNoise(stepNoises, sh);
+					heldOuts[sh] = stepNoises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
 				}
 			}
 			outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
 		}
 		
 	}// step()
-
+	
+	int prepareNoise(float* stepNoises, int sh) {
+		int noiseIndex = abs( noiseSources[sh] );
+		if (stepNoises[noiseIndex] == nullNoise) {
+			switch (noiseIndex) {
+				case (PINK) :
+					stepNoises[noiseIndex] = 5.0f * clamp(0.18f * pinkFilter.pink(), -1.0f, 1.0f);
+				break;
+				case (RED) :
+					redFilter.process(stepNoises[0]);
+					stepNoises[noiseIndex] = 5.0f * clamp(7.8f * redFilter.lowpass(), -1.0f, 1.0f);
+				break;
+				case (BLUE) :
+					blueFilter.process(pinkFilter.pink());
+					stepNoises[noiseIndex] = 5.0f * clamp(0.64f * blueFilter.highpass(), -1.0f, 1.0f);
+				break;
+				default ://(WHITE)
+					stepNoises[noiseIndex] = stepNoises[0] * 5.0f;
+				break;
+			}
+		}
+		return noiseIndex;
+	}
 };
 
 
