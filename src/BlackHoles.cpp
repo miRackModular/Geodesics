@@ -233,7 +233,7 @@ struct BlackHolesWidget : ModuleWidget {
 	BlackHolesWidget(BlackHoles *module) : ModuleWidget(module) {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHoles.svg")));
+        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHolesBG-01.svg")));
         //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BlackHolesFull.svg")));// no dark pannel for now
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;

@@ -119,7 +119,12 @@ struct GeoRedLight : GeoGrayModuleLight {
 		addBaseColor(COLOR_RED);
 	}
 };
-
+struct GeoWhiteRedLight : GeoGrayModuleLight {
+	GeoWhiteRedLight() {
+		addBaseColor(COLOR_WHITE);
+		addBaseColor(COLOR_RED);
+	}
+};
 
 
 // Other

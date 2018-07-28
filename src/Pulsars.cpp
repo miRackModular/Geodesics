@@ -433,7 +433,7 @@ struct PulsarsWidget : ModuleWidget {
 	PulsarsWidget(Pulsars *module) : ModuleWidget(module) {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/Pulsars.svg")));
+        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/PulsarsBG-01.svg")));
         //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/Pulsars_dark.svg")));// no dark pannel for now
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;

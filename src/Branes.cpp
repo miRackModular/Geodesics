@@ -73,6 +73,8 @@ struct Branes : Module {
 		NUM_OUTPUTS
 	};
 	enum LightIds {
+		ENUMS(BYPASS_CV_LIGHTS, 2 * 2),// room for white-red
+		ENUMS(BYPASS_TRIG_LIGHTS, 2 * 2),// room for white-red
 		NUM_LIGHTS
 	};
 	
@@ -100,6 +102,7 @@ struct Branes : Module {
 	PinkFilter pinkFilter;
 	RCFilter redFilter;
 	RCFilter blueFilter;
+	float trigLights[2];
 
 	
 	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -110,6 +113,7 @@ struct Branes : Module {
 		for (int i = 0; i < 2; i++) {
 			sampleTriggers[i].reset();
 			trigBypassTriggers[i].reset();
+			trigLights[i] = 0.0f;
 		}
 		redFilter.setCutoff(441.0f / engineGetSampleRate());
 		blueFilter.setCutoff(44100.0f / engineGetSampleRate());
@@ -203,6 +207,8 @@ struct Branes : Module {
 		bool trigInputsActive[2];
 		for (int i = 0; i < 2; i++)	{	
 			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].value);
+			if (trigs[i])
+				trigLights[i] = 1.0f;
 			trigInputsActive[i] = trigBypass[i] ? false : inputs[TRIG_INPUTS + i].active;
 		}
 		
@@ -231,6 +237,17 @@ struct Branes : Module {
 				}
 			}
 			outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
+		}
+		
+		// Lights
+		for (int i = 0; i < 2; i++) {
+			float red = trigBypass[i] ? 1.0f : 0.0f;
+			float white = !trigBypass[i] ? trigLights[i] : 0.0f;
+			lights[BYPASS_CV_LIGHTS + i * 2 + 0].value = white;
+			lights[BYPASS_CV_LIGHTS + i * 2 + 1].value = red;
+			lights[BYPASS_TRIG_LIGHTS + i * 2 + 0].value = white;
+			lights[BYPASS_TRIG_LIGHTS + i * 2 + 1].value = red;
+			trigLights[i] -= (trigLights[i] / lightLambda) * (float)engineGetSampleTime();
 		}
 		
 	}// step()
@@ -310,7 +327,7 @@ struct BranesWidget : ModuleWidget {
 	BranesWidget(Branes *module) : ModuleWidget(module) {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/Branes.svg")));
+        panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BranesBG-01.svg")));
         //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/Branes_dark.svg")));// no dark pannel for now
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;
@@ -320,8 +337,8 @@ struct BranesWidget : ModuleWidget {
 		// part of svg panel, no code required
 		
 		float colRulerCenter = box.size.x / 2.0f;
-		static constexpr float rowRulerHoldA = 125.5;
-		static constexpr float rowRulerHoldB = 254.5f;
+		static constexpr float rowRulerHoldA = 119.5;
+		static constexpr float rowRulerHoldB = 248.5f;
 		static constexpr float radiusIn = 35.0f;
 		static constexpr float radiusOut = 64.0f;
 		static constexpr float offsetIn = 25.0f;
@@ -373,9 +390,21 @@ struct BranesWidget : ModuleWidget {
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 13, &module->panelTheme));
 		
 		
+		static constexpr float rowRulerBypass = 345.5f;
+		
 		// Trigger bypass
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 50, 350), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 50, 350), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		// buttons
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 32.0f, rowRulerBypass), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 32.0f, rowRulerBypass), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		// cv inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 65.0f, rowRulerBypass), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 65.0f, rowRulerBypass), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 1, &module->panelTheme));
+		// LEDs bottom
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 46.5f, rowRulerBypass), module, Branes::BYPASS_CV_LIGHTS + 0 * 2));
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 46.5f, rowRulerBypass), module, Branes::BYPASS_CV_LIGHTS + 1 * 2));
+		// LEDs top
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 5.5f, rowRulerHoldA + 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 5.5f, rowRulerHoldB - 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
 
 	}
 };
