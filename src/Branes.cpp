@@ -319,7 +319,7 @@ struct BranesWidget : ModuleWidget {
 		darkItem->text = darkPanelID;// Geodesics.hpp
 		darkItem->module = module;
 		darkItem->theme = 1;
-		menu->addChild(darkItem);
+		//menu->addChild(darkItem);
 
 		return menu;
 	}	
@@ -328,7 +328,7 @@ struct BranesWidget : ModuleWidget {
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
         panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BranesBG-01.svg")));
-        //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/Branes_dark.svg")));// no dark pannel for now
+        //panel->addPanel(SVG::load(assetPlugin(plugin, "res/light/BranesBG-02.svg")));// no dark pannel for now
         box.size = panel->box.size;
         panel->mode = &module->panelTheme;
         addChild(panel);

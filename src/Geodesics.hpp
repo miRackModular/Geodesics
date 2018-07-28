@@ -25,6 +25,7 @@ extern Plugin *plugin;
 extern Model *modelBlackHoles;
 extern Model *modelPulsars;
 extern Model *modelBranes;
+extern Model *modelIons;
 
 
 
@@ -117,6 +118,11 @@ struct GeoBlueLight : GeoGrayModuleLight {
 struct GeoRedLight : GeoGrayModuleLight {
 	GeoRedLight() {
 		addBaseColor(COLOR_RED);
+	}
+};
+struct GeoYellowLight : GeoGrayModuleLight {
+	GeoYellowLight() {
+		addBaseColor(COLOR_YELLOW);
 	}
 };
 struct GeoWhiteRedLight : GeoGrayModuleLight {
