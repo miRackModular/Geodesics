@@ -28,7 +28,7 @@ struct Ions : Module {
 		ENUMS(CLK_INPUTS, 2),
 		RUN_INPUT,
 		RESET_INPUT,
-		PROB_INPUT,
+		PROB_INPUT,// CV_value/10  is added to PROB_PARAM, which is a 0 to 1 knob
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -51,19 +51,21 @@ struct Ions : Module {
 	
 	// Constants
 	static constexpr float clockIgnoreOnResetDuration = 0.001f;// disable clock on powerup and reset for 1 ms (so that the first step plays)
+	const int cvMap[2][16] = {{0, 1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14},
+										 {0, 8, 9 ,10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7}};
 
 	// Need to save, with reset
 	bool running;
-	int stepIndexBlue;
-	int stepIndexYellow;
-	int stateBlue;
-	int stateYellow;
+	int stepIndexes[2];// position of electrons (sequencers)
+	int states[2];// which clocks to use
+	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
 	bool leap;
 	
 	
 	// Need to save, no reset
 	int panelTheme;
 	bool resetOnRun;
+	bool quantize;
 	
 	// No need to save, with reset
 	long clockIgnoreOnReset;
@@ -75,13 +77,19 @@ struct Ions : Module {
 	SchmittTrigger clocksTriggers[2];
 	SchmittTrigger resetTrigger;
 	SchmittTrigger stateTriggers[2];
+	SchmittTrigger octTriggers[2];
 	SchmittTrigger leapTrigger;
 
+	
+	inline float quantizeCV(float cv, bool enable) {return enable ? (roundf(cv * 12.0f) / 12.0f) : cv;}
+	inline bool jumpRandom() {return (randomUniform() < (params[PROB_PARAM].value + inputs[PROB_INPUT].value / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
+	
 	
 	Ions() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
 		resetOnRun = false;
+		quantize = true;
 		
 		// No need to save, no reset		
 		runningTrigger.reset();
@@ -89,6 +97,7 @@ struct Ions : Module {
 		for (int i = 0; i < 2; i++) {
 			clocksTriggers[i].reset();
 			stateTriggers[i].reset();
+			octTriggers[i].reset();
 		}
 		resetTrigger.reset();
 		leapTrigger.reset();
@@ -105,8 +114,10 @@ struct Ions : Module {
 	void onReset() override {
 		// Need to save, with reset
 		running = false;
-		stateBlue = 0;
-		stateYellow = 0;
+		for (int i = 0; i < 2; i++) {
+			states[i] = 0;
+			ranges[i] = 1;
+		}
 		leap = false;
 		initRun(true);
 		
@@ -120,12 +131,14 @@ struct Ions : Module {
 	void onRandomize() override {
 		// Need to save, with reset
 		running = false;
-		stateBlue = randomu32() % 3;
-		stateYellow = randomu32() % 3;
+		for (int i = 0; i < 2; i++) {
+			states[i] = randomu32() % 3;
+			ranges[i] = randomu32() % 3;
+		}
 		leap = (randomu32() % 2) > 0;
 		initRun(true);
-		stepIndexBlue = randomu32() % 16;
-		stepIndexYellow = randomu32() % 16;
+		stepIndexes[0] = randomu32() % 16;
+		stepIndexes[1] = randomu32() % 16;
 		
 		// No need to save, with reset
 		// none
@@ -134,8 +147,8 @@ struct Ions : Module {
 
 	void initRun(bool hard) {// run button activated or run edge in run input jack
 		if (hard) {
-			stepIndexBlue = 0;
-			stepIndexYellow = 0;
+			stepIndexes[0] = 0;
+			stepIndexes[1] = 0;
 		}
 		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		resetLight = 0.0f;
@@ -152,20 +165,23 @@ struct Ions : Module {
 		// resetOnRun
 		json_object_set_new(rootJ, "resetOnRun", json_boolean(resetOnRun));
 		
+		// quantize
+		json_object_set_new(rootJ, "quantize", json_boolean(quantize));
+		
 		// running
 		json_object_set_new(rootJ, "running", json_boolean(running));
 
-		// stepIndexBlue
-		json_object_set_new(rootJ, "stepIndexBlue", json_integer(stepIndexBlue));
+		// stepIndexes
+		json_object_set_new(rootJ, "stepIndexes0", json_integer(stepIndexes[0]));
+		json_object_set_new(rootJ, "stepIndexes1", json_integer(stepIndexes[1]));
 
-		// stepIndexYellow
-		json_object_set_new(rootJ, "stepIndexYellow", json_integer(stepIndexYellow));
+		// states
+		json_object_set_new(rootJ, "states0", json_integer(states[0]));
+		json_object_set_new(rootJ, "states1", json_integer(states[1]));
 
-		// stateBlue
-		json_object_set_new(rootJ, "stateBlue", json_integer(stateBlue));
-
-		// stateYellow
-		json_object_set_new(rootJ, "stateYellow", json_integer(stateYellow));
+		// ranges
+		json_object_set_new(rootJ, "ranges0", json_integer(ranges[0]));
+		json_object_set_new(rootJ, "ranges1", json_integer(ranges[1]));
 
 		// leap
 		json_object_set_new(rootJ, "leap", json_boolean(leap));
@@ -189,30 +205,39 @@ struct Ions : Module {
 		if (resetOnRunJ)
 			resetOnRun = json_is_true(resetOnRunJ);
 
+		// quantize
+		json_t *quantizeJ = json_object_get(rootJ, "quantize");
+		if (quantizeJ)
+			quantize = json_is_true(quantizeJ);
+
 		// running
 		json_t *runningJ = json_object_get(rootJ, "running");
 		if (runningJ)
 			running = json_is_true(runningJ);
 
-		// stepIndexBlue
-		json_t *stepIndexBlueJ = json_object_get(rootJ, "stepIndexBlue");
-		if (stepIndexBlueJ)
-			stepIndexBlue = json_integer_value(stepIndexBlueJ);
+		// stepIndexes
+		json_t *stepIndexes0J = json_object_get(rootJ, "stepIndexes0");
+		if (stepIndexes0J)
+			stepIndexes[0] = json_integer_value(stepIndexes0J);
+		json_t *stepIndexes1J = json_object_get(rootJ, "stepIndexes1");
+		if (stepIndexes1J)
+			stepIndexes[1] = json_integer_value(stepIndexes1J);
 
-		// stateBlue
-		json_t *stateBlueJ = json_object_get(rootJ, "stateBlue");
-		if (stateBlueJ)
-			stateBlue = json_integer_value(stateBlueJ);
+		// states
+		json_t *states0J = json_object_get(rootJ, "states0");
+		if (states0J)
+			states[0] = json_integer_value(states0J);
+		json_t *states1J = json_object_get(rootJ, "states1");
+		if (states1J)
+			states[1] = json_integer_value(states1J);
 
-		// stepIndexYellow
-		json_t *stepIndexYellowJ = json_object_get(rootJ, "stepIndexYellow");
-		if (stepIndexYellowJ)
-			stepIndexYellow = json_integer_value(stepIndexYellowJ);
-
-		// stateYellow
-		json_t *stateYellowJ = json_object_get(rootJ, "stateYellow");
-		if (stateYellowJ)
-			stateYellow = json_integer_value(stateYellowJ);
+		// ranges
+		json_t *ranges0J = json_object_get(rootJ, "ranges0");
+		if (ranges0J)
+			ranges[0] = json_integer_value(ranges0J);
+		json_t *ranges1J = json_object_get(rootJ, "ranges1");
+		if (ranges1J)
+			ranges[1] = json_integer_value(ranges1J);
 
 		// leap
 		json_t *leapJ = json_object_get(rootJ, "leap");
@@ -243,45 +268,42 @@ struct Ions : Module {
 		}
 
 		// State buttons and CV inputs
-		// Blue state
-		if (stateTriggers[0].process(params[STATE_PARAMS + 0].value + inputs[CLK_INPUTS + 0].value)) {
-			stateBlue ++;
-			if (stateBlue >= 3)
-				stateBlue = 0;
+		for (int i = 0; i < 2; i++) {
+			if (stateTriggers[i].process(params[STATE_PARAMS + i].value)) {
+				states[i]++;
+				if (states[i] >= 3)
+					states[i] = 0;
+			}
 		}
-		// Yellow state
-		if (stateTriggers[1].process(params[STATE_PARAMS + 1].value + inputs[CLK_INPUTS + 1].value)) {
-			stateYellow ++;
-			if (stateYellow >= 3)
-				stateYellow = 0;
+		
+		// Range buttons
+		for (int i = 0; i < 2; i++) {
+			if (octTriggers[i].process(params[OCT_PARAMS + i].value)) {
+				ranges[i]++;
+				if (ranges[i] >= 3)
+					ranges[i] = 0;
+			}
 		}
+
 		
 
 		//********** Clock and reset **********
 		
-		// Clock
+		// Clocks
 		bool globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].value);
-		bool blueClockTrig = clocksTriggers[0].process(inputs[CLK_INPUTS + 0].value);
-		bool yellowClockTrig = clocksTriggers[1].process(inputs[CLK_INPUTS + 1].value);
-		if (globalClockTrig || (blueClockTrig && stateBlue >= 1)) {
-			if (running && clockIgnoreOnReset == 0l) {
-				/*int base = stepIndexBlue & 0x8; // 0 or 8
-				int step8 = stepIndexBlue & 0x7; // 0 to 7
-				step8++;
-				
-				if ( (step8 == 8 || leap) && inputs[PROB_PARAM].value > 0.5f) {
-					base = 8 - base;// change atom
-				}*/
-				stepIndexBlue++;
-				if (stepIndexBlue >= 16)
-					stepIndexBlue = 0;
-			}
-		}
-		if (globalClockTrig || (yellowClockTrig && stateYellow >= 1)) {
-			if (running && clockIgnoreOnReset == 0l) {
-				stepIndexYellow++;
-				if (stepIndexYellow >= 16)
-					stepIndexYellow = 0;
+		for (int i = 0; i < 2; i++) {
+			bool localClockTrig = clocksTriggers[i].process(inputs[CLK_INPUTS + i].value);
+			if (globalClockTrig || (localClockTrig && states[i] >= 1)) {
+				if (running && clockIgnoreOnReset == 0l) {
+					int base = stepIndexes[i] & 0x8;// 0 or 8
+					int step8 = stepIndexes[i] & 0x7;// 0 to 7
+					if ( (step8 == 7 || leap) && jumpRandom() )
+						base = 8 - base;// change atom
+					step8++;
+					if (step8 > 7)
+						step8 = 0;
+					stepIndexes[i] = base | step8;
+				}
 			}
 		}
 		
@@ -297,10 +319,18 @@ struct Ions : Module {
 		
 		//********** Outputs and lights **********
 
+		// Outputs
+		for (int i = 0; i < 2; i++) {
+			float knobVal = params[CV_PARAMS + cvMap[i][stepIndexes[i]]].value;
+			float cv = (knobVal * (float)(ranges[i] * 2 + 1) - (float)ranges[i]);
+			cv = quantizeCV(cv, quantize);
+			outputs[SEQ_OUTPUTS + i].value = cv;
+		}
+		
 		// Blue and Yellow lights
 		for (int i = 0; i < 16; i++) {
-			lights[BLUE_LIGHTS + i].value = (stepIndexBlue == i ? 1.0f : 0.0f);
-			lights[YELLOW_LIGHTS + i].value = (stepIndexYellow == i ? 1.0f : 0.0f);
+			lights[BLUE_LIGHTS + i].value = (stepIndexes[0] == i ? 1.0f : 0.0f);
+			lights[YELLOW_LIGHTS + i].value = (stepIndexes[1] == i ? 1.0f : 0.0f);
 		}
 		
 		// Reset light
@@ -310,13 +340,20 @@ struct Ions : Module {
 		lights[RUN_LIGHT].value = running ? 1.0f : 0.0f;
 
 		// State lights
-		lights[GLOBAL_LIGHTS + 0].value = (stateBlue & 0x1) == 0 ? 1.0f : 0.0f;
-		lights[GLOBAL_LIGHTS + 1].value = (stateYellow & 0x1) == 0 ? 1.0f : 0.0f;
-		lights[LOCAL_LIGHTS + 0].value = stateBlue >= 1 ? 1.0f : 0.0f;
-		lights[LOCAL_LIGHTS + 1].value = stateYellow >= 1 ? 1.0f : 0.0f;
+		for (int i = 0; i < 2; i++) {
+			lights[GLOBAL_LIGHTS + i].value = (states[i] & 0x1) == 0 ? 1.0f : 0.0f;
+			lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 1.0f : 0.0f;
+		}
 		
 		// Leap light
 		lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
+		
+		// Range lights
+		for (int i = 0; i < 3; i++) {
+			lights[OCTA_LIGHTS + i].value = (i <= ranges[0] ? 1.0f : 0.0f);
+			lights[OCTB_LIGHTS + i].value = (i <= ranges[1] ? 1.0f : 0.0f);
+		}
+
 		
 		if (clockIgnoreOnReset > 0l)
 			clockIgnoreOnReset--;
@@ -340,6 +377,12 @@ struct IonsWidget : ModuleWidget {
 		Ions *module;
 		void onAction(EventAction &e) override {
 			module->resetOnRun = !module->resetOnRun;
+		}
+	};
+	struct QuantizeItem : MenuItem {
+		Ions *module;
+		void onAction(EventAction &e) override {
+			module->quantize = !module->quantize;
 		}
 	};
 	Menu *createContextMenu() override {
@@ -377,6 +420,10 @@ struct IonsWidget : ModuleWidget {
 		rorItem->module = module;
 		menu->addChild(rorItem);
 
+		QuantizeItem *qtzItem = MenuItem::create<QuantizeItem>("Plank Constant (Quantize)", CHECKMARK(module->quantize));
+		qtzItem->module = module;
+		menu->addChild(qtzItem);
+
 		return menu;
 	}	
 	
@@ -407,22 +454,22 @@ struct IonsWidget : ModuleWidget {
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerAtomB), Port::OUTPUT, module, Ions::SEQ_OUTPUTS + 1, &module->panelTheme));		
 		
 		// CV knobs
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerAtomA + radius3 + 2.0f), module, Ions::CV_PARAMS + 0, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomA + offset3), module, Ions::CV_PARAMS + 1, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius3, rowRulerAtomA), module, Ions::CV_PARAMS + 2, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomA - offset3), module, Ions::CV_PARAMS + 3, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerAtomA - radius3), module, Ions::CV_PARAMS + 4, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomA - offset3), module, Ions::CV_PARAMS + 5, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius3, rowRulerAtomA), module, Ions::CV_PARAMS + 6, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomA + offset3), module, Ions::CV_PARAMS + 7, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerAtomA + radius3 + 2.0f), module, Ions::CV_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomA + offset3), module, Ions::CV_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius3, rowRulerAtomA), module, Ions::CV_PARAMS + 2, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomA - offset3), module, Ions::CV_PARAMS + 3, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerAtomA - radius3), module, Ions::CV_PARAMS + 4, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomA - offset3), module, Ions::CV_PARAMS + 5, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius3, rowRulerAtomA), module, Ions::CV_PARAMS + 6, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomA + offset3), module, Ions::CV_PARAMS + 7, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		//
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomB - offset3), module, Ions::CV_PARAMS + 8, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius3, rowRulerAtomB), module, Ions::CV_PARAMS + 9, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomB + offset3), module, Ions::CV_PARAMS + 10, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerAtomB + radius3), module, Ions::CV_PARAMS + 11, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomB + offset3), module, Ions::CV_PARAMS + 12, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius3, rowRulerAtomB), module, Ions::CV_PARAMS + 13, -1.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomB - offset3), module, Ions::CV_PARAMS + 14, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomB - offset3), module, Ions::CV_PARAMS + 8, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius3, rowRulerAtomB), module, Ions::CV_PARAMS + 9, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerAtomB + offset3), module, Ions::CV_PARAMS + 10, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerAtomB + radius3), module, Ions::CV_PARAMS + 11, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomB + offset3), module, Ions::CV_PARAMS + 12, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius3, rowRulerAtomB), module, Ions::CV_PARAMS + 13, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerAtomB - offset3), module, Ions::CV_PARAMS + 14, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
 		// Prob knob and CV inuput
 		float probX = colRulerCenter + 2.0f * offset3;
@@ -476,23 +523,23 @@ struct IonsWidget : ModuleWidget {
 		
 		// Yellow electron lights
 		// bottom yellow
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomB - radius2), module, Ions::BLUE_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset2, rowRulerAtomB - offset2), module, Ions::BLUE_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + radius2, rowRulerAtomB), module, Ions::BLUE_LIGHTS + 2));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset2, rowRulerAtomB + offset2), module, Ions::BLUE_LIGHTS + 3));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomB + radius2), module, Ions::BLUE_LIGHTS + 4));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset2, rowRulerAtomB + offset2), module, Ions::BLUE_LIGHTS + 5));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - radius2, rowRulerAtomB), module, Ions::BLUE_LIGHTS + 6));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset2, rowRulerAtomB - offset2), module, Ions::BLUE_LIGHTS + 7));		
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomB - radius2), module, Ions::YELLOW_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset2, rowRulerAtomB - offset2), module, Ions::YELLOW_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + radius2, rowRulerAtomB), module, Ions::YELLOW_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset2, rowRulerAtomB + offset2), module, Ions::YELLOW_LIGHTS + 3));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomB + radius2), module, Ions::YELLOW_LIGHTS + 4));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset2, rowRulerAtomB + offset2), module, Ions::YELLOW_LIGHTS + 5));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - radius2, rowRulerAtomB), module, Ions::YELLOW_LIGHTS + 6));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset2, rowRulerAtomB - offset2), module, Ions::YELLOW_LIGHTS + 7));		
 		// top yellow
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomA + radius1), module, Ions::BLUE_LIGHTS + 8));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset1, rowRulerAtomA + offset1), module, Ions::BLUE_LIGHTS + 9));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + radius1, rowRulerAtomA), module, Ions::BLUE_LIGHTS + 10));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset1, rowRulerAtomA - offset1), module, Ions::BLUE_LIGHTS + 11));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomA - radius1), module, Ions::BLUE_LIGHTS + 12));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset1, rowRulerAtomA - offset1), module, Ions::BLUE_LIGHTS + 13));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - radius1, rowRulerAtomA), module, Ions::BLUE_LIGHTS + 14));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset1, rowRulerAtomA + offset1), module, Ions::BLUE_LIGHTS + 15));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomA + radius1), module, Ions::YELLOW_LIGHTS + 8));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset1, rowRulerAtomA + offset1), module, Ions::YELLOW_LIGHTS + 9));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + radius1, rowRulerAtomA), module, Ions::YELLOW_LIGHTS + 10));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + offset1, rowRulerAtomA - offset1), module, Ions::YELLOW_LIGHTS + 11));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter, rowRulerAtomA - radius1), module, Ions::YELLOW_LIGHTS + 12));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset1, rowRulerAtomA - offset1), module, Ions::YELLOW_LIGHTS + 13));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - radius1, rowRulerAtomA), module, Ions::YELLOW_LIGHTS + 14));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset1, rowRulerAtomA + offset1), module, Ions::YELLOW_LIGHTS + 15));
 
 		// Run jack, light and button
 		static constexpr float rowRulerRunJack = 343.12f;
@@ -532,20 +579,4 @@ Model *modelIons = Model::create<Ions, IonsWidget>("Geodesics", "Ions", "Ions", 
 0.6.0:
 created
 
-*/
-
-
-/*
-
-Tout fonctionne comme dans le manuel, il y a juste quelques détails qui changent :
-Le state clock a 3 états : global, local, et global + local ( 2 clock a la fois comme dans branes)
-Le run et reset expériment ont leur bouton et cv propres, ils contrôlent les deux séquenceur à la fois.
-Pour « energy » qui est en fait le range de la séquence, il n’est pas liés au knob, mais au séquences, la séquence bleu peut avoir un range différent que la séquence jaune, même en passant par les mêmes knob, je ne sais pas si c’est possible
- 
-energy à 3 états
-o o O o o : range un octave
-o O O O o : range trois octaves
-O O O O O : range cinq octaves
- 
-J’ai mis ci-joint une version des leds en couleur pour que tu puisse t’y retrouve
 */
