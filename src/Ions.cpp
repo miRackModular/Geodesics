@@ -52,7 +52,7 @@ struct Ions : Module {
 	// Constants
 	static constexpr float clockIgnoreOnResetDuration = 0.001f;// disable clock on powerup and reset for 1 ms (so that the first step plays)
 	const int cvMap[2][16] = {{0, 1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14},
-										 {0, 8, 9 ,10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7}};
+							  {0, 8, 9 ,10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7}};// map each of the 16 steps of a sequence step to a CV knob index (0-14)
 
 	// Need to save, with reset
 	bool running;
@@ -66,6 +66,7 @@ struct Ions : Module {
 	int panelTheme;
 	bool resetOnRun;
 	bool quantize;
+	bool symmetry;
 	
 	// No need to save, with reset
 	long clockIgnoreOnReset;
@@ -90,6 +91,7 @@ struct Ions : Module {
 		panelTheme = 0;
 		resetOnRun = false;
 		quantize = true;
+		symmetry = false;
 		
 		// No need to save, no reset		
 		runningTrigger.reset();
@@ -168,6 +170,9 @@ struct Ions : Module {
 		// quantize
 		json_object_set_new(rootJ, "quantize", json_boolean(quantize));
 		
+		// symmetry
+		json_object_set_new(rootJ, "symmetry", json_boolean(symmetry));
+		
 		// running
 		json_object_set_new(rootJ, "running", json_boolean(running));
 
@@ -210,6 +215,11 @@ struct Ions : Module {
 		if (quantizeJ)
 			quantize = json_is_true(quantizeJ);
 
+		// symmetry
+		json_t *symmetryJ = json_object_get(rootJ, "symmetry");
+		if (symmetryJ)
+			symmetry = json_is_true(symmetryJ);
+
 		// running
 		json_t *runningJ = json_object_get(rootJ, "running");
 		if (runningJ)
@@ -251,8 +261,6 @@ struct Ions : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {	
-
-
 		//********** Buttons, knobs, switches and inputs **********
 	
 		// Run button
@@ -306,6 +314,8 @@ struct Ions : Module {
 				}
 			}
 		}
+		if (symmetry)
+			stepIndexes[1] = stepIndexes[0];
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
@@ -385,6 +395,12 @@ struct IonsWidget : ModuleWidget {
 			module->quantize = !module->quantize;
 		}
 	};
+	struct SymmetryItem : MenuItem {
+		Ions *module;
+		void onAction(EventAction &e) override {
+			module->symmetry = !module->symmetry;
+		}
+	};
 	Menu *createContextMenu() override {
 		Menu *menu = ModuleWidget::createContextMenu();
 
@@ -416,13 +432,17 @@ struct IonsWidget : ModuleWidget {
 		settingsLabel->text = "Settings";
 		menu->addChild(settingsLabel);
 		
-		ResetOnRunItem *rorItem = MenuItem::create<ResetOnRunItem>("Reset on Run", CHECKMARK(module->resetOnRun));
-		rorItem->module = module;
-		menu->addChild(rorItem);
-
 		QuantizeItem *qtzItem = MenuItem::create<QuantizeItem>("Plank Constant (Quantize)", CHECKMARK(module->quantize));
 		qtzItem->module = module;
 		menu->addChild(qtzItem);
+
+		SymmetryItem *symItem = MenuItem::create<SymmetryItem>("Supersymmetry", CHECKMARK(module->symmetry));
+		symItem->module = module;
+		menu->addChild(symItem);
+
+		ResetOnRunItem *rorItem = MenuItem::create<ResetOnRunItem>("Reset on Run", CHECKMARK(module->resetOnRun));
+		rorItem->module = module;
+		menu->addChild(rorItem);
 
 		return menu;
 	}	
@@ -495,11 +515,11 @@ struct IonsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(octX + 5.0f, octYA + 14.0f), module, Ions::OCTA_LIGHTS + 2));		
 		// bottom:
 		addParam(createDynamicParam<GeoPushButton>(Vec(octX, octYB), module, Ions::OCT_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 13.0f, octYB - 7.0f), module, Ions::OCTA_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 14.0f, octYB + 4.0f), module, Ions::OCTA_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 6.0f, octYB - 14.0f), module, Ions::OCTA_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 7.0f, octYB + 12.0f), module, Ions::OCTA_LIGHTS + 2));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX + 5.0f, octYB - 14.0f), module, Ions::OCTA_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 13.0f, octYB - 7.0f), module, Ions::OCTB_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 14.0f, octYB + 4.0f), module, Ions::OCTB_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 6.0f, octYB - 14.0f), module, Ions::OCTB_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 7.0f, octYB + 12.0f), module, Ions::OCTB_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX + 5.0f, octYB - 14.0f), module, Ions::OCTB_LIGHTS + 2));
 		
 		// Blue electron lights
 		// top blue

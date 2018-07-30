@@ -26,6 +26,8 @@ extern Model *modelBlackHoles;
 extern Model *modelPulsars;
 extern Model *modelBranes;
 extern Model *modelIons;
+extern Model *modelBlankLogo;
+extern Model *modelBlankInfo;
 
 
 

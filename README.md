@@ -24,7 +24,7 @@ Here are the modules.
 
 * [Ions](#ions): Atomic Dual Sequencer.
 
-Details about each module are given below.
+Details about each module are given in the [user manual](GeodesicsUserManualBeta.pdf).
 
 
 
