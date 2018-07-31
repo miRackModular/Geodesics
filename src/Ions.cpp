@@ -1,5 +1,5 @@
 //***********************************************************************************************
-//Atomic Dual Sequencer module for VCV Rack by Pierre Collard and Marc Boulé
+//Atomic Duophonic Voltage Sequencer module for VCV Rack by Pierre Collard and Marc Boulé
 //
 //Based on code from the Fundamental plugins by Andrew Belt and graphics  
 //  from the Component Library by Wes Milholen. 
@@ -301,7 +301,7 @@ struct Ions : Module {
 		bool globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].value);
 		for (int i = 0; i < 2; i++) {
 			bool localClockTrig = clocksTriggers[i].process(inputs[CLK_INPUTS + i].value);
-			if (globalClockTrig || (localClockTrig && states[i] >= 1)) {
+			if ((globalClockTrig && ((states[i] & 0x1) == 0)) || (localClockTrig && states[i] >= 1)) {
 				if (running && clockIgnoreOnReset == 0l) {
 					int base = stepIndexes[i] & 0x8;// 0 or 8
 					int step8 = stepIndexes[i] & 0x7;// 0 to 7

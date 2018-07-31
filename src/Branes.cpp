@@ -1,5 +1,5 @@
 //***********************************************************************************************
-//Colliding Sample-and-Hold module for VCV Rack by Pierre Collard and Marc Boulé
+//Colliding Sample and Hold module for VCV Rack by Pierre Collard and Marc Boulé
 //
 //Based on code from the Fundamental plugins by Andrew Belt and graphics  
 //  from the Component Library by Wes Milholen. 

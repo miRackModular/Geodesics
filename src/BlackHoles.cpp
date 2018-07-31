@@ -1,5 +1,5 @@
 //***********************************************************************************************
-//Gravitational Attenumixer module for VCV Rack by Pierre Collard and Marc Boulé
+//Gravitational Voltage Controled Amplifiers module for VCV Rack by Pierre Collard and Marc Boulé
 //
 //Based on code from the Fundamental plugins by Andrew Belt and graphics  
 //  from the Component Library by Wes Milholen. 
