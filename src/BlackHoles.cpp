@@ -20,7 +20,7 @@ struct BlackHoles : Module {
 	};
 	enum InputIds {
 		ENUMS(IN_INPUTS, 8),// -10 to 10 V 
-		ENUMS(LEVELCV_INPUTS, 8),// 0 to 10V CV
+		ENUMS(LEVELCV_INPUTS, 8),// 0 to 10V CV or -5 to 5V depeding on cvMode
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -42,6 +42,7 @@ struct BlackHoles : Module {
 	
 	// Need to save, no reset
 	int panelTheme;
+	int cvMode;
 	
 	// No need to save, with reset
 	// none
@@ -53,6 +54,8 @@ struct BlackHoles : Module {
 	BlackHoles() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
+		cvMode = 0;// 0 is -5v to 5v, 1 is 0v to 10v
+
 		// No need to save, no reset		
 		expTriggers[0].reset();
 		expTriggers[1].reset();
@@ -99,6 +102,9 @@ struct BlackHoles : Module {
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
+		// cvMode
+		json_object_set_new(rootJ, "cvMode", json_integer(cvMode));
+
 		return rootJ;
 	}
 
@@ -120,6 +126,11 @@ struct BlackHoles : Module {
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
 			panelTheme = json_integer_value(panelThemeJ);
+
+		// cvMode
+		json_t *cvModeJ = json_object_get(rootJ, "cvMode");
+		if (cvModeJ)
+			cvMode = json_integer_value(cvModeJ);
 
 		// No need to save, with reset
 		// none
@@ -176,7 +187,7 @@ struct BlackHoles : Module {
 	}// step()
 	
 	float calcChannel(float in, Param &level, Input &levelCV, bool isExp) {
-		float levCv = levelCV.active ? (levelCV.value / 5.0f - 1.0f) : 0.0f;
+		float levCv = levelCV.active ? (levelCV.value / 5.0f - (cvMode != 0 ? 1.0f : 0.0f)) : 0.0f;
 		float lev = clamp(level.value + levCv, -1.0f, 1.0f);
 		if (isExp) {
 			float newlev = rescale(powf(expBase, fabs(lev)), 1.0f, expBase, 0.0f, 1.0f);
@@ -200,6 +211,16 @@ struct BlackHolesWidget : ModuleWidget {
 		}
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
+		}
+	};
+	struct CVModeItem : MenuItem {
+		BlackHoles *module;
+		int modecv;
+		void onAction(EventAction &e) override {
+			module->cvMode = modecv;
+		}
+		void step() override {
+			rightText = (module->cvMode == modecv) ? "✔" : "";
 		}
 	};
 	Menu *createContextMenu() override {
@@ -226,6 +247,24 @@ struct BlackHolesWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		//menu->addChild(darkItem);
+
+		menu->addChild(new MenuLabel());// empty line
+		
+		MenuLabel *settingsLabel = new MenuLabel();
+		settingsLabel->text = "MC2 input CV levels";
+		menu->addChild(settingsLabel);
+		
+		CVModeItem *bipolItem = new CVModeItem();
+		bipolItem->text = "Bipolar: -5V to 5V";
+		bipolItem->module = module;
+		bipolItem->modecv = 0;
+		menu->addChild(bipolItem);
+
+		CVModeItem *unipolItem = new CVModeItem();
+		unipolItem->text = "Unipolar: 0V to 10V";
+		unipolItem->module = module;
+		unipolItem->modecv = 1;
+		menu->addChild(unipolItem);
 
 		return menu;
 	}	
@@ -318,6 +357,9 @@ struct BlackHolesWidget : ModuleWidget {
 Model *modelBlackHoles = Model::create<BlackHoles, BlackHolesWidget>("Geodesics", "BlackHoles", "BlackHoles", AMPLIFIER_TAG);
 
 /*CHANGE LOG
+
+0.6.1:
+add bipol right click menu option for knob CVs
 
 0.6.0:
 created

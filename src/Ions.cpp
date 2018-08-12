@@ -21,6 +21,10 @@ struct Ions : Module {
 		ENUMS(OCT_PARAMS, 2),
 		LEAP_PARAM,
 		ENUMS(STATE_PARAMS, 2),// 3 states : global, local, global+local
+		PLANK_PARAM,
+		UNCERTANTY_PARAM,
+		RESETONRUN_PARAM,
+		STEPCLOCKS_PARAM,
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -33,6 +37,7 @@ struct Ions : Module {
 	};
 	enum OutputIds {
 		ENUMS(SEQ_OUTPUTS, 2),
+		ENUMS(JUMP_OUTPUTS, 2),
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -45,6 +50,11 @@ struct Ions : Module {
 		LEAP_LIGHT,
 		ENUMS(OCTA_LIGHTS, 3),// 0 is center, 1 is inside mirrors, 2 is outside mirrors
 		ENUMS(OCTB_LIGHTS, 3),
+		PLANK_LIGHT,
+		UNCERTANTY_LIGHT,
+		ENUMS(JUMP_LIGHTS, 2),
+		RESETONRUN_LIGHT,
+		STEPCLOCKS_LIGHT,
 		NUM_LIGHTS
 	};
 	
@@ -56,6 +66,10 @@ struct Ions : Module {
 
 	// Need to save, with reset
 	bool running;
+	bool resetOnRun;
+	bool quantize;// a.k.a. plank constant
+	//bool symmetry;
+	bool uncertanty;
 	int stepIndexes[2];// position of electrons (sequencers)
 	int states[2];// which clocks to use
 	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
@@ -64,9 +78,6 @@ struct Ions : Module {
 	
 	// Need to save, no reset
 	int panelTheme;
-	bool resetOnRun;
-	bool quantize;
-	bool symmetry;
 	
 	// No need to save, with reset
 	long clockIgnoreOnReset;
@@ -80,6 +91,13 @@ struct Ions : Module {
 	SchmittTrigger stateTriggers[2];
 	SchmittTrigger octTriggers[2];
 	SchmittTrigger leapTrigger;
+	SchmittTrigger plankTrigger;
+	SchmittTrigger uncertantyTrigger;
+	SchmittTrigger resetOnRunTrigger;
+	SchmittTrigger stepClocksTrigger;
+	PulseGenerator jumpPulses[2];
+	float jumpLights[2];
+	float stepClocksLight;
 
 	
 	inline float quantizeCV(float cv, bool enable) {return enable ? (roundf(cv * 12.0f) / 12.0f) : cv;}
@@ -89,9 +107,6 @@ struct Ions : Module {
 	Ions() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
-		resetOnRun = false;
-		quantize = true;
-		symmetry = false;
 		
 		// No need to save, no reset		
 		runningTrigger.reset();
@@ -100,9 +115,16 @@ struct Ions : Module {
 			clocksTriggers[i].reset();
 			stateTriggers[i].reset();
 			octTriggers[i].reset();
+			jumpPulses[i].reset();
+			jumpLights[i] = 0.0f;
 		}
+		stepClocksLight = 0.0f;
 		resetTrigger.reset();
 		leapTrigger.reset();
+		plankTrigger.reset();
+		uncertantyTrigger.reset();
+		resetOnRunTrigger.reset();
+		stepClocksTrigger.reset();
 		
 		onReset();
 	}
@@ -116,6 +138,10 @@ struct Ions : Module {
 	void onReset() override {
 		// Need to save, with reset
 		running = false;
+		resetOnRun = false;
+		quantize = true;
+		//symmetry = false;
+		uncertanty = false;
 		for (int i = 0; i < 2; i++) {
 			states[i] = 0;
 			ranges[i] = 1;
@@ -133,6 +159,10 @@ struct Ions : Module {
 	void onRandomize() override {
 		// Need to save, with reset
 		running = false;
+		resetOnRun = false;
+		quantize = true;
+		//symmetry = false;
+		uncertanty = false;
 		for (int i = 0; i < 2; i++) {
 			states[i] = randomu32() % 3;
 			ranges[i] = randomu32() % 3;
@@ -171,7 +201,10 @@ struct Ions : Module {
 		json_object_set_new(rootJ, "quantize", json_boolean(quantize));
 		
 		// symmetry
-		json_object_set_new(rootJ, "symmetry", json_boolean(symmetry));
+		//json_object_set_new(rootJ, "symmetry", json_boolean(symmetry));
+		
+		// uncertanty
+		json_object_set_new(rootJ, "uncertanty", json_boolean(uncertanty));
 		
 		// running
 		json_object_set_new(rootJ, "running", json_boolean(running));
@@ -216,9 +249,14 @@ struct Ions : Module {
 			quantize = json_is_true(quantizeJ);
 
 		// symmetry
-		json_t *symmetryJ = json_object_get(rootJ, "symmetry");
-		if (symmetryJ)
-			symmetry = json_is_true(symmetryJ);
+		//json_t *symmetryJ = json_object_get(rootJ, "symmetry");
+		//if (symmetryJ)
+			//symmetry = json_is_true(symmetryJ);
+
+		// uncertanty
+		json_t *uncertantyJ = json_object_get(rootJ, "uncertanty");
+		if (uncertantyJ)
+			uncertanty = json_is_true(uncertantyJ);
 
 		// running
 		json_t *runningJ = json_object_get(rootJ, "running");
@@ -261,6 +299,8 @@ struct Ions : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {	
+		float sampleTime = engineGetSampleTime();
+	
 		//********** Buttons, knobs, switches and inputs **********
 	
 		// Run button
@@ -273,6 +313,21 @@ struct Ions : Module {
 		// Leap button
 		if (leapTrigger.process(params[LEAP_PARAM].value)) {
 			leap = !leap;
+		}
+
+		// Plank button (quatize)
+		if (plankTrigger.process(params[PLANK_PARAM].value)) {
+			quantize = !quantize;
+		}
+
+		// Uncertanty button
+		if (uncertantyTrigger.process(params[UNCERTANTY_PARAM].value)) {
+			uncertanty = !uncertanty;// TODO implement this functionality
+		}
+
+		// Reset on Run button
+		if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].value)) {
+			resetOnRun = !resetOnRun;
 		}
 
 		// State buttons and CV inputs
@@ -299,14 +354,18 @@ struct Ions : Module {
 		
 		// Clocks
 		bool globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].value);
+		bool stepClocksTrig = stepClocksTrigger.process(params[STEPCLOCKS_PARAM].value);// TODO
 		for (int i = 0; i < 2; i++) {
 			bool localClockTrig = clocksTriggers[i].process(inputs[CLK_INPUTS + i].value);
 			if ((globalClockTrig && ((states[i] & 0x1) == 0)) || (localClockTrig && states[i] >= 1)) {
 				if (running && clockIgnoreOnReset == 0l) {
 					int base = stepIndexes[i] & 0x8;// 0 or 8
 					int step8 = stepIndexes[i] & 0x7;// 0 to 7
-					if ( (step8 == 7 || leap) && jumpRandom() )
+					if ( (step8 == 7 || leap) && jumpRandom() ) {
 						base = 8 - base;// change atom
+						jumpPulses[i].trigger(0.001f);
+						jumpLights[i] = 1.0f;
+					}
 					step8++;
 					if (step8 > 7)
 						step8 = 0;
@@ -314,8 +373,8 @@ struct Ions : Module {
 				}
 			}
 		}
-		if (symmetry)
-			stepIndexes[1] = stepIndexes[0];
+		//if (symmetry)
+			//stepIndexes[1] = stepIndexes[0];
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
@@ -324,7 +383,7 @@ struct Ions : Module {
 			clockTrigger.reset();
 		}
 		else
-			resetLight -= (resetLight / lightLambda) * engineGetSampleTime();
+			resetLight -= (resetLight / lightLambda) * sampleTime;
 		
 		
 		//********** Outputs and lights **********
@@ -335,6 +394,7 @@ struct Ions : Module {
 			float cv = (knobVal * (float)(ranges[i] * 2 + 1) - (float)ranges[i]);
 			cv = quantizeCV(cv, quantize);
 			outputs[SEQ_OUTPUTS + i].value = cv;
+			outputs[JUMP_OUTPUTS + i].value = jumpPulses[i].process((float)sampleTime);
 		}
 		
 		// Blue and Yellow lights
@@ -355,8 +415,11 @@ struct Ions : Module {
 			lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 1.0f : 0.0f;
 		}
 		
-		// Leap light
+		// Leap, Plank, Uncertanty and ResetOnRun lights
 		lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
+		lights[PLANK_LIGHT].value = quantize ? 1.0f : 0.0f;
+		lights[UNCERTANTY_LIGHT].value = uncertanty ? 1.0f : 0.0f;
+		lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
 		
 		// Range lights
 		for (int i = 0; i < 3; i++) {
@@ -364,6 +427,18 @@ struct Ions : Module {
 			lights[OCTB_LIGHTS + i].value = (i <= ranges[1] ? 1.0f : 0.0f);
 		}
 
+		// Jump lights
+		for (int i = 0; i < 2; i++) {
+			lights[JUMP_LIGHTS + i].value = jumpLights[i];
+			jumpLights[i] -= (jumpLights[i] / lightLambda) * sampleTime;
+		}
+
+		// Step clocks light
+		if (stepClocksTrig)
+			stepClocksLight = 1.0f;
+		else
+			stepClocksLight -= (stepClocksLight / lightLambda) * sampleTime;
+		lights[STEPCLOCKS_LIGHT].value = stepClocksLight;
 		
 		if (clockIgnoreOnReset > 0l)
 			clockIgnoreOnReset--;
@@ -381,24 +456,6 @@ struct IonsWidget : ModuleWidget {
 		}
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};
-	struct ResetOnRunItem : MenuItem {
-		Ions *module;
-		void onAction(EventAction &e) override {
-			module->resetOnRun = !module->resetOnRun;
-		}
-	};
-	struct QuantizeItem : MenuItem {
-		Ions *module;
-		void onAction(EventAction &e) override {
-			module->quantize = !module->quantize;
-		}
-	};
-	struct SymmetryItem : MenuItem {
-		Ions *module;
-		void onAction(EventAction &e) override {
-			module->symmetry = !module->symmetry;
 		}
 	};
 	Menu *createContextMenu() override {
@@ -426,24 +483,6 @@ struct IonsWidget : ModuleWidget {
 		darkItem->theme = 1;
 		//menu->addChild(darkItem);
 
-		menu->addChild(new MenuLabel());// empty line
-		
-		MenuLabel *settingsLabel = new MenuLabel();
-		settingsLabel->text = "Settings";
-		menu->addChild(settingsLabel);
-		
-		QuantizeItem *qtzItem = MenuItem::create<QuantizeItem>("Plank Constant (Quantize)", CHECKMARK(module->quantize));
-		qtzItem->module = module;
-		menu->addChild(qtzItem);
-
-		SymmetryItem *symItem = MenuItem::create<SymmetryItem>("Supersymmetry", CHECKMARK(module->symmetry));
-		symItem->module = module;
-		menu->addChild(symItem);
-
-		ResetOnRunItem *rorItem = MenuItem::create<ResetOnRunItem>("Reset on Run", CHECKMARK(module->resetOnRun));
-		rorItem->module = module;
-		menu->addChild(rorItem);
-
 		return menu;
 	}	
 	
@@ -460,8 +499,8 @@ struct IonsWidget : ModuleWidget {
 		// part of svg panel, no code required
 		
 		float colRulerCenter = box.size.x / 2.0f;
-		static constexpr float rowRulerAtomA = 115.12;
-		static constexpr float rowRulerAtomB = 241.12f;
+		static constexpr float rowRulerAtomA = 125.5;
+		static constexpr float rowRulerAtomB = 251.5f;
 		static constexpr float radius1 = 21.0f;
 		static constexpr float offset1 = 14.0f;
 		static constexpr float radius2 = 35.0f;
@@ -494,12 +533,23 @@ struct IonsWidget : ModuleWidget {
 		// Prob knob and CV inuput
 		float probX = colRulerCenter + 2.0f * offset3;
 		float probY = rowRulerAtomA + radius3 + 2.0f;
-		addParam(createDynamicParam<GeoKnob>(Vec(probX, probY), module, Ions::PROB_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(probX + 15.0f, probY + 30.0f), Port::INPUT, module, Ions::PROB_INPUT, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobLeft>(Vec(probX, probY), module, Ions::PROB_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(probX + 32.0f, probY), Port::INPUT, module, Ions::PROB_INPUT, &module->panelTheme));
+		
+		// Jump pulses
+		addOutput(createDynamicPort<GeoPort>(Vec(probX + 18.0f, probY - 37.0f), Port::OUTPUT, module, Ions::JUMP_OUTPUTS + 0, &module->panelTheme));		
+		addOutput(createDynamicPort<GeoPort>(Vec(probX + 18.0f, probY + 37.0f), Port::OUTPUT, module, Ions::JUMP_OUTPUTS + 1, &module->panelTheme));		
+		// Jump lights
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX, probY - 46.0f), module, Ions::JUMP_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX, probY + 46.0f), module, Ions::JUMP_LIGHTS + 1));
 		
 		// Leap light and button
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX + 12.0f, probY - 27.0f), module, Ions::LEAP_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(probX + 17.0f, probY - 40.0f), module, Ions::LEAP_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 86.5f, 62.5f), module, Ions::LEAP_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 77.5f, 50.5f), module, Ions::LEAP_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+
+		// Plank light and button
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 86.5f, 62.5f), module, Ions::PLANK_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 77.5f, 50.5f), module, Ions::PLANK_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 
 		// Octave buttons and lights
 		float octX = colRulerCenter + 98.0f;
@@ -562,17 +612,26 @@ struct IonsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset1, rowRulerAtomA + offset1), module, Ions::YELLOW_LIGHTS + 15));
 
 		// Run jack, light and button
-		static constexpr float rowRulerRunJack = 343.12f;
-		static constexpr float offsetRunJackX = 31.0f;
+		static constexpr float rowRulerRunJack = 344.5f;
+		static constexpr float offsetRunJackX = 119.5f;
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetRunJackX, rowRulerRunJack), Port::INPUT, module, Ions::RUN_INPUT, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRunJackX - 18.0f, rowRulerRunJack - 7.0f), module, Ions::RUN_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRunJackX - 30.0f, rowRulerRunJack - 15.0f), module, Ions::RUN_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRunJackX + 18.0f, rowRulerRunJack), module, Ions::RUN_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRunJackX + 33.0f, rowRulerRunJack), module, Ions::RUN_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 		
 		// Reset jack, light and button
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetRunJackX, rowRulerRunJack), Port::INPUT, module, Ions::RESET_INPUT, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRunJackX + 18.0f, rowRulerRunJack - 7.0f), module, Ions::RESET_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRunJackX + 30.0f, rowRulerRunJack - 15.0f), module, Ions::RESET_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRunJackX - 18.0f, rowRulerRunJack), module, Ions::RESET_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRunJackX - 33.0f, rowRulerRunJack), module, Ions::RESET_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 	
+		static constexpr float offsetMagneticButton = 42.5f;
+		// Magnetic clock (step clocks)
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetMagneticButton - 15.0f, rowRulerRunJack), module, Ions::STEPCLOCKS_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetMagneticButton, rowRulerRunJack), module, Ions::STEPCLOCKS_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));			
+		// Reset on Run light and button
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetMagneticButton + 15.0f, rowRulerRunJack), module, Ions::RESETONRUN_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetMagneticButton, rowRulerRunJack), module, Ions::RESETONRUN_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+
+		
 		// Globak clock
 		float gclkX = colRulerCenter - 2.0f * offset3;
 		float gclkY = rowRulerAtomA + radius3 + 2.0f;
@@ -589,12 +648,20 @@ struct IonsWidget : ModuleWidget {
 		// local inputs
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 20.0f, gclkY - 63.0f), Port::INPUT, module, Ions::CLK_INPUTS + 0, &module->panelTheme));
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 20.0f, gclkY + 63.0f), Port::INPUT, module, Ions::CLK_INPUTS + 1, &module->panelTheme));
+		
+		// Uncertanty light and button
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 20.0f, gclkY), module, Ions::UNCERTANTY_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX - 34.0f, gclkY), module, Ions::UNCERTANTY_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+
 	}
 };
 
 Model *modelIons = Model::create<Ions, IonsWidget>("Geodesics", "Ions", "Ions", SEQUENCER_TAG);
 
 /*CHANGE LOG
+
+0.6.1:
+Ions reloaded (many changes)
 
 0.6.0:
 created
