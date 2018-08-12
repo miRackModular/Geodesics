@@ -22,7 +22,7 @@ struct Ions : Module {
 		LEAP_PARAM,
 		ENUMS(STATE_PARAMS, 2),// 3 states : global, local, global+local
 		PLANK_PARAM,
-		UNCERTANTY_PARAM,
+		uncertainty_PARAM,
 		RESETONRUN_PARAM,
 		STEPCLOCKS_PARAM,
 		NUM_PARAMS
@@ -53,7 +53,7 @@ struct Ions : Module {
 		ENUMS(OCTA_LIGHTS, 3),// 0 is center, 1 is inside mirrors, 2 is outside mirrors
 		ENUMS(OCTB_LIGHTS, 3),
 		PLANK_LIGHT,
-		UNCERTANTY_LIGHT,
+		uncertainty_LIGHT,
 		ENUMS(JUMP_LIGHTS, 2),
 		RESETONRUN_LIGHT,
 		STEPCLOCKS_LIGHT,
@@ -71,7 +71,7 @@ struct Ions : Module {
 	bool resetOnRun;
 	bool quantize;// a.k.a. plank constant
 	//bool symmetry;
-	bool uncertanty;
+	bool uncertainty;
 	int stepIndexes[2];// position of electrons (sequencers)
 	int states[2];// which clocks to use (0 = global, 1 = local, 2 = both)
 	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
@@ -96,7 +96,7 @@ struct Ions : Module {
 	SchmittTrigger stateCVTriggers[2];
 	SchmittTrigger leapTrigger;
 	SchmittTrigger plankTrigger;
-	SchmittTrigger uncertantyTrigger;
+	SchmittTrigger uncertaintyTrigger;
 	SchmittTrigger resetOnRunTrigger;
 	SchmittTrigger stepClocksTrigger;
 	PulseGenerator jumpPulses[2];
@@ -127,7 +127,7 @@ struct Ions : Module {
 		resetTrigger.reset();
 		leapTrigger.reset();
 		plankTrigger.reset();
-		uncertantyTrigger.reset();
+		uncertaintyTrigger.reset();
 		resetOnRunTrigger.reset();
 		stepClocksTrigger.reset();
 		
@@ -146,13 +146,13 @@ struct Ions : Module {
 		resetOnRun = false;
 		quantize = true;
 		//symmetry = false;
-		uncertanty = false;
+		uncertainty = false;
 		for (int i = 0; i < 2; i++) {
 			states[i] = 0;
 			ranges[i] = 1;
 		}
 		leap = false;
-		initRun(true);
+		initRun(true, false);
 		
 		// No need to save, with reset
 		for (int i = 0; i < 2; i++) {
@@ -169,15 +169,13 @@ struct Ions : Module {
 		resetOnRun = false;
 		quantize = true;
 		//symmetry = false;
-		uncertanty = false;
+		uncertainty = false;
 		for (int i = 0; i < 2; i++) {
 			states[i] = randomu32() % 3;
 			ranges[i] = randomu32() % 3;
 		}
 		leap = (randomu32() % 2) > 0;
-		initRun(true);
-		stepIndexes[0] = randomu32() % 16;
-		stepIndexes[1] = randomu32() % 16;
+		initRun(true, true);
 		
 		// No need to save, with reset
 		for (int i = 0; i < 2; i++) {
@@ -186,10 +184,16 @@ struct Ions : Module {
 	}
 	
 
-	void initRun(bool hard) {// run button activated or run edge in run input jack
+	void initRun(bool hard, bool randomize) {// run button activated or run edge in run input jack
 		if (hard) {
-			stepIndexes[0] = 0;
-			stepIndexes[1] = 0;
+			if (randomize) {
+				stepIndexes[0] = randomu32() % 16;
+				stepIndexes[1] = randomu32() % 16;
+			}
+			else {
+				stepIndexes[0] = 0;
+				stepIndexes[1] = 0;
+			}
 		}
 		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		resetLight = 0.0f;
@@ -212,8 +216,8 @@ struct Ions : Module {
 		// symmetry
 		//json_object_set_new(rootJ, "symmetry", json_boolean(symmetry));
 		
-		// uncertanty
-		json_object_set_new(rootJ, "uncertanty", json_boolean(uncertanty));
+		// uncertainty
+		json_object_set_new(rootJ, "uncertainty", json_boolean(uncertainty));
 		
 		// running
 		json_object_set_new(rootJ, "running", json_boolean(running));
@@ -262,10 +266,10 @@ struct Ions : Module {
 		//if (symmetryJ)
 			//symmetry = json_is_true(symmetryJ);
 
-		// uncertanty
-		json_t *uncertantyJ = json_object_get(rootJ, "uncertanty");
-		if (uncertantyJ)
-			uncertanty = json_is_true(uncertantyJ);
+		// uncertainty
+		json_t *uncertaintyJ = json_object_get(rootJ, "uncertainty");
+		if (uncertaintyJ)
+			uncertainty = json_is_true(uncertaintyJ);
 
 		// running
 		json_t *runningJ = json_object_get(rootJ, "running");
@@ -302,7 +306,7 @@ struct Ions : Module {
 			leap = json_is_true(leapJ);
 
 		// No need to save, with reset
-		initRun(true);
+		initRun(true, false);
 		rangeInc[0] = true;
 		rangeInc[1] = true;
 	}
@@ -318,7 +322,7 @@ struct Ions : Module {
 		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].value)) {
 			running = !running;
 			if (running)
-				initRun(resetOnRun);
+				initRun(resetOnRun, false);
 		}
 		
 		// Leap button
@@ -331,9 +335,9 @@ struct Ions : Module {
 			quantize = !quantize;
 		}
 
-		// Uncertanty button
-		if (uncertantyTrigger.process(params[UNCERTANTY_PARAM].value)) {
-			uncertanty = !uncertanty;// TODO implement this functionality
+		// uncertainty button
+		if (uncertaintyTrigger.process(params[uncertainty_PARAM].value)) {
+			uncertainty = !uncertainty;
 		}
 
 		// Reset on Run button
@@ -394,23 +398,55 @@ struct Ions : Module {
 		
 		// Clocks
 		bool globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].value);
-		bool stepClocksTrig = stepClocksTrigger.process(params[STEPCLOCKS_PARAM].value);// TODO
+		bool stepClocksTrig = stepClocksTrigger.process(params[STEPCLOCKS_PARAM].value);
 		for (int i = 0; i < 2; i++) {
-			bool localClockTrig = clocksTriggers[i].process(inputs[CLK_INPUTS + i].value);
-			if ((globalClockTrig && ((states[i] & 0x1) == 0)) || (localClockTrig && states[i] >= 1)) {
-				if (running && clockIgnoreOnReset == 0l) {
-					int base = stepIndexes[i] & 0x8;// 0 or 8
-					int step8 = stepIndexes[i] & 0x7;// 0 to 7
-					if ( (step8 == 7 || leap) && jumpRandom() ) {
-						base = 8 - base;// change atom
-						jumpPulses[i].trigger(0.001f);
-						jumpLights[i] = 1.0f;
+			int jumpCount = 0;
+			
+			if (running && clockIgnoreOnReset == 0l) {	
+				
+				// Local clocks and uncertainty
+				bool localClockTrig = clocksTriggers[i].process(inputs[CLK_INPUTS + i].value);
+				localClockTrig &= (states[i] >= 1);
+				if (localClockTrig) {
+					if (uncertainty) {// local clock modified by uncertainty
+						int numSteps = 8;
+						int	prob = randomu32() % 1000;
+						if (prob < 175)
+							numSteps = 1;
+						else if (prob < 330) // 175 + 155
+							numSteps = 2;
+						else if (prob < 475) // 175 + 155 + 145
+							numSteps = 3;
+						else if (prob < 610) // 175 + 155 + 145 + 135
+							numSteps = 4;
+						else if (prob < 725) // 175 + 155 + 145 + 135 + 115
+							numSteps = 5;
+						else if (prob < 830) // 175 + 155 + 145 + 135 + 115 + 105
+							numSteps = 6;
+						else if (prob < 925) // 175 + 155 + 145 + 135 + 115 + 105 + 95
+							numSteps = 7;
+						for (int n = 0; n < numSteps; n++)
+							jumpCount += stepElectron(i, leap);
 					}
-					step8++;
-					if (step8 > 7)
-						step8 = 0;
-					stepIndexes[i] = base | step8;
+					else 
+						jumpCount += stepElectron(i, leap);// normal local clock
+				}				
+				
+				// Global clock
+				if (globalClockTrig && ((states[i] & 0x1) == 0) && !localClockTrig) {
+					jumpCount += stepElectron(i, leap);
 				}
+				
+			}
+			
+			// Magnetic clock (step clock)
+			if (stepClocksTrig)
+				jumpCount += stepElectron(i, leap);
+			
+			// Jump occurred feedback
+			if ((jumpCount & 0x1) != 0) {
+				jumpPulses[i].trigger(0.001f);
+				jumpLights[i] = 1.0f;				
 			}
 		}
 		//if (symmetry)
@@ -418,7 +454,7 @@ struct Ions : Module {
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
-			initRun(true);// must be after sequence reset
+			initRun(true, uncertainty);
 			resetLight = 1.0f;
 			clockTrigger.reset();
 		}
@@ -463,10 +499,10 @@ struct Ions : Module {
 			lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 0.5f : 0.0f;
 		}
 		
-		// Leap, Plank, Uncertanty and ResetOnRun lights
+		// Leap, Plank, uncertainty and ResetOnRun lights
 		lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
 		lights[PLANK_LIGHT].value = quantize ? 1.0f : 0.0f;
-		lights[UNCERTANTY_LIGHT].value = uncertanty ? 1.0f : 0.0f;
+		lights[uncertainty_LIGHT].value = uncertainty ? 1.0f : 0.0f;
 		lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
 		
 		// Range lights
@@ -491,6 +527,22 @@ struct Ions : Module {
 		if (clockIgnoreOnReset > 0l)
 			clockIgnoreOnReset--;
 	}// step()
+	
+	
+	int stepElectron(int i, bool leap) {
+		int jumped = 0;
+		int base = stepIndexes[i] & 0x8;// 0 or 8
+		int step8 = stepIndexes[i] & 0x7;// 0 to 7
+		if ( (step8 == 7 || leap) && jumpRandom() ) {
+			jumped = 1;
+			base = 8 - base;// change atom
+		}
+		step8++;
+		if (step8 > 7)
+			step8 = 0;
+		stepIndexes[i] = base | step8;
+		return jumped;
+	}
 };
 
 
@@ -703,9 +755,9 @@ struct IonsWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 11.0f, gclkY - 107.0f), Port::INPUT, module, Ions::STATECV_INPUTS + 0, &module->panelTheme));
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 11.0f, gclkY + 107.0f), Port::INPUT, module, Ions::STATECV_INPUTS + 1, &module->panelTheme));
 		
-		// Uncertanty light and button
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 20.0f, gclkY), module, Ions::UNCERTANTY_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX - 34.0f, gclkY), module, Ions::UNCERTANTY_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		// uncertainty light and button
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 20.0f, gclkY), module, Ions::uncertainty_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX - 34.0f, gclkY), module, Ions::uncertainty_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 
 	}
 };
