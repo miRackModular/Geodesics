@@ -13,7 +13,7 @@ Based on code from the Fundamental plugins by Andrew Belt and graphics from the 
 
 # Modules <a id="modules"></a>
 
-Here are the modules. Short desctiptions are given below, while more detailed information can be found in the [user manual](GeodesicsUserManualBeta.pdf).
+Here are the modules. Short desctiptions are given below, while more detailed information can be found in the [user manual](GeodesicsUserManual061.pdf). A summary of changes done in version 0.6.1 can be found [here](GeodesicsWhatsNew061.pdf). 
 
 * [Black Holes](#blackholes): Gravitational Voltage Controled Amplifiers.
 

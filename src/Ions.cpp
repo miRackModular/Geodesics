@@ -73,7 +73,7 @@ struct Ions : Module {
 	//bool symmetry;
 	bool uncertanty;
 	int stepIndexes[2];// position of electrons (sequencers)
-	int states[2];// which clocks to use
+	int states[2];// which clocks to use (0 = global, 1 = local, 2 = both)
 	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
 	bool leap;
 	
@@ -84,6 +84,7 @@ struct Ions : Module {
 	// No need to save, with reset
 	long clockIgnoreOnReset;
 	float resetLight;
+	bool rangeInc[2];// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	
 	// No need to save, no reset
 	SchmittTrigger runningTrigger;
@@ -103,7 +104,7 @@ struct Ions : Module {
 	float stepClocksLight;
 
 	
-	inline float quantizeCV(float cv, bool enable) {return enable ? (roundf(cv * 12.0f) / 12.0f) : cv;}
+	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
 	inline bool jumpRandom() {return (randomUniform() < (params[PROB_PARAM].value + inputs[PROB_INPUT].value / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
 	
 	
@@ -154,7 +155,9 @@ struct Ions : Module {
 		initRun(true);
 		
 		// No need to save, with reset
-		// none
+		for (int i = 0; i < 2; i++) {
+			rangeInc[i] = true;
+		}
 	}
 
 	
@@ -177,7 +180,9 @@ struct Ions : Module {
 		stepIndexes[1] = randomu32() % 16;
 		
 		// No need to save, with reset
-		// none
+		for (int i = 0; i < 2; i++) {
+			rangeInc[i] = true;
+		}
 	}
 	
 
@@ -298,6 +303,8 @@ struct Ions : Module {
 
 		// No need to save, with reset
 		initRun(true);
+		rangeInc[0] = true;
+		rangeInc[1] = true;
 	}
 
 	
@@ -336,19 +343,48 @@ struct Ions : Module {
 
 		// State buttons and CV inputs
 		for (int i = 0; i < 2; i++) {
-			if (stateTriggers[i].process(params[STATE_PARAMS + i].value)) {
+			int stateTrig = stateTriggers[i].process(params[STATE_PARAMS + i].value);
+			if (inputs[STATECV_INPUTS + i].active) {
+				if (inputs[STATECV_INPUTS + i].value <= -1.0f)
+					states[i] = 0;
+				else if (inputs[STATECV_INPUTS + i].value < 1.0f)
+					states[i] = 1;
+				else 
+					states[i] = 2;
+			}
+			else if (stateTrig) {
 				states[i]++;
 				if (states[i] >= 3)
 					states[i] = 0;
 			}
-		}// TODO implement state CV inputs
+		}
 		
-		// Range buttons
+		// Range buttons and CV inputs
 		for (int i = 0; i < 2; i++) {
-			if (octTriggers[i].process(params[OCT_PARAMS + i].value)) {
-				ranges[i]++;
-				if (ranges[i] >= 3)
+			int rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
+			if (inputs[OCTCV_INPUTS + i].active) {
+				if (inputs[OCTCV_INPUTS + i].value <= -1.0f)
 					ranges[i] = 0;
+				else if (inputs[OCTCV_INPUTS + i].value < 1.0f)
+					ranges[i] = 1;
+				else 
+					ranges[i] = 2;
+			}
+			else if (rangeTrig) {
+				if (rangeInc[i]) {
+					ranges[i]++;
+					if (ranges[i] >= 3) {
+						ranges[i] = 1;
+						rangeInc[i] = false;
+					}
+				}
+				else {
+					ranges[i]--;
+					if (ranges[i] < 0) {
+						ranges[i] = 1;
+						rangeInc[i] = true;
+					}
+				}
 			}
 		}
 
@@ -395,8 +431,16 @@ struct Ions : Module {
 		// Outputs
 		for (int i = 0; i < 2; i++) {
 			float knobVal = params[CV_PARAMS + cvMap[i][stepIndexes[i]]].value;
-			float cv = (knobVal * (float)(ranges[i] * 2 + 1) - (float)ranges[i]);// TODO add effect of OCTCV_INPUTS
-			cv = quantizeCV(cv, quantize);
+			float cv = 0.0f;
+			int range = ranges[i];
+			if (quantize) {
+				cv = (knobVal * (float)(range * 2 + 1) - (float)range);
+				cv = quantizeCV(cv);
+			}
+			else {
+				int maxCV = (range == 0 ? 1 : (range * 5));// maxCV is [1, 5, 10]
+				cv = knobVal * (float)(maxCV * 2) - (float)maxCV;
+			}
 			outputs[SEQ_OUTPUTS + i].value = cv;
 			outputs[JUMP_OUTPUTS + i].value = jumpPulses[i].process((float)sampleTime);
 		}
@@ -415,8 +459,8 @@ struct Ions : Module {
 
 		// State lights
 		for (int i = 0; i < 2; i++) {
-			lights[GLOBAL_LIGHTS + i].value = (states[i] & 0x1) == 0 ? 1.0f : 0.0f;
-			lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 1.0f : 0.0f;
+			lights[GLOBAL_LIGHTS + i].value = (states[i] & 0x1) == 0 ? 0.5f : 0.0f;
+			lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 0.5f : 0.0f;
 		}
 		
 		// Leap, Plank, Uncertanty and ResetOnRun lights
