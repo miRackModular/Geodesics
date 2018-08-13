@@ -54,7 +54,7 @@ struct BlackHoles : Module {
 	BlackHoles() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
-		cvMode = 0;// 0 is -5v to 5v, 1 is 0v to 10v
+		cvMode = 0;// 0 is -5v to 5v, 1 is -10v to 10v
 
 		// No need to save, no reset		
 		expTriggers[0].reset();
@@ -187,7 +187,7 @@ struct BlackHoles : Module {
 	}// step()
 	
 	float calcChannel(float in, Param &level, Input &levelCV, bool isExp) {
-		float levCv = levelCV.active ? (levelCV.value / 5.0f - (cvMode != 0 ? 1.0f : 0.0f)) : 0.0f;
+		float levCv = levelCV.active ? (levelCV.value / (cvMode != 0 ? 10.0f : 5.0f)) : 0.0f;
 		float lev = clamp(level.value + levCv, -1.0f, 1.0f);
 		if (isExp) {
 			float newlev = rescale(powf(expBase, fabs(lev)), 1.0f, expBase, 0.0f, 1.0f);
@@ -251,17 +251,17 @@ struct BlackHolesWidget : ModuleWidget {
 		menu->addChild(new MenuLabel());// empty line
 		
 		MenuLabel *settingsLabel = new MenuLabel();
-		settingsLabel->text = "MC2 input CV levels";
+		settingsLabel->text = "Gravitation CV levels";
 		menu->addChild(settingsLabel);
 		
 		CVModeItem *bipolItem = new CVModeItem();
-		bipolItem->text = "Bipolar: -5V to 5V";
+		bipolItem->text = "-5V to 5V";
 		bipolItem->module = module;
 		bipolItem->modecv = 0;
 		menu->addChild(bipolItem);
 
 		CVModeItem *unipolItem = new CVModeItem();
-		unipolItem->text = "Unipolar: 0V to 10V";
+		unipolItem->text = "-10V to 10V";
 		unipolItem->module = module;
 		unipolItem->modecv = 1;
 		menu->addChild(unipolItem);
