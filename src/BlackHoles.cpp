@@ -218,7 +218,7 @@ struct BlackHoles : Module {
 		for (int i = 0; i < 2; i++)
 			lights[EXP_LIGHTS + i].value = isExponential[i] ? 1.0f : 0.0f;
 		
-		// CV Level buttons
+		// CV Level lights
 		lights[CVALEVEL_LIGHTS + 0].value = (cvMode & 0x1) == 0 ? 1.0f : 0.0f;
 		lights[CVALEVEL_LIGHTS + 1].value = 1.0f - lights[CVALEVEL_LIGHTS + 0].value;
 		lights[CVBLEVEL_LIGHTS + 0].value = (cvMode & 0x2) == 0 ? 1.0f : 0.0f;
@@ -394,7 +394,8 @@ Model *modelBlackHoles = Model::create<BlackHoles, BlackHolesWidget>("Geodesics"
 /*CHANGE LOG
 
 0.6.1:
-add bipol right click menu option for knob CVs
+add CV level modes buttons and lights
+change CV level behavior
 
 0.6.0:
 created

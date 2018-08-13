@@ -17,6 +17,7 @@ struct Pulsars : Module {
 		ENUMS(VOID_PARAMS, 2),// push-button
 		ENUMS(REV_PARAMS, 2),// push-button
 		ENUMS(RND_PARAMS, 2),// push-button
+		ENUMS(CVLEVEL_PARAMS, 2),// push-button
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -39,6 +40,8 @@ struct Pulsars : Module {
 		ENUMS(VOID_LIGHTS, 2),
 		ENUMS(REV_LIGHTS, 2),
 		ENUMS(RND_LIGHTS, 2),
+		ENUMS(CVALEVEL_LIGHTS, 2),// White, but two lights (light 0 is cvMode bit = 0, light 1 is cvMode bit = 1)
+		ENUMS(CVBLEVEL_LIGHTS, 2),// White, but two lights
 		NUM_LIGHTS
 	};
 	
@@ -53,7 +56,7 @@ struct Pulsars : Module {
 	
 	// Need to save, no reset
 	int panelTheme;
-	int cvMode;
+	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
 	
 	// No need to save, with reset
 	int posA;// always between 0 and 7
@@ -66,13 +69,14 @@ struct Pulsars : Module {
 	SchmittTrigger voidTriggers[2];
 	SchmittTrigger revTriggers[2];
 	SchmittTrigger rndTriggers[2];
+	SchmittTrigger cvLevelTriggers[2];
 	float lfoLights[2];
 
 	
 	Pulsars() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
-		cvMode = 0;// 0 is -5v to 5v, 1 is 0v to 10v
+		cvMode = 0;
 		
 		// No need to save, no reset		
 		for (int i = 0; i < 2; i++) {
@@ -213,12 +217,18 @@ struct Pulsars : Module {
 			}
 		}
 		
+		// CV Level buttons
+		for (int i = 0; i < 2; i++) {
+			if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
+				cvMode ^= (0x1 << i);
+		}
+
 		// LFO values (normalized to 0.0f to 1.0f space, clamped and offset adjusted depending cvMode)
 		float lfoVal[2];
 		lfoVal[0] = inputs[LFO_INPUTS + 0].value;
 		lfoVal[1] = inputs[LFO_INPUTS + 1].active ? inputs[LFO_INPUTS + 1].value : lfoVal[0];
 		for (int i = 0; i < 2; i++)
-			lfoVal[i] = clamp( (lfoVal[i] + (cvMode == 0 ? 5.0f : 0.0f)) / 10.0f , 0.0f , 1.0f);
+			lfoVal[i] = clamp( (lfoVal[i] + ((cvMode & (0x1 << i)) == 0 ? 5.0f : 0.0f)) / 10.0f , 0.0f , 1.0f);
 		
 		// Pulsar A
 		bool active8[8];
@@ -305,6 +315,12 @@ struct Pulsars : Module {
 			lights[RND_LIGHTS + i].value = isRandom[i] ? 1.0f : 0.0f;
 		}
 		
+		// CV Level lights
+		lights[CVALEVEL_LIGHTS + 0].value = (cvMode & 0x1) == 0 ? 1.0f : 0.0f;
+		lights[CVALEVEL_LIGHTS + 1].value = 1.0f - lights[CVALEVEL_LIGHTS + 0].value;
+		lights[CVBLEVEL_LIGHTS + 0].value = (cvMode & 0x2) == 0 ? 1.0f : 0.0f;
+		lights[CVBLEVEL_LIGHTS + 1].value = 1.0f - lights[CVBLEVEL_LIGHTS + 0].value;
+
 		// LFO lights
 		for (int i = 0; i < 2; i++) {
 			lights[LFO_LIGHTS + i].value = lfoLights[i];
@@ -460,6 +476,11 @@ struct PulsarsWidget : ModuleWidget {
 		static constexpr float offsetRndButtonY = 24.0f;// from center of pulsar
 		static constexpr float offsetRndLedX = 63.0f;// from center of pulsar
 		static constexpr float offsetRndLedY = 11.0f;// from center of pulsar
+		static constexpr float offsetLedVsBut5X = 6.0f;
+		static constexpr float offsetLedVsBut5Y = 10.0f;
+		static constexpr float offsetLedVsBut10X = 11.0f;
+		static constexpr float offsetLedVsBut10Y = 1.0f;
+
 
 		// PulsarA center output
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerPulsarA), Port::OUTPUT, module, Pulsars::OUTA_OUTPUT, &module->panelTheme));
@@ -497,6 +518,11 @@ struct PulsarsWidget : ModuleWidget {
 		// PulsarA random (light and button)
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndLedX, rowRulerPulsarA + offsetRndLedY), module, Pulsars::RND_LIGHTS + 0));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRndButtonX, rowRulerPulsarA + offsetRndButtonY), module, Pulsars::RND_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+
+		// PulsarA CV level (lights and button)
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRndButtonX, rowRulerPulsarA + offsetRndButtonY), module, Pulsars::CVLEVEL_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsBut5X, rowRulerPulsarA + offsetRndButtonY + offsetLedVsBut5Y), module, Pulsars::CVALEVEL_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsBut10X, rowRulerPulsarA + offsetRndButtonY - offsetLedVsBut10Y), module, Pulsars::CVALEVEL_LIGHTS + 1));
 
 		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA + offsetJacks + offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 0, &module->panelTheme));
@@ -540,6 +566,11 @@ struct PulsarsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndLedX, rowRulerPulsarB - offsetRndLedY), module, Pulsars::RND_LIGHTS + 1));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRndButtonX, rowRulerPulsarB - offsetRndButtonY), module, Pulsars::RND_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
+		// PulsarB CV level (lights and button)
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRndButtonX, rowRulerPulsarB - offsetRndButtonY), module, Pulsars::CVLEVEL_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsBut5X, rowRulerPulsarB - offsetRndButtonY - offsetLedVsBut5Y), module, Pulsars::CVBLEVEL_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsBut10X, rowRulerPulsarB - offsetRndButtonY + offsetLedVsBut10Y), module, Pulsars::CVBLEVEL_LIGHTS + 1));
+
 		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB - offsetJacks - offsetLFO), Port::INPUT, module, Pulsars::LFO_INPUTS + 1, &module->panelTheme));		
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 1));
@@ -549,6 +580,9 @@ struct PulsarsWidget : ModuleWidget {
 Model *modelPulsars = Model::create<Pulsars, PulsarsWidget>("Geodesics", "Pulsars", "Pulsars", MIXER_TAG);
 
 /*CHANGE LOG
+
+0.6.1:
+add CV level modes buttons and lights, remove from right-click menu
 
 0.6.0:
 created
