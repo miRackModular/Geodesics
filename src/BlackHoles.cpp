@@ -16,6 +16,8 @@ struct BlackHoles : Module {
 	enum ParamIds {
 		ENUMS(LEVEL_PARAMS, 8),// -1.0f to 1.0f knob, set to default (0.0f) when using CV input
 		ENUMS(EXP_PARAMS, 2),// push-button
+		WORMHOLE_PARAM,
+		ENUMS(CVLEVEL_PARAMS, 2),// push-button
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -30,6 +32,9 @@ struct BlackHoles : Module {
 	};
 	enum LightIds {
 		ENUMS(EXP_LIGHTS, 2),
+		ENUMS(WORMHOLE_LIGHT, 2),// room for WhiteRed
+		ENUMS(CVALEVEL_LIGHTS, 2),// White, but two lights (light 0 is cvMode bit = 0, light 1 is cvMode bit = 1)
+		ENUMS(CVBLEVEL_LIGHTS, 2),// White, but two lights
 		NUM_LIGHTS
 	};
 	
@@ -39,22 +44,25 @@ struct BlackHoles : Module {
 
 	// Need to save, with reset
 	bool isExponential[2];
+	bool wormhole;
 	
 	// Need to save, no reset
 	int panelTheme;
-	int cvMode;
+	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper BH, bit 1 is lower BH
 	
 	// No need to save, with reset
 	// none
 	
 	// No need to save, no reset
 	SchmittTrigger expTriggers[2];
+	SchmittTrigger cvLevelTriggers[2];
+	SchmittTrigger wormholeTrigger;
 
 	
 	BlackHoles() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
-		cvMode = 0;// 0 is -5v to 5v, 1 is -10v to 10v
+		cvMode = 0;
 
 		// No need to save, no reset		
 		expTriggers[0].reset();
@@ -73,6 +81,8 @@ struct BlackHoles : Module {
 		// Need to save, with reset
 		isExponential[0] = false;
 		isExponential[1] = false;
+		wormhole = true;
+		
 		// No need to save, with reset
 		// none
 	}
@@ -85,6 +95,8 @@ struct BlackHoles : Module {
 		for (int i = 0; i < 2; i++) {
 			isExponential[i] = (randomu32() % 2) > 0;
 		}
+		wormhole = (randomu32() % 2) > 0;
+		
 		// No need to save, with reset
 		// none
 	}
@@ -99,6 +111,9 @@ struct BlackHoles : Module {
 		json_object_set_new(rootJ, "isExponential0", json_real(isExponential[0]));
 		json_object_set_new(rootJ, "isExponential1", json_real(isExponential[1]));
 		
+		// wormhole
+		json_object_set_new(rootJ, "wormhole", json_boolean(wormhole));
+
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
@@ -122,6 +137,11 @@ struct BlackHoles : Module {
 		if (isExponential1J)
 			isExponential[1] = json_real_value(isExponential1J);
 
+		// wormhole
+		json_t *wormholeJ = json_object_get(rootJ, "wormhole");
+		if (wormholeJ)
+			wormhole = json_is_true(wormholeJ);
+
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -140,10 +160,20 @@ struct BlackHoles : Module {
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
 		// Exponential buttons
-		for (int i = 0; i < 2; i++) {
+		for (int i = 0; i < 2; i++)
 			if (expTriggers[i].process(params[EXP_PARAMS + i].value)) {
 				isExponential[i] = !isExponential[i];
-			}
+		}
+		
+		// Wormhole buttons
+		if (wormholeTrigger.process(params[WORMHOLE_PARAM].value)) {
+			wormhole = ! wormhole;
+		}
+
+		// CV Level buttons
+		for (int i = 0; i < 2; i++) {
+			if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
+				cvMode ^= (0x1 << i);
 		}
 		
 		
@@ -154,7 +184,7 @@ struct BlackHoles : Module {
 			if (inputs[IN_INPUTS + i].active)
 				inputs0[i] = inputs[IN_INPUTS + i].value;
 		for (int i = 0; i < 4; i++) {
-			float chanVal = calcChannel(inputs0[i], params[LEVEL_PARAMS + i], inputs[LEVELCV_INPUTS + i], isExponential[0]);
+			float chanVal = calcChannel(inputs0[i], params[LEVEL_PARAMS + i], inputs[LEVELCV_INPUTS + i], isExponential[0], cvMode & 0x1);
 			outputs[OUT_OUTPUTS + i].value = chanVal;
 			blackHole0 += chanVal;
 		}
@@ -170,23 +200,33 @@ struct BlackHoles : Module {
 				inputs1[i] = inputs[IN_INPUTS + i + 4].value;
 				allUnconnected = false;
 			}
-		if (allUnconnected)
+		if (allUnconnected && wormhole)
 			for (int i = 0; i < 4; i++)
 				inputs1[i] = blackHole0;
 		for (int i = 0; i < 4; i++) {
-			float chanVal = calcChannel(inputs1[i], params[LEVEL_PARAMS + i + 4], inputs[LEVELCV_INPUTS + i + 4], isExponential[1]);
+			float chanVal = calcChannel(inputs1[i], params[LEVEL_PARAMS + i + 4], inputs[LEVELCV_INPUTS + i + 4], isExponential[1], cvMode >> 1);
 			outputs[OUT_OUTPUTS + i + 4].value = chanVal;
 			blackHole1 += chanVal;
 		}
 		outputs[BLACKHOLE_OUTPUTS + 1].value = clamp(blackHole1, -10.0f, 10.0f);
 
+		// Wormhole light
+		lights[WORMHOLE_LIGHT + 0].value = ((wormhole && allUnconnected) ? 1.0f : 0.0f);
+		lights[WORMHOLE_LIGHT + 1].value = ((wormhole && !allUnconnected) ? 1.0f : 0.0f);
 				
 		// isExponential lights
 		for (int i = 0; i < 2; i++)
 			lights[EXP_LIGHTS + i].value = isExponential[i] ? 1.0f : 0.0f;
+		
+		// CV Level buttons
+		lights[CVALEVEL_LIGHTS + 0].value = (cvMode & 0x1) == 0 ? 1.0f : 0.0f;
+		lights[CVALEVEL_LIGHTS + 1].value = 1.0f - lights[CVALEVEL_LIGHTS + 0].value;
+		lights[CVBLEVEL_LIGHTS + 0].value = (cvMode & 0x2) == 0 ? 1.0f : 0.0f;
+		lights[CVBLEVEL_LIGHTS + 1].value = 1.0f - lights[CVBLEVEL_LIGHTS + 0].value;
+	
 	}// step()
 	
-	float calcChannel(float in, Param &level, Input &levelCV, bool isExp) {
+	float calcChannel(float in, Param &level, Input &levelCV, bool isExp, int cvMode) {
 		float levCv = levelCV.active ? (levelCV.value / (cvMode != 0 ? 10.0f : 5.0f)) : 0.0f;
 		float lev = clamp(level.value + levCv, -1.0f, 1.0f);
 		if (isExp) {
@@ -211,16 +251,6 @@ struct BlackHolesWidget : ModuleWidget {
 		}
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};
-	struct CVModeItem : MenuItem {
-		BlackHoles *module;
-		int modecv;
-		void onAction(EventAction &e) override {
-			module->cvMode = modecv;
-		}
-		void step() override {
-			rightText = (module->cvMode == modecv) ? "✔" : "";
 		}
 	};
 	Menu *createContextMenu() override {
@@ -248,24 +278,6 @@ struct BlackHolesWidget : ModuleWidget {
 		darkItem->theme = 1;
 		//menu->addChild(darkItem);
 
-		menu->addChild(new MenuLabel());// empty line
-		
-		MenuLabel *settingsLabel = new MenuLabel();
-		settingsLabel->text = "Gravitation CV levels";
-		menu->addChild(settingsLabel);
-		
-		CVModeItem *bipolItem = new CVModeItem();
-		bipolItem->text = "-5V to 5V";
-		bipolItem->module = module;
-		bipolItem->modecv = 0;
-		menu->addChild(bipolItem);
-
-		CVModeItem *unipolItem = new CVModeItem();
-		unipolItem->text = "-10V to 10V";
-		unipolItem->module = module;
-		unipolItem->modecv = 1;
-		menu->addChild(unipolItem);
-
 		return menu;
 	}	
 	
@@ -282,12 +294,12 @@ struct BlackHolesWidget : ModuleWidget {
 		// part of svg panel, no code required
 		
 		float colRulerCenter = box.size.x / 2.0f;
-		float rowRulerBlack0 = 108.5f;
-		float rowRulerBlack1 = 272.5f;
-		float radiusIn = 30.0f;
-		float radiusOut = 61.0f;
-		float offsetL = 53.0f;
-		float offsetS = 30.0f;
+		static constexpr float rowRulerBlack0 = 108.5f;
+		static constexpr float rowRulerBlack1 = 272.5f;
+		static constexpr float radiusIn = 30.0f;
+		static constexpr float radiusOut = 61.0f;
+		static constexpr float offsetL = 53.0f;
+		static constexpr float offsetS = 30.0f;
 		
 		
 		// BlackHole0 knobs
@@ -316,11 +328,6 @@ struct BlackHolesWidget : ModuleWidget {
 		// BlackHole0 center output
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 0, &module->panelTheme));
 
-		// BlackHole0 Exp button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(24.5f, 189.5f), module, BlackHoles::EXP_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(34.5f, 178.5f), module, BlackHoles::EXP_LIGHTS + 0));
-		
-		
 				
 		// BlackHole1 knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerBlack1 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 4, -1.0f, 1.0f, 0.0f, &module->panelTheme));
@@ -348,9 +355,37 @@ struct BlackHolesWidget : ModuleWidget {
 		// BlackHole1 center output
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack1), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 1, &module->panelTheme));
 		
+		
+		static constexpr float offsetButtons = 64.0f;
+		static constexpr float offsetLedVsBut = 11.0f;
+		static constexpr float offsetLedVsButS = 5.0f;// small
+		static constexpr float offsetLedVsButL = 12.0f;// large
+		
+		
+		// BlackHole0 Exp button and light
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtons, rowRulerBlack0 + offsetButtons), module, BlackHoles::EXP_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtons + offsetLedVsBut, rowRulerBlack0 + offsetButtons - offsetLedVsBut), module, BlackHoles::EXP_LIGHTS + 0));
+		
 		// BlackHole1 Exp button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(140.5f, 191.5f), module, BlackHoles::EXP_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(129.5f, 201.5f), module, BlackHoles::EXP_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtons, rowRulerBlack1 + offsetButtons), module, BlackHoles::EXP_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtons + offsetLedVsBut, rowRulerBlack1 + offsetButtons - offsetLedVsBut), module, BlackHoles::EXP_LIGHTS + 1));
+		
+		// Wormhole button and light
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtons, rowRulerBlack1 - offsetButtons), module, BlackHoles::WORMHOLE_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - offsetButtons + offsetLedVsBut, rowRulerBlack1 - offsetButtons + offsetLedVsBut), module, BlackHoles::WORMHOLE_LIGHT));
+		
+		
+		// CV Level A button and light
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtons, rowRulerBlack0 + offsetButtons), module, BlackHoles::CVLEVEL_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButL, rowRulerBlack0 + offsetButtons + offsetLedVsButS), module, BlackHoles::CVALEVEL_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButS, rowRulerBlack0 + offsetButtons + offsetLedVsButL), module, BlackHoles::CVALEVEL_LIGHTS + 1));
+		
+		// CV Level B button and light
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtons, rowRulerBlack1 + offsetButtons), module, BlackHoles::CVLEVEL_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButL, rowRulerBlack1 + offsetButtons + offsetLedVsButS), module, BlackHoles::CVBLEVEL_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButS, rowRulerBlack1 + offsetButtons + offsetLedVsButL), module, BlackHoles::CVBLEVEL_LIGHTS + 1));
+
+
 	}
 };
 
