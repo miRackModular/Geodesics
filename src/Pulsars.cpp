@@ -390,16 +390,6 @@ struct PulsarsWidget : ModuleWidget {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
 		}
 	};	
-	struct CVModeItem : MenuItem {
-		Pulsars *module;
-		int modecv;
-		void onAction(EventAction &e) override {
-			module->cvMode = modecv;
-		}
-		void step() override {
-			rightText = (module->cvMode == modecv) ? "✔" : "";
-		}
-	};
 	Menu *createContextMenu() override {
 		Menu *menu = ModuleWidget::createContextMenu();
 
@@ -424,24 +414,6 @@ struct PulsarsWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		//menu->addChild(darkItem);
-
-		menu->addChild(new MenuLabel());// empty line
-		
-		MenuLabel *settingsLabel = new MenuLabel();
-		settingsLabel->text = "MC2 input CV levels";
-		menu->addChild(settingsLabel);
-		
-		CVModeItem *bipolItem = new CVModeItem();
-		bipolItem->text = "Bipolar: -5V to 5V";
-		bipolItem->module = module;
-		bipolItem->modecv = 0;
-		menu->addChild(bipolItem);
-
-		CVModeItem *unipolItem = new CVModeItem();
-		unipolItem->text = "Unipolar: 0V to 10V";
-		unipolItem->module = module;
-		unipolItem->modecv = 1;
-		menu->addChild(unipolItem);
 		
 		return menu;
 	}	
