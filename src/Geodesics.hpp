@@ -52,6 +52,13 @@ struct GeoPort : DynamicSVGPort {
 	}
 };
 
+struct BlankPort : SVGPort {
+	BlankPort() {
+		shadow->opacity = 0.0;
+		setSVG(SVG::load(assetPlugin(plugin, "res/comp/Otrsp-01.svg")));
+	}
+};
+
 
 // Buttons and switches
 
@@ -93,6 +100,16 @@ struct GeoKnobLeft : GeoKnob {
 struct GeoKnobBottom : GeoKnob {
 	GeoKnobBottom() {
 		orientationAngle = M_PI;
+	}
+};
+
+
+struct BlankCKnob : SVGKnob {
+	BlankCKnob() {
+		minAngle = -0.73*M_PI;
+		maxAngle = 0.73*M_PI;
+		shadow->opacity = 0.0;
+		setSVG(SVG::load(assetPlugin(plugin, "res/comp/C-01.svg")));
 	}
 };
 
