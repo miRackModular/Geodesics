@@ -45,10 +45,10 @@ struct BlackHoles : Module {
 	// Need to save, with reset
 	bool isExponential[2];
 	bool wormhole;
+	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper BH, bit 1 is lower BH
 	
 	// Need to save, no reset
 	int panelTheme;
-	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper BH, bit 1 is lower BH
 	
 	// No need to save, with reset
 	// none
@@ -62,7 +62,6 @@ struct BlackHoles : Module {
 	BlackHoles() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
-		cvMode = 0;
 
 		// No need to save, no reset		
 		expTriggers[0].reset();
@@ -79,6 +78,7 @@ struct BlackHoles : Module {
 	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
 		// Need to save, with reset
+		cvMode = 0x3;
 		isExponential[0] = false;
 		isExponential[1] = false;
 		wormhole = true;

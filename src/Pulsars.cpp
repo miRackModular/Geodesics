@@ -53,10 +53,10 @@ struct Pulsars : Module {
 	bool isVoid[2];
 	bool isReverse[2];
 	bool isRandom[2];
+	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
 	
 	// Need to save, no reset
 	int panelTheme;
-	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
 	
 	// No need to save, with reset
 	int posA;// always between 0 and 7
@@ -76,7 +76,6 @@ struct Pulsars : Module {
 	Pulsars() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
 		// Need to save, no reset
 		panelTheme = 0;
-		cvMode = 0;
 		
 		// No need to save, no reset		
 		for (int i = 0; i < 2; i++) {
@@ -97,6 +96,7 @@ struct Pulsars : Module {
 	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
 		// Need to save, with reset
+		cvMode = 0;
 		for (int i = 0; i < 2; i++) {
 			topCross[i] = false;
 			isVoid[i] = false;
