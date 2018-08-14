@@ -162,7 +162,7 @@ struct BlankLogoWidget : ModuleWidget {
 		// Screws
 		// part of svg panel, no code required
 		
-		addParam(createParamCentered<BlankCKnob>(Vec(29.5f,74.2f), module, BlankLogo::CLK_FREQ_PARAM, -4.0f, 4.0f, 0.0f));// 60 BMP when default value
+		addParam(createParamCentered<BlankCKnob>(Vec(29.5f,74.2f), module, BlankLogo::CLK_FREQ_PARAM, -2.0f, 4.0f, 1.0f));// 120 BMP when default value
 		addOutput(createOutputCentered<BlankPort>(Vec(29.5f,187.5f), module, BlankLogo::OUT_OUTPUT));
 		
 	}
