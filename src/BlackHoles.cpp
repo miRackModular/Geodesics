@@ -356,34 +356,35 @@ struct BlackHolesWidget : ModuleWidget {
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack1), Port::OUTPUT, module, BlackHoles::BLACKHOLE_OUTPUTS + 1, &module->panelTheme));
 		
 		
-		static constexpr float offsetButtons = 64.0f;
-		static constexpr float offsetLedVsBut = 11.0f;
+		static constexpr float offsetButtonsX = 62.0f;
+		static constexpr float offsetButtonsY = 64.0f;
+		static constexpr float offsetLedVsBut = 9.0f;
 		static constexpr float offsetLedVsButS = 5.0f;// small
 		static constexpr float offsetLedVsButL = 12.0f;// large
 		
 		
 		// BlackHole0 Exp button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtons, rowRulerBlack0 + offsetButtons), module, BlackHoles::EXP_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtons + offsetLedVsBut, rowRulerBlack0 + offsetButtons - offsetLedVsBut), module, BlackHoles::EXP_LIGHTS + 0));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtonsX, rowRulerBlack0 + offsetButtonsY), module, BlackHoles::EXP_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtonsX + offsetLedVsBut, rowRulerBlack0 + offsetButtonsY - offsetLedVsBut - 1.0f), module, BlackHoles::EXP_LIGHTS + 0));
 		
 		// BlackHole1 Exp button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtons, rowRulerBlack1 + offsetButtons), module, BlackHoles::EXP_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtons + offsetLedVsBut, rowRulerBlack1 + offsetButtons - offsetLedVsBut), module, BlackHoles::EXP_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtonsX, rowRulerBlack1 + offsetButtonsY), module, BlackHoles::EXP_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtonsX + offsetLedVsBut, rowRulerBlack1 + offsetButtonsY - offsetLedVsBut -1.0f), module, BlackHoles::EXP_LIGHTS + 1));
 		
 		// Wormhole button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtons, rowRulerBlack1 - offsetButtons), module, BlackHoles::WORMHOLE_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - offsetButtons + offsetLedVsBut, rowRulerBlack1 - offsetButtons + offsetLedVsBut), module, BlackHoles::WORMHOLE_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtonsX, rowRulerBlack1 - offsetButtonsY), module, BlackHoles::WORMHOLE_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - offsetButtonsX + offsetLedVsBut, rowRulerBlack1 - offsetButtonsY + offsetLedVsBut), module, BlackHoles::WORMHOLE_LIGHT));
 		
 		
 		// CV Level A button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtons, rowRulerBlack0 + offsetButtons), module, BlackHoles::CVLEVEL_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButL, rowRulerBlack0 + offsetButtons + offsetLedVsButS), module, BlackHoles::CVALEVEL_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButS, rowRulerBlack0 + offsetButtons + offsetLedVsButL), module, BlackHoles::CVALEVEL_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtonsX, rowRulerBlack0 + offsetButtonsY), module, BlackHoles::CVLEVEL_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButL, rowRulerBlack0 + offsetButtonsY + offsetLedVsButS), module, BlackHoles::CVALEVEL_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButS, rowRulerBlack0 + offsetButtonsY + offsetLedVsButL), module, BlackHoles::CVALEVEL_LIGHTS + 1));
 		
 		// CV Level B button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtons, rowRulerBlack1 + offsetButtons), module, BlackHoles::CVLEVEL_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButL, rowRulerBlack1 + offsetButtons + offsetLedVsButS), module, BlackHoles::CVBLEVEL_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtons + offsetLedVsButS, rowRulerBlack1 + offsetButtons + offsetLedVsButL), module, BlackHoles::CVBLEVEL_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtonsX, rowRulerBlack1 + offsetButtonsY), module, BlackHoles::CVLEVEL_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButL, rowRulerBlack1 + offsetButtonsY + offsetLedVsButS), module, BlackHoles::CVBLEVEL_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButS, rowRulerBlack1 + offsetButtonsY + offsetLedVsButL), module, BlackHoles::CVBLEVEL_LIGHTS + 1));
 
 
 	}
