@@ -1,8 +1,11 @@
 # A Modular Collection for VCV Rack by Pyer and Marc Boulé
 
+Modules for [VCV Rack](https://vcvrack.com), available soon in the [plugin manager](https://vcvrack.com/plugins.html).
+
 Module concept and graphics by Pierre Collard (Pyer), code By Marc Boulé.
 
 ![Geodesics](res/img/Blanks.jpg)
+
 
 
 ## License
