@@ -52,7 +52,7 @@ struct Ions : Module {
 		LEAP_LIGHT,
 		ENUMS(OCTA_LIGHTS, 3),// 0 is center, 1 is inside mirrors, 2 is outside mirrors
 		ENUMS(OCTB_LIGHTS, 3),
-		PLANK_LIGHT,
+		ENUMS(PLANK_LIGHT, 3),// room for blue, yellow, white
 		uncertainty_LIGHT,
 		ENUMS(JUMP_LIGHTS, 2),
 		RESETONRUN_LIGHT,
@@ -69,7 +69,7 @@ struct Ions : Module {
 	// Need to save, with reset
 	bool running;
 	bool resetOnRun;
-	bool quantize;// a.k.a. plank constant
+	int quantize;// a.k.a. plank constant, 0 = none, 1 = blue, 2 = yellow, 3 = white (both)
 	//bool symmetry;
 	bool uncertainty;
 	int stepIndexes[2];// position of electrons (sequencers)
@@ -144,7 +144,7 @@ struct Ions : Module {
 		// Need to save, with reset
 		running = false;
 		resetOnRun = false;
-		quantize = true;
+		quantize = 3;
 		//symmetry = false;
 		uncertainty = false;
 		for (int i = 0; i < 2; i++) {
@@ -167,7 +167,7 @@ struct Ions : Module {
 		// Need to save, with reset
 		running = false;
 		resetOnRun = false;
-		quantize = true;
+		quantize = randomu32() % 4;
 		//symmetry = false;
 		uncertainty = false;
 		for (int i = 0; i < 2; i++) {
@@ -211,7 +211,7 @@ struct Ions : Module {
 		json_object_set_new(rootJ, "resetOnRun", json_boolean(resetOnRun));
 		
 		// quantize
-		json_object_set_new(rootJ, "quantize", json_boolean(quantize));
+		json_object_set_new(rootJ, "quantize", json_integer(quantize));
 		
 		// symmetry
 		//json_object_set_new(rootJ, "symmetry", json_boolean(symmetry));
@@ -259,7 +259,7 @@ struct Ions : Module {
 		// quantize
 		json_t *quantizeJ = json_object_get(rootJ, "quantize");
 		if (quantizeJ)
-			quantize = json_is_true(quantizeJ);
+			quantize = json_integer_value(quantizeJ);
 
 		// symmetry
 		//json_t *symmetryJ = json_object_get(rootJ, "symmetry");
@@ -332,7 +332,9 @@ struct Ions : Module {
 
 		// Plank button (quatize)
 		if (plankTrigger.process(params[PLANK_PARAM].value)) {
-			quantize = !quantize;
+			quantize++;
+			if (quantize >= 4)
+				quantize = 0;
 		}
 
 		// uncertainty button
@@ -469,7 +471,7 @@ struct Ions : Module {
 			float knobVal = params[CV_PARAMS + cvMap[i][stepIndexes[i]]].value;
 			float cv = 0.0f;
 			int range = ranges[i];
-			if (quantize) {
+			if ( (i == 0 && (quantize & 0x1) != 0) || (i == 1 && (quantize > 1)) ) {
 				cv = (knobVal * (float)(range * 2 + 1) - (float)range);
 				cv = quantizeCV(cv);
 			}
@@ -501,7 +503,9 @@ struct Ions : Module {
 		
 		// Leap, Plank, uncertainty and ResetOnRun lights
 		lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
-		lights[PLANK_LIGHT].value = quantize ? 1.0f : 0.0f;
+		lights[PLANK_LIGHT + 0].value = (quantize == 1) ? 1.0f : 0.0f;// Blue
+		lights[PLANK_LIGHT + 1].value = (quantize == 2) ? 1.0f : 0.0f;// Yellow
+		lights[PLANK_LIGHT + 2].value = (quantize == 3) ? 1.0f : 0.0f;// White
 		lights[uncertainty_LIGHT].value = uncertainty ? 1.0f : 0.0f;
 		lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
 		
@@ -648,7 +652,7 @@ struct IonsWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 77.5f, 50.5f), module, Ions::LEAP_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 
 		// Plank light and button
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 86.5f, 62.5f), module, Ions::PLANK_LIGHT));
+		addChild(createLightCentered<SmallLight<GeoBlueYellowWhiteLight>>(Vec(colRulerCenter + 86.5f, 62.5f), module, Ions::PLANK_LIGHT));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 77.5f, 50.5f), module, Ions::PLANK_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 
 		// Octave buttons and lights
