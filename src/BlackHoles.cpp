@@ -219,15 +219,17 @@ struct BlackHoles : Module {
 			lights[EXP_LIGHTS + i].value = isExponential[i] ? 1.0f : 0.0f;
 		
 		// CV Level lights
-		lights[CVALEVEL_LIGHTS + 0].value = (cvMode & 0x1) == 0 ? 1.0f : 0.0f;
-		lights[CVALEVEL_LIGHTS + 1].value = 1.0f - lights[CVALEVEL_LIGHTS + 0].value;
-		lights[CVBLEVEL_LIGHTS + 0].value = (cvMode & 0x2) == 0 ? 1.0f : 0.0f;
-		lights[CVBLEVEL_LIGHTS + 1].value = 1.0f - lights[CVBLEVEL_LIGHTS + 0].value;
+		bool is5V = (cvMode & 0x1) == 0;
+		lights[CVALEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
+		lights[CVALEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
+		is5V = (cvMode & 0x2) == 0;
+		lights[CVBLEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
+		lights[CVBLEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
 	
 	}// step()
 	
-	float calcChannel(float in, Param &level, Input &levelCV, bool isExp, int cvMode) {
-		float levCv = levelCV.active ? (levelCV.value / (cvMode != 0 ? 10.0f : 5.0f)) : 0.0f;
+	inline float calcChannel(float in, Param &level, Input &levelCV, bool isExp, int cvMode) {
+		float levCv = levelCV.active ? (levelCV.value * (cvMode != 0 ? 0.1f : 0.2f)) : 0.0f;
 		float lev = clamp(level.value + levCv, -1.0f, 1.0f);
 		if (isExp) {
 			float newlev = rescale(powf(expBase, fabs(lev)), 1.0f, expBase, 0.0f, 1.0f);

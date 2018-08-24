@@ -53,7 +53,7 @@ struct Pulsars : Module {
 	bool isVoid[2];
 	bool isReverse[2];
 	bool isRandom[2];
-	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
+	int cvMode;// 0 is -5v to 5v, 1 is 0v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
 	
 	// Need to save, no reset
 	int panelTheme;
@@ -316,10 +316,12 @@ struct Pulsars : Module {
 		}
 		
 		// CV Level lights
-		lights[CVALEVEL_LIGHTS + 0].value = (cvMode & 0x1) == 0 ? 1.0f : 0.0f;
-		lights[CVALEVEL_LIGHTS + 1].value = 1.0f - lights[CVALEVEL_LIGHTS + 0].value;
-		lights[CVBLEVEL_LIGHTS + 0].value = (cvMode & 0x2) == 0 ? 1.0f : 0.0f;
-		lights[CVBLEVEL_LIGHTS + 1].value = 1.0f - lights[CVBLEVEL_LIGHTS + 0].value;
+		bool isBiolar = (cvMode & 0x1) == 0;
+		lights[CVALEVEL_LIGHTS + 0].value = isBiolar ? 1.0f : 0.0f;
+		lights[CVALEVEL_LIGHTS + 1].value = isBiolar ? 0.0f : 1.0f;
+		isBiolar = (cvMode & 0x2) == 0;
+		lights[CVBLEVEL_LIGHTS + 0].value = isBiolar ? 1.0f : 0.0f;
+		lights[CVBLEVEL_LIGHTS + 1].value = isBiolar ? 0.0f : 1.0f;
 
 		// LFO lights
 		for (int i = 0; i < 2; i++) {

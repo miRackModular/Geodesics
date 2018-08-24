@@ -214,8 +214,8 @@ struct Branes : Module {
 		
 		// sample and hold outputs
 		for (int sh = 0; sh < 14; sh++) {
-			if (trigInputsActive[sh / 7] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// trig connected (with crosstrigger mechanism)
-				if (trigs[sh / 7] || (sh == 13 && trigs[0]) || (sh == 6 && trigs[1])) {
+			if (trigInputsActive[sh < 7 ? 0 : 1] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// trig connected (with crosstrigger mechanism)
+				if (trigs[sh < 7 ? 0 : 1] || (sh == 13 && trigs[0]) || (sh == 6 && trigs[1])) {
 					if (inputs[IN_INPUTS + sh].active)// if input cable
 						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
 					else {
