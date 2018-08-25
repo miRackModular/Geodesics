@@ -103,14 +103,14 @@ struct Branes : Module {
 	PinkFilter pinkFilter[2];
 	RCFilter redFilter[2];
 	RCFilter blueFilter[2];
-	
+	PinkFilter pinkForBlueFilter[2];
+
 	bool cacheHitRed[2];// no need to init; index is braneIndex
 	float cacheValRed[2];
 	bool cacheHitBlue[2];// no need to init; index is braneIndex
 	float cacheValBlue[2];
 	bool cacheHitPink[2];// no need to init; index is braneIndex
 	float cacheValPink[2];
-
 
 	
 	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -226,8 +226,10 @@ struct Branes : Module {
 			cacheHitPink[i] = false;
 		}
 		
-		// sample and hold outputs
+		// sample and hold outputs (noise continually generated or else stepping non-white on S&H only will not work well because of filters)
+		float noises[14];
 		for (int sh = 0; sh < 14; sh++) {
+			noises[sh] = getNoise(sh);
 			if (outputs[OUT_OUTPUTS + sh].active) {
 				int braneIndex = sh < 7 ? 0 : 1;
 				if (trigInputsActive[braneIndex] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// if trigs connected (with crosstrigger mechanism)
@@ -235,7 +237,7 @@ struct Branes : Module {
 						if (inputs[IN_INPUTS + sh].active)// if input cable
 							heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
 						else
-							heldOuts[sh] = getNoise(sh);// sample and hold noise
+							heldOuts[sh] = noises[sh];//getNoise(sh);// sample and hold noise
 					}
 					// else no rising edge, so simply preserve heldOuts[sh], nothing to do
 				}
@@ -243,7 +245,7 @@ struct Branes : Module {
 					if (inputs[IN_INPUTS + sh].active)
 						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig and input
 					else
-						heldOuts[sh] = getNoise(sh);// generate continuous noise if no trig and no input
+						heldOuts[sh] = noises[sh];//getNoise(sh);// generate continuous noise if no trig and no input
 				}
 				outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
 			}
@@ -265,26 +267,24 @@ struct Branes : Module {
 	float getNoise(int sh) {
 		// some of the code in here is from Joel Robichaud - Nohmad Noise module
 		int noiseIndex = abs( noiseSources[sh] );
-		float whiteSample = whiteNoise.white();
 		if (noiseIndex == WHITE)
-			return 5.0f * whiteSample;
+			return 5.0f * whiteNoise.white();
 		
 		int braneIndex = sh < 7 ? 0 : 1;
 		if (noiseIndex == RED) {
 			if (cacheHitRed[braneIndex])
 				return -1.0 * cacheValRed[braneIndex];
-			redFilter[braneIndex].process(whiteSample);
+			redFilter[braneIndex].process(whiteNoise.white());
 			cacheValRed[braneIndex] = 5.0f * clamp(7.8f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
 			cacheHitRed[braneIndex] = true;
 			return cacheValRed[braneIndex];
 		}
 		
-		pinkFilter[braneIndex].process(whiteSample);
-		float pinkSample = pinkFilter[braneIndex].pink();
 		if (noiseIndex == PINK) {
 			if (cacheHitPink[braneIndex])
 				return -1.0 * cacheValPink[braneIndex];
-			cacheValPink[braneIndex] = 5.0f * clamp(0.18f * pinkSample, -1.0f, 1.0f);
+			pinkFilter[braneIndex].process(whiteNoise.white());
+			cacheValPink[braneIndex] = 5.0f * clamp(0.18f * pinkFilter[braneIndex].pink(), -1.0f, 1.0f);
 			cacheHitPink[braneIndex] = true;
 			return cacheValPink[braneIndex];
 		}
@@ -292,7 +292,8 @@ struct Branes : Module {
 		// noiseIndex == BLUE
 		if (cacheHitBlue[braneIndex])
 			return -1.0 * cacheValBlue[braneIndex];
-		blueFilter[braneIndex].process(pinkSample);
+		pinkForBlueFilter[braneIndex].process(whiteNoise.white());
+		blueFilter[braneIndex].process(pinkForBlueFilter[braneIndex].pink());
 		cacheValBlue[braneIndex] = 5.0f * clamp(0.64f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
 		cacheHitBlue[braneIndex] = true;
 		return cacheValBlue[braneIndex];
