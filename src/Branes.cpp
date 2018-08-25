@@ -233,7 +233,7 @@ struct Branes : Module {
 			if (outputs[OUT_OUTPUTS + sh].active) {
 				int braneIndex = sh < 7 ? 0 : 1;
 				if (trigInputsActive[braneIndex] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// if trigs connected (with crosstrigger mechanism)
-					if (trigs[braneIndex] || (sh == 13 && trigs[0]) || (sh == 6 && trigs[1])) {// if trig rising edge
+					if ((trigInputsActive[braneIndex] && trigs[braneIndex]) || (sh == 13 && trigInputsActive[0] && trigs[0]) || (sh == 6 && trigInputsActive[1] && trigs[1])) {// if trig rising edge
 						if (inputs[IN_INPUTS + sh].active)// if input cable
 							heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
 						else
