@@ -84,7 +84,6 @@ struct Branes : Module {
 	// S&H are numbered 7 to 13 in BraneB from top right to top left
 	enum NoiseId {NONE, WHITE, PINK, RED, BLUE};//use negative value for inv phase
 	int noiseSources[14] = {PINK, RED, BLUE, WHITE, -BLUE, -RED, -PINK,   -PINK, -RED, -BLUE, WHITE, BLUE, RED, PINK};
-	static constexpr float nullNoise = 100.0f;// when a noise has not been generated for the current step
 
 	// Need to save, with reset
 	bool trigBypass[2];
@@ -98,11 +97,20 @@ struct Branes : Module {
 	// No need to save, no reset
 	SchmittTrigger sampleTriggers[2];
 	SchmittTrigger trigBypassTriggers[2];
-	NoiseGenerator whiteNoise;
-	PinkFilter pinkFilter;
-	RCFilter redFilter;
-	RCFilter blueFilter;
 	float trigLights[2];
+	
+	NoiseGenerator whiteNoise;
+	PinkFilter pinkFilter[2];
+	RCFilter redFilter[2];
+	RCFilter blueFilter[2];
+	
+	bool cacheHitRed[2];// no need to init; index is braneIndex
+	float cacheValRed[2];
+	bool cacheHitBlue[2];// no need to init; index is braneIndex
+	float cacheValBlue[2];
+	bool cacheHitPink[2];// no need to init; index is braneIndex
+	float cacheValPink[2];
+
 
 	
 	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -115,8 +123,10 @@ struct Branes : Module {
 			trigBypassTriggers[i].reset();
 			trigLights[i] = 0.0f;
 		}
-		redFilter.setCutoff(441.0f / engineGetSampleRate());
-		blueFilter.setCutoff(44100.0f / engineGetSampleRate());
+		redFilter[0].setCutoff(441.0f / engineGetSampleRate());
+		redFilter[1].setCutoff(441.0f / engineGetSampleRate());
+		blueFilter[0].setCutoff(44100.0f / engineGetSampleRate());
+		blueFilter[1].setCutoff(44100.0f / engineGetSampleRate());
 		
 		onReset();
 	}
@@ -193,8 +203,6 @@ struct Branes : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
-		float stepNoises[6] = {nullNoise, nullNoise, nullNoise, nullNoise, nullNoise, 0.0f};// order is whiteBase (-1 to 1), white, pink, red, blue, pink_processed (1.0f or 0.0f)
-		
 		// trigBypass buttons and cv inputs
 		for (int i = 0; i < 2; i++) {
 			if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].value)) {
@@ -212,31 +220,33 @@ struct Branes : Module {
 			trigInputsActive[i] = trigBypass[i] ? false : inputs[TRIG_INPUTS + i].active;
 		}
 		
+		for (int i = 0; i < 2; i++) {
+			cacheHitRed[i] = false;
+			cacheHitBlue[i] = false;
+			cacheHitPink[i] = false;
+		}
+		
 		// sample and hold outputs
 		for (int sh = 0; sh < 14; sh++) {
-			if (trigInputsActive[sh < 7 ? 0 : 1] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// trig connected (with crosstrigger mechanism)
-				if (trigs[sh < 7 ? 0 : 1] || (sh == 13 && trigs[0]) || (sh == 6 && trigs[1])) {
-					if (inputs[IN_INPUTS + sh].active)// if input cable
-						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
-					else {
-						int noiseIndex = prepareNoise(stepNoises, sh);// sample and hold noise
-						heldOuts[sh] = stepNoises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
+			if (outputs[OUT_OUTPUTS + sh].active) {
+				int braneIndex = sh < 7 ? 0 : 1;
+				if (trigInputsActive[braneIndex] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// if trigs connected (with crosstrigger mechanism)
+					if (trigs[braneIndex] || (sh == 13 && trigs[0]) || (sh == 6 && trigs[1])) {// if trig rising edge
+						if (inputs[IN_INPUTS + sh].active)// if input cable
+							heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
+						else
+							heldOuts[sh] = getNoise(sh);// sample and hold noise
 					}
+					// else no rising edge, so simply preserve heldOuts[sh], nothing to do
 				}
+				else { // no trig connected
+					if (inputs[IN_INPUTS + sh].active)
+						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig and input
+					else
+						heldOuts[sh] = getNoise(sh);// generate continuous noise if no trig and no input
+				}
+				outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
 			}
-			else { // no trig connected
-				if (inputs[IN_INPUTS + sh].active) {
-					heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig and no input
-				}
-				else {
-					heldOuts[sh] = 0.0f;
-					if (outputs[OUT_OUTPUTS + sh].active) {
-						int noiseIndex = prepareNoise(stepNoises, sh);
-						heldOuts[sh] = stepNoises[noiseIndex] * (noiseSources[sh] > 0 ? 1.0f : -1.0f);
-					}
-				}
-			}
-			outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
 		}
 		
 		// Lights
@@ -252,34 +262,40 @@ struct Branes : Module {
 		
 	}// step()
 	
-	int prepareNoise(float* stepNoises, int sh) {
+	float getNoise(int sh) {
+		// some of the code in here is from Joel Robichaud - Nohmad Noise module
 		int noiseIndex = abs( noiseSources[sh] );
-		if (stepNoises[noiseIndex] == nullNoise) {
-			if (stepNoises[0] == nullNoise)
-				stepNoises[0] = whiteNoise.white();
-			if ((noiseIndex == PINK || noiseIndex == BLUE) && stepNoises[5] == 0.0f) {
-				pinkFilter.process(stepNoises[0]);
-				stepNoises[5] = 1.0f;
-			}
-			switch (noiseIndex) {
-				// most of the code in here is from Joel Robichaud - Nohmad Noise module
-				case (PINK) :
-					stepNoises[noiseIndex] = 5.0f * clamp(0.18f * pinkFilter.pink(), -1.0f, 1.0f);
-				break;
-				case (RED) :
-					redFilter.process(stepNoises[0]);
-					stepNoises[noiseIndex] = 5.0f * clamp(7.8f * redFilter.lowpass(), -1.0f, 1.0f);
-				break;
-				case (BLUE) :
-					blueFilter.process(pinkFilter.pink());
-					stepNoises[noiseIndex] = 5.0f * clamp(0.64f * blueFilter.highpass(), -1.0f, 1.0f);
-				break;
-				default ://(WHITE)
-					stepNoises[noiseIndex] = 5.0f * stepNoises[0];
-				break;
-			}
+		float whiteSample = whiteNoise.white();
+		if (noiseIndex == WHITE)
+			return 5.0f * whiteSample;
+		
+		int braneIndex = sh < 7 ? 0 : 1;
+		if (noiseIndex == RED) {
+			if (cacheHitRed[braneIndex])
+				return -1.0 * cacheValRed[braneIndex];
+			redFilter[braneIndex].process(whiteSample);
+			cacheValRed[braneIndex] = 5.0f * clamp(7.8f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
+			cacheHitRed[braneIndex] = true;
+			return cacheValRed[braneIndex];
 		}
-		return noiseIndex;
+		
+		pinkFilter[braneIndex].process(whiteSample);
+		float pinkSample = pinkFilter[braneIndex].pink();
+		if (noiseIndex == PINK) {
+			if (cacheHitPink[braneIndex])
+				return -1.0 * cacheValPink[braneIndex];
+			cacheValPink[braneIndex] = 5.0f * clamp(0.18f * pinkSample, -1.0f, 1.0f);
+			cacheHitPink[braneIndex] = true;
+			return cacheValPink[braneIndex];
+		}
+			
+		// noiseIndex == BLUE
+		if (cacheHitBlue[braneIndex])
+			return -1.0 * cacheValBlue[braneIndex];
+		blueFilter[braneIndex].process(pinkSample);
+		cacheValBlue[braneIndex] = 5.0f * clamp(0.64f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
+		cacheHitBlue[braneIndex] = true;
+		return cacheValBlue[braneIndex];
 	}
 };
 
