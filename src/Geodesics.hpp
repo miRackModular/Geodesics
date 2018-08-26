@@ -120,8 +120,29 @@ struct BlankCKnob : SVGKnob {
 struct GeoGrayModuleLight : ModuleLightWidget {
 	GeoGrayModuleLight() {
 		bgColor = nvgRGB(0x8e, 0x8e, 0x8e);
-		borderColor = nvgRGBA(0, 0, 0, 0x60);
+		borderColor = nvgRGB(0x1d, 0x1d, 0x1b);//nvgRGBA(0, 0, 0, 0x60);
 	}
+	
+	void drawLight(NVGcontext *vg) override { // from LightWidget.cpp (only nvgStrokeWidth of border was changed)
+		float radius = box.size.x / 2.0;
+
+		nvgBeginPath(vg);
+		nvgCircle(vg, radius, radius, radius);
+
+		// Background
+		nvgFillColor(vg, bgColor);
+		nvgFill(vg);
+
+		// Foreground
+		nvgFillColor(vg, color);
+		nvgFill(vg);
+
+		// Border
+		nvgStrokeWidth(vg, 1.0);// 0.5);
+		nvgStrokeColor(vg, borderColor);
+		nvgStroke(vg);
+	}
+	
 };
 
 struct GeoWhiteLight : GeoGrayModuleLight {
