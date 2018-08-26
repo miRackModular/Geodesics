@@ -99,4 +99,4 @@ struct BlankInfoWidget : ModuleWidget {
 	}
 };
 
-Model *modelBlankInfo = Model::create<BlankInfo, BlankInfoWidget>("Geodesics", "Blank-Panel Info", "MISC - Blank-Panel Info", BLANK_TAG);
+Model *modelBlankInfo = Model::create<BlankInfo, BlankInfoWidget>("Geodesics", "Blank-Panel Info", "Blank-Panel Info", BLANK_TAG);

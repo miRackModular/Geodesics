@@ -168,4 +168,4 @@ struct BlankLogoWidget : ModuleWidget {
 	}
 };
 
-Model *modelBlankLogo = Model::create<BlankLogo, BlankLogoWidget>("Geodesics", "Blank-Panel Logo", "MISC - Blank-Panel Logo", BLANK_TAG);
+Model *modelBlankLogo = Model::create<BlankLogo, BlankLogoWidget>("Geodesics", "Blank-Panel Logo", "Blank-Panel Logo", BLANK_TAG);
