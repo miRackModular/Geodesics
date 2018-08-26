@@ -1,6 +1,6 @@
 # A Modular Collection for VCV Rack by Pyer and Marc Boulé
 
-This page shows a very brief overview of the modules, along with a link to the user manual. For more information, including videos of the modules in use, please see the [Geodesics Website](https://www.pyer.be/geodesics.html). The modules are available in the [plugin manager](https://vcvrack.com/plugins.html) of [VCV Rack](https://vcvrack.com).
+This page shows a very brief overview of the modules, along with a link to the [user manual](GeodesicsUserManual062.pdf). For more information, including videos of the modules in use, please see the [Geodesics Website](https://www.pyer.be/geodesics.html). The modules are available in the [plugin manager](https://vcvrack.com/plugins.html) of [VCV Rack](https://vcvrack.com).
 
 ![Geodesics](res/img/Blanks.jpg)
 
@@ -14,7 +14,7 @@ Based on code from the Fundamental plugins by Andrew Belt and graphics from the 
 
 # Modules <a id="modules"></a>
 
-Here are the modules. Short desctiptions are given below, while more detailed information can be found in the [user manual](GeodesicsUserManual062.pdf). A summary of changes done in version 0.6.2 can be found [here](GeodesicsWhatsNew062.pdf), while the changes done in version 0.6.1 can be found [here](GeodesicsWhatsNew061.pdf). 
+Here are the modules. A summary of changes done in version 0.6.2 can be found [here](GeodesicsWhatsNew062.pdf), while the changes done in version 0.6.1 can be found [here](GeodesicsWhatsNew061.pdf). 
 
 * [Black Holes](#blackholes): Gravitational Voltage Controled Amplifiers.
 
