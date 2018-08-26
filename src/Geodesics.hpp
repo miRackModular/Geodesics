@@ -153,7 +153,6 @@ struct GeoWhiteLight : GeoGrayModuleLight {
 struct GeoBlueLight : GeoGrayModuleLight {
 	GeoBlueLight() {
 		addBaseColor(COLOR_BLUE);
-		//borderColor = nvgRGB(0x1f, 0x86, 0xcc);//1f86cc
 	}
 };
 struct GeoRedLight : GeoGrayModuleLight {
@@ -164,7 +163,6 @@ struct GeoRedLight : GeoGrayModuleLight {
 struct GeoYellowLight : GeoGrayModuleLight {
 	GeoYellowLight() {
 		addBaseColor(COLOR_YELLOW);
-		//borderColor = nvgRGB(0xff, 0xc2, 0x00);//ffc200
 	}
 };
 struct GeoWhiteRedLight : GeoGrayModuleLight {
