@@ -480,7 +480,7 @@ struct Ions : Module {
 				cv = knobVal * (float)(maxCV * 2) - (float)maxCV;
 			}
 			outputs[SEQ_OUTPUTS + i].value = cv;
-			outputs[JUMP_OUTPUTS + i].value = jumpPulses[i].process((float)sampleTime);
+			outputs[JUMP_OUTPUTS + i].value = jumpPulses[i].process((float)sampleTime) ? 10.0f : 0.0f;
 		}
 		
 		// Blue and Yellow lights
@@ -769,6 +769,9 @@ struct IonsWidget : ModuleWidget {
 Model *modelIons = Model::create<Ions, IonsWidget>("Geodesics", "Ions", "Ions", SEQUENCER_TAG);
 
 /*CHANGE LOG
+
+0.6.3:
+make jump triggers outputs 10V triggers instead of 1V triggers
 
 0.6.1:
 Ions reloaded (many changes)
