@@ -430,6 +430,8 @@ Model *modelBranes = Model::create<Branes, BranesWidget>("Geodesics", "Branes", 
 
 /*CHANGE LOG
 
+0.6.2: bug fix for stuck outputs, improve random noise non-correlation 
+
 0.6.0:
 created
 
