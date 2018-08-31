@@ -33,8 +33,8 @@ extern Model *modelBlankInfo;
 
 // General constants
 static const float lightLambda = 0.075f;
-static const std::string lightPanelID = "White light";
-static const std::string darkPanelID = "Dark copper";
+static const std::string lightPanelID = "White light edition";
+static const std::string darkPanelID = "Dark matter edition";
 
 
 
@@ -47,15 +47,15 @@ struct GeoPort : DynamicSVGPort {
 	GeoPort() {
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
-		addFrame(SVG::load(assetPlugin(plugin, "res/light/comp/Jack.svg")));
-		//addFrame(SVG::load(assetPlugin(plugin, "res/dark/comp/Jack.svg")));// no dark ports in Geodesics for now
+		addFrame(SVG::load(assetPlugin(plugin, "res/WhiteLight/Jack-WL.svg")));
+		addFrame(SVG::load(assetPlugin(plugin, "res/DarkMatter/Jack-DM.svg")));
 	}
 };
 
 struct BlankPort : SVGPort {
 	BlankPort() {
 		shadow->opacity = 0.0;
-		setSVG(SVG::load(assetPlugin(plugin, "res/comp/Otrsp-01.svg")));
+		setSVG(SVG::load(assetPlugin(plugin, "res/general/Otrsp-01.svg")));
 	}
 };
 
@@ -64,10 +64,10 @@ struct BlankPort : SVGPort {
 
 struct GeoPushButton : DynamicSVGSwitch, MomentarySwitch {
 	GeoPushButton() {// only one skin for now
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/PushButton1_0.svg")));
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/PushButton1_1.svg")));
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_0.svg"))); // no dark buttons in Geodesics for now
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_1.svg"))); // no dark buttons in Geodesics for now
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/general/PushButton1_0.svg")));
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/general/PushButton1_1.svg")));
+		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_0.svg"))); // no dark psuhbutton in Geodesics for now
+		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_1.svg"))); // no dark psuhbutton in Geodesics for now
 	}
 };
 
@@ -82,8 +82,8 @@ struct GeoKnob : DynamicSVGKnob {
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if know is small (taken from IMSmallKnob)
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/light/comp/Knob.svg")));
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/Knob.svg")));// no dark knobs in Geodesics for now
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/WhiteLight/Knob-WL.svg")));
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/DarkMatter/Knob-DM.svg")));
 	}
 };
 
@@ -104,12 +104,13 @@ struct GeoKnobBottom : GeoKnob {
 };
 
 
-struct BlankCKnob : SVGKnob {
+struct BlankCKnob : DynamicSVGKnob {
 	BlankCKnob() {
 		minAngle = -0.73*M_PI;
 		maxAngle = 0.73*M_PI;
 		shadow->opacity = 0.0;
-		setSVG(SVG::load(assetPlugin(plugin, "res/comp/C-01.svg")));
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/WhiteLight/C-WL.svg")));
+		addFrameAll(SVG::load(assetPlugin(plugin, "res/DarkMatter/C-DM.svg")));
 	}
 };
 
