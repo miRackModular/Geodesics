@@ -32,7 +32,7 @@ struct BlackHoles : Module {
 	};
 	enum LightIds {
 		ENUMS(EXP_LIGHTS, 2),
-		ENUMS(WORMHOLE_LIGHT, 2),// room for WhiteRed
+		WORMHOLE_LIGHT,
 		ENUMS(CVALEVEL_LIGHTS, 2),// White, but two lights (light 0 is cvMode bit = 0, light 1 is cvMode bit = 1)
 		ENUMS(CVBLEVEL_LIGHTS, 2),// White, but two lights
 		NUM_LIGHTS
@@ -194,15 +194,12 @@ struct BlackHoles : Module {
 		// BlackHole 1 all outputs
 		float blackHole1 = 0.0f;
 		float inputs1[4] = {10.0f, 10.0f, 10.0f, 10.0f};// default to generate CV when no input connected
-		bool allUnconnected = true;
-		for (int i = 0; i < 4; i++) 
-			if (inputs[IN_INPUTS + i + 4].active) {
+		for (int i = 0; i < 4; i++) {
+			if (inputs[IN_INPUTS + i + 4].active)
 				inputs1[i] = inputs[IN_INPUTS + i + 4].value;
-				allUnconnected = false;
-			}
-		if (allUnconnected && wormhole)
-			for (int i = 0; i < 4; i++)
+			else if (wormhole)
 				inputs1[i] = blackHole0;
+		}
 		for (int i = 0; i < 4; i++) {
 			float chanVal = calcChannel(inputs1[i], params[LEVEL_PARAMS + i + 4], inputs[LEVELCV_INPUTS + i + 4], isExponential[1], cvMode >> 1);
 			outputs[OUT_OUTPUTS + i + 4].value = chanVal;
@@ -211,8 +208,7 @@ struct BlackHoles : Module {
 		outputs[BLACKHOLE_OUTPUTS + 1].value = clamp(blackHole1, -10.0f, 10.0f);
 
 		// Wormhole light
-		lights[WORMHOLE_LIGHT + 0].value = ((wormhole && allUnconnected) ? 1.0f : 0.0f);
-		lights[WORMHOLE_LIGHT + 1].value = ((wormhole && !allUnconnected) ? 1.0f : 0.0f);
+		lights[WORMHOLE_LIGHT].value = (wormhole ? 1.0f : 0.0f);
 				
 		// isExponential lights
 		for (int i = 0; i < 2; i++)
@@ -375,7 +371,7 @@ struct BlackHolesWidget : ModuleWidget {
 		
 		// Wormhole button and light
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtonsX, rowRulerBlack1 - offsetButtonsY), module, BlackHoles::WORMHOLE_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - offsetButtonsX + offsetLedVsBut, rowRulerBlack1 - offsetButtonsY + offsetLedVsBut), module, BlackHoles::WORMHOLE_LIGHT));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtonsX + offsetLedVsBut, rowRulerBlack1 - offsetButtonsY + offsetLedVsBut), module, BlackHoles::WORMHOLE_LIGHT));
 		
 		
 		// CV Level A button and light
@@ -395,6 +391,9 @@ struct BlackHolesWidget : ModuleWidget {
 Model *modelBlackHoles = Model::create<BlackHoles, BlackHolesWidget>("Geodesics", "BlackHoles", "BlackHoles", AMPLIFIER_TAG);
 
 /*CHANGE LOG
+
+0.6.3:
+change wormhole behvior, simplified (no all unconnected criteria)
 
 0.6.1:
 add CV level modes buttons and lights
