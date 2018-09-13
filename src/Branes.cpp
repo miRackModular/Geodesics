@@ -185,10 +185,10 @@ struct Branes : Module {
 		// trigBypass
 		json_t *trigBypass0J = json_object_get(rootJ, "trigBypass0");
 		if (trigBypass0J)
-			trigBypass[0] = json_real_value(trigBypass0J);
+			trigBypass[0] = json_number_value(trigBypass0J);
 		json_t *trigBypass1J = json_object_get(rootJ, "trigBypass1");
 		if (trigBypass1J)
-			trigBypass[1] = json_real_value(trigBypass1J);
+			trigBypass[1] = json_number_value(trigBypass1J);
 
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");

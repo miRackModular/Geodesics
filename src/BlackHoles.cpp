@@ -132,10 +132,10 @@ struct BlackHoles : Module {
 		// isExponential
 		json_t *isExponential0J = json_object_get(rootJ, "isExponential0");
 		if (isExponential0J)
-			isExponential[0] = json_real_value(isExponential0J);
+			isExponential[0] = json_number_value(isExponential0J);
 		json_t *isExponential1J = json_object_get(rootJ, "isExponential1");
 		if (isExponential1J)
-			isExponential[1] = json_real_value(isExponential1J);
+			isExponential[1] = json_number_value(isExponential1J);
 
 		// wormhole
 		json_t *wormholeJ = json_object_get(rootJ, "wormhole");

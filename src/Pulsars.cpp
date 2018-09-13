@@ -163,26 +163,26 @@ struct Pulsars : Module {
 		// isVoid
 		json_t *isVoid0J = json_object_get(rootJ, "isVoid0");
 		if (isVoid0J)
-			isVoid[0] = json_real_value(isVoid0J);
+			isVoid[0] = json_number_value(isVoid0J);
 		json_t *isVoid1J = json_object_get(rootJ, "isVoid1");
 		if (isVoid1J)
-			isVoid[1] = json_real_value(isVoid1J);
+			isVoid[1] = json_number_value(isVoid1J);
 
 		// isReverse
 		json_t *isReverse0J = json_object_get(rootJ, "isReverse0");
 		if (isReverse0J)
-			isReverse[0] = json_real_value(isReverse0J);
+			isReverse[0] = json_number_value(isReverse0J);
 		json_t *isReverse1J = json_object_get(rootJ, "isReverse1");
 		if (isReverse1J)
-			isReverse[1] = json_real_value(isReverse1J);
+			isReverse[1] = json_number_value(isReverse1J);
 
 		// isRandom
 		json_t *isRandom0J = json_object_get(rootJ, "isRandom0");
 		if (isRandom0J)
-			isRandom[0] = json_real_value(isRandom0J);
+			isRandom[0] = json_number_value(isRandom0J);
 		json_t *isRandom1J = json_object_get(rootJ, "isRandom1");
 		if (isRandom1J)
-			isRandom[1] = json_real_value(isRandom1J);
+			isRandom[1] = json_number_value(isRandom1J);
 
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
