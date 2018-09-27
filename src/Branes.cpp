@@ -299,13 +299,13 @@ struct Branes : Module {
 	
 	float getNoise(int sh) {
 		// some of the code in here is from Joel Robichaud - Nohmad Noise module
-		int noiseIndex = abs( noiseSources[sh] );
-		if (noiseIndex == WHITE)
-			return 5.0f * whiteNoise.white();
-		
 		float ret = 0.0f;
 		int braneIndex = sh < 7 ? 0 : 1;
-		if (noiseIndex == RED) {
+		int noiseIndex = abs( noiseSources[sh] );
+		if (noiseIndex == WHITE) {
+			ret = 5.0f * whiteNoise.white();
+		}
+		else if (noiseIndex == RED) {
 			if (cacheHitRed[braneIndex])
 				ret = -1.0 * cacheValRed[braneIndex];
 			else {
@@ -339,7 +339,7 @@ struct Branes : Module {
 		
 		// noise ranges
 		if (noiseRange[0]) {
-			if (sh >= 4 && sh <= 6)// 0 to 10 instead of -5 to 5
+			if (sh >= 3 && sh <= 6)// 0 to 10 instead of -5 to 5
 				ret += 5.0f;
 		}
 		if (noiseRange[1]) {
@@ -347,7 +347,7 @@ struct Branes : Module {
 				ret += 5.0f;
 				ret *= 0.1f;
 			}
-			else if (sh >= 11) {// -1 to 1 instead of -5 to 5
+			else if (sh >= 10) {// -1 to 1 instead of -5 to 5
 				ret *= 0.2f;
 			}	
 		}
