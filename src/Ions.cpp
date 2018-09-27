@@ -26,6 +26,7 @@ struct Ions : Module {
 		RESETONRUN_PARAM,
 		STEPCLOCKS_PARAM,
 		// -- 0.6.3 ^^
+		PLANK2_PARAM,
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -56,7 +57,7 @@ struct Ions : Module {
 		LEAP_LIGHT,
 		ENUMS(OCTA_LIGHTS, 3),// 0 is center, 1 is inside mirrors, 2 is outside mirrors
 		ENUMS(OCTB_LIGHTS, 3),
-		ENUMS(PLANK_LIGHT, 3),// room for blue, yellow, white
+		ENUMS(PLANK_LIGHTS, 2),// blue, yellow (both white leds) (modified for 0.6.4 but no effect on patches)
 		UNCERTANTY_LIGHT,
 		ENUMS(JUMP_LIGHTS, 2),
 		RESETONRUN_LIGHT,
@@ -73,7 +74,7 @@ struct Ions : Module {
 	// Need to save, with reset
 	bool running;
 	bool resetOnRun;
-	int quantize;// a.k.a. plank constant, 0 = none, 1 = blue, 2 = yellow, 3 = white (both)
+	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
 	//bool symmetry;
 	bool uncertainty;
 	int stepIndexes[2];// position of electrons (sequencers)
@@ -100,6 +101,7 @@ struct Ions : Module {
 	SchmittTrigger stateCVTriggers[2];
 	SchmittTrigger leapTrigger;
 	SchmittTrigger plankTrigger;
+	SchmittTrigger plank2Trigger;
 	SchmittTrigger uncertaintyTrigger;
 	SchmittTrigger resetOnRunTrigger;
 	SchmittTrigger stepClocksTrigger;
@@ -131,6 +133,7 @@ struct Ions : Module {
 		resetTrigger.reset();
 		leapTrigger.reset();
 		plankTrigger.reset();
+		plank2Trigger.reset();
 		uncertaintyTrigger.reset();
 		resetOnRunTrigger.reset();
 		stepClocksTrigger.reset();
@@ -171,7 +174,7 @@ struct Ions : Module {
 		// Need to save, with reset
 		running = false;
 		resetOnRun = false;
-		quantize = randomu32() % 4;
+		quantize = randomu32() & 0x3;
 		//symmetry = false;
 		uncertainty = false;
 		for (int i = 0; i < 2; i++) {
@@ -334,12 +337,11 @@ struct Ions : Module {
 			leap = !leap;
 		}
 
-		// Plank button (quatize)
-		if (plankTrigger.process(params[PLANK_PARAM].value)) {
-			quantize++;
-			if (quantize >= 4)
-				quantize = 0;
-		}
+		// Plank buttons (quatize)
+		if (plankTrigger.process(params[PLANK_PARAM].value))
+			quantize ^= 0x1;
+		if (plank2Trigger.process(params[PLANK2_PARAM].value))
+			quantize ^= 0x2;
 
 		// uncertainty button
 		if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].value + inputs[UNCERTANTY_INPUT].value)) {
@@ -507,9 +509,8 @@ struct Ions : Module {
 		
 		// Leap, Plank, uncertainty and ResetOnRun lights
 		lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
-		lights[PLANK_LIGHT + 0].value = (quantize == 1) ? 1.0f : 0.0f;// Blue
-		lights[PLANK_LIGHT + 1].value = (quantize == 2) ? 1.0f : 0.0f;// Yellow
-		lights[PLANK_LIGHT + 2].value = (quantize == 3) ? 1.0f : 0.0f;// White
+		lights[PLANK_LIGHTS + 0].value = (quantize & 0x1) ? 1.0f : 0.0f;// Blue
+		lights[PLANK_LIGHTS + 1].value = (quantize & 0x2) ? 1.0f : 0.0f;// Yellow
 		lights[UNCERTANTY_LIGHT].value = uncertainty ? 1.0f : 0.0f;
 		lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
 		
@@ -651,9 +652,12 @@ struct IonsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX - 3.0f, probY - 37.2f - 4.8f), module, Ions::JUMP_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX - 3.0f, probY + 36.7f + 5.0f), module, Ions::JUMP_LIGHTS + 1));
 		
-		// Plank light and button
-		addChild(createLightCentered<SmallLight<GeoBlueYellowWhiteLight>>(Vec(233.5f, 60.5f), module, Ions::PLANK_LIGHT));
+		// Plank light and button (top)
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(233.5f, 60.5f), module, Ions::PLANK_LIGHTS + 0));
 		addParam(createDynamicParam<GeoPushButton>(Vec(225.5f, 48.5f), module, Ions::PLANK_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		// Plank light and button (bottom)
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(233.5f, 298.5f), module, Ions::PLANK_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(225.5f, 310.5f), module, Ions::PLANK2_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 
 		// Octave buttons and lights
 		float octX = colRulerCenter + 107.0f;
@@ -761,12 +765,12 @@ struct IonsWidget : ModuleWidget {
 		
 		// Leap light, button and CV input
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 5.0f, 60.5f), module, Ions::LEAP_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX + 4.0f, 50.5f), module, Ions::LEAP_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX + 3.0f, 48.5f), module, Ions::LEAP_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 14.0f, 76.5f), Port::INPUT, module, Ions::LEAP_INPUT, &module->panelTheme));
 
 		// uncertainty light, button and CV input
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 5.0f, 298.5f), module, Ions::UNCERTANTY_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX + 4.0f, 310.5f), module, Ions::UNCERTANTY_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX + 3.0f, 310.5f), module, Ions::UNCERTANTY_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 14.0f, 282.5f), Port::INPUT, module, Ions::UNCERTANTY_INPUT, &module->panelTheme));
 
 	}
@@ -775,6 +779,10 @@ struct IonsWidget : ModuleWidget {
 Model *modelIons = Model::create<Ions, IonsWidget>("Geodesics", "Ions", "Ions", SEQUENCER_TAG);
 
 /*CHANGE LOG
+
+0.6.4:
+make separate buttons for plank constant (quantize)
+add cv inputs for uncertanty and quantum leap
 
 0.6.3:
 make jump triggers outputs 10V triggers instead of 1V triggers
