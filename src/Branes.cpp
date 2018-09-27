@@ -60,12 +60,16 @@ struct PinkFilter {
 struct Branes : Module {
 	enum ParamIds {
 		ENUMS(TRIG_BYPASS_PARAMS, 2),
+		// -- 0.6.3 ^^
+		ENUMS(NOISE_RANGE_PARAMS, 2),
 		NUM_PARAMS
 	};
 	enum InputIds {
 		ENUMS(IN_INPUTS, 14),
 		ENUMS(TRIG_INPUTS, 2),
 		ENUMS(TRIG_BYPASS_INPUTS, 2),
+		// -- 0.6.3 ^^
+		ENUMS(NOISE_RANGE_INPUTS, 2),
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -75,6 +79,8 @@ struct Branes : Module {
 	enum LightIds {
 		ENUMS(BYPASS_CV_LIGHTS, 2 * 2),// room for white-red
 		ENUMS(BYPASS_TRIG_LIGHTS, 2 * 2),// room for white-red
+		// -- 0.6.3 ^^
+		ENUMS(NOISE_RANGE_LIGHTS, 2),
 		NUM_LIGHTS
 	};
 	
@@ -87,6 +93,7 @@ struct Branes : Module {
 
 	// Need to save, with reset
 	bool trigBypass[2];
+	bool noiseRange[2];
 	
 	// Need to save, no reset
 	int panelTheme;
@@ -97,6 +104,7 @@ struct Branes : Module {
 	// No need to save, no reset
 	SchmittTrigger sampleTriggers[2];
 	SchmittTrigger trigBypassTriggers[2];
+	SchmittTrigger noiseRangeTriggers[2];
 	float trigLights[2];
 	
 	NoiseGenerator whiteNoise;
@@ -121,6 +129,7 @@ struct Branes : Module {
 		for (int i = 0; i < 2; i++) {
 			sampleTriggers[i].reset();
 			trigBypassTriggers[i].reset();
+			noiseRangeTriggers[i].reset();
 			trigLights[i] = 0.0f;
 		}
 		redFilter[0].setCutoff(441.0f / engineGetSampleRate());
@@ -139,8 +148,10 @@ struct Branes : Module {
 	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
 		// Need to save, with reset
-		for (int i = 0; i < 2; i++)
+		for (int i = 0; i < 2; i++) {
 			trigBypass[i] = false;
+			noiseRange[i] = false;
+		}
 		
 		// No need to save, with reset
 		for (int i = 0; i < 14; i++)
@@ -152,8 +163,10 @@ struct Branes : Module {
 	// called by engine thread if right-click randomize
 	void onRandomize() override {
 		// Need to save, with reset
-		for (int i = 0; i < 2; i++)
+		for (int i = 0; i < 2; i++) {
 			trigBypass[i] = (randomu32() % 2) > 0;
+			noiseRange[i] = (randomu32() % 2) > 0;
+		}
 		
 		// No need to save, with reset
 		for (int i = 0; i < 14; i++)
@@ -169,6 +182,10 @@ struct Branes : Module {
 		// trigBypass
 		json_object_set_new(rootJ, "trigBypass0", json_real(trigBypass[0]));
 		json_object_set_new(rootJ, "trigBypass1", json_real(trigBypass[1]));
+
+		// noiseRange
+		json_object_set_new(rootJ, "noiseRange0", json_real(noiseRange[0]));
+		json_object_set_new(rootJ, "noiseRange1", json_real(noiseRange[1]));
 
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
@@ -190,6 +207,14 @@ struct Branes : Module {
 		if (trigBypass1J)
 			trigBypass[1] = json_number_value(trigBypass1J);
 
+		// noiseRange
+		json_t *noiseRange0J = json_object_get(rootJ, "noiseRange0");
+		if (noiseRange0J)
+			noiseRange[0] = json_number_value(noiseRange0J);
+		json_t *noiseRange1J = json_object_get(rootJ, "noiseRange1");
+		if (noiseRange1J)
+			noiseRange[1] = json_number_value(noiseRange1J);
+
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -207,6 +232,13 @@ struct Branes : Module {
 		for (int i = 0; i < 2; i++) {
 			if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].value)) {
 				trigBypass[i] = !trigBypass[i];
+			}
+		}
+		
+		// noiseRange buttons and cv inputs
+		for (int i = 0; i < 2; i++) {
+			if (noiseRangeTriggers[i].process(params[NOISE_RANGE_PARAMS + i].value + inputs[NOISE_RANGE_INPUTS + i].value)) {
+				noiseRange[i] = !noiseRange[i];
 			}
 		}
 
@@ -237,7 +269,7 @@ struct Branes : Module {
 						if (inputs[IN_INPUTS + sh].active)// if input cable
 							heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
 						else
-							heldOuts[sh] = noises[sh];//getNoise(sh);// sample and hold noise
+							heldOuts[sh] = noises[sh];// sample and hold noise
 					}
 					// else no rising edge, so simply preserve heldOuts[sh], nothing to do
 				}
@@ -245,7 +277,7 @@ struct Branes : Module {
 					if (inputs[IN_INPUTS + sh].active)
 						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig and input
 					else
-						heldOuts[sh] = noises[sh];//getNoise(sh);// generate continuous noise if no trig and no input
+						heldOuts[sh] = noises[sh];// continuous noise if no trig and no input
 				}
 				outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
 			}
@@ -259,6 +291,7 @@ struct Branes : Module {
 			lights[BYPASS_CV_LIGHTS + i * 2 + 1].value = red;
 			lights[BYPASS_TRIG_LIGHTS + i * 2 + 0].value = white;
 			lights[BYPASS_TRIG_LIGHTS + i * 2 + 1].value = red;
+			lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
 			trigLights[i] -= (trigLights[i] / lightLambda) * (float)engineGetSampleTime();
 		}
 		
@@ -270,33 +303,55 @@ struct Branes : Module {
 		if (noiseIndex == WHITE)
 			return 5.0f * whiteNoise.white();
 		
+		float ret = 0.0f;
 		int braneIndex = sh < 7 ? 0 : 1;
 		if (noiseIndex == RED) {
 			if (cacheHitRed[braneIndex])
-				return -1.0 * cacheValRed[braneIndex];
-			redFilter[braneIndex].process(whiteNoise.white());
-			cacheValRed[braneIndex] = 5.0f * clamp(7.8f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
-			cacheHitRed[braneIndex] = true;
-			return cacheValRed[braneIndex];
+				ret = -1.0 * cacheValRed[braneIndex];
+			else {
+				redFilter[braneIndex].process(whiteNoise.white());
+				cacheValRed[braneIndex] = 5.0f * clamp(7.8f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
+				cacheHitRed[braneIndex] = true;
+				ret = cacheValRed[braneIndex];
+			}
+		}
+		else if (noiseIndex == PINK) {
+			if (cacheHitPink[braneIndex])
+				ret = -1.0 * cacheValPink[braneIndex];
+			else {
+				pinkFilter[braneIndex].process(whiteNoise.white());
+				cacheValPink[braneIndex] = 5.0f * clamp(0.18f * pinkFilter[braneIndex].pink(), -1.0f, 1.0f);
+				cacheHitPink[braneIndex] = true;
+				ret = cacheValPink[braneIndex];
+			}
+		}
+		else {// noiseIndex == BLUE
+			if (cacheHitBlue[braneIndex])
+				ret = -1.0 * cacheValBlue[braneIndex];
+			else {
+				pinkForBlueFilter[braneIndex].process(whiteNoise.white());
+				blueFilter[braneIndex].process(pinkForBlueFilter[braneIndex].pink());
+				cacheValBlue[braneIndex] = 5.0f * clamp(0.64f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
+				cacheHitBlue[braneIndex] = true;
+				ret = cacheValBlue[braneIndex];
+			}
 		}
 		
-		if (noiseIndex == PINK) {
-			if (cacheHitPink[braneIndex])
-				return -1.0 * cacheValPink[braneIndex];
-			pinkFilter[braneIndex].process(whiteNoise.white());
-			cacheValPink[braneIndex] = 5.0f * clamp(0.18f * pinkFilter[braneIndex].pink(), -1.0f, 1.0f);
-			cacheHitPink[braneIndex] = true;
-			return cacheValPink[braneIndex];
+		// noise ranges
+		if (noiseRange[0]) {
+			if (sh >= 4 && sh <= 6)// 0 to 10 instead of -5 to 5
+				ret += 5.0f;
 		}
-			
-		// noiseIndex == BLUE
-		if (cacheHitBlue[braneIndex])
-			return -1.0 * cacheValBlue[braneIndex];
-		pinkForBlueFilter[braneIndex].process(whiteNoise.white());
-		blueFilter[braneIndex].process(pinkForBlueFilter[braneIndex].pink());
-		cacheValBlue[braneIndex] = 5.0f * clamp(0.64f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
-		cacheHitBlue[braneIndex] = true;
-		return cacheValBlue[braneIndex];
+		if (noiseRange[1]) {
+			if (sh >= 7 && sh <= 9) {// 0 to 1 instead of -5 to 5
+				ret += 5.0f;
+				ret *= 0.1f;
+			}
+			else if (sh >= 11) {// -1 to 1 instead of -5 to 5
+				ret *= 0.2f;
+			}	
+		}
+		return ret;
 	}
 };
 
@@ -354,8 +409,8 @@ struct BranesWidget : ModuleWidget {
 		// part of svg panel, no code required
 		
 		float colRulerCenter = box.size.x / 2.0f;
-		static constexpr float rowRulerHoldA = 119.5;
-		static constexpr float rowRulerHoldB = 248.5f;
+		static constexpr float rowRulerHoldA = 132.5;
+		static constexpr float rowRulerHoldB = 261.5f;
 		static constexpr float radiusIn = 35.0f;
 		static constexpr float radiusOut = 64.0f;
 		static constexpr float offsetIn = 25.0f;
@@ -407,21 +462,31 @@ struct BranesWidget : ModuleWidget {
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 13, &module->panelTheme));
 		
 		
-		static constexpr float rowRulerBypass = 345.5f;
-		
 		// Trigger bypass
-		// buttons
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 32.0f, rowRulerBypass), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 32.0f, rowRulerBypass), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		// cv inputs
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 65.0f, rowRulerBypass), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 0, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 65.0f, rowRulerBypass), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 1, &module->panelTheme));
-		// LEDs bottom
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 46.5f, rowRulerBypass), module, Branes::BYPASS_CV_LIGHTS + 0 * 2));
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 46.5f, rowRulerBypass), module, Branes::BYPASS_CV_LIGHTS + 1 * 2));
-		// LEDs top
+		// Bypass buttons
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 334.5f), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 31.5f), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		// Bypass cv inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 315.5f), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 50.5f), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 1, &module->panelTheme));
+		// Bypass LEDs near buttons
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 327.5f), module, Branes::BYPASS_CV_LIGHTS + 0 * 2));
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 38.5f), module, Branes::BYPASS_CV_LIGHTS + 1 * 2));
+				
+		// Bypass LEDs in branes
 		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 5.5f, rowRulerHoldA + 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
 		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 5.5f, rowRulerHoldB - 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
+		
+		// Noise range
+		// Range buttons
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 334.5f), module, Branes::NOISE_RANGE_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 31.5f), module, Branes::NOISE_RANGE_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		// Range cv inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 315.5f), Port::INPUT, module, Branes::NOISE_RANGE_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 50.5f), Port::INPUT, module, Branes::NOISE_RANGE_INPUTS + 1, &module->panelTheme));
+		// Range LEDs near buttons
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 327.5f), module, Branes::NOISE_RANGE_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 38.5f), module, Branes::NOISE_RANGE_LIGHTS + 1));
 
 	}
 };
@@ -430,7 +495,11 @@ Model *modelBranes = Model::create<Branes, BranesWidget>("Geodesics", "Branes", 
 
 /*CHANGE LOG
 
-0.6.2: bug fix for stuck outputs, improve random noise non-correlation 
+0.6.4:
+add noise range setting
+
+0.6.2: 
+bug fix for stuck outputs, improve random noise non-correlation 
 
 0.6.0:
 created

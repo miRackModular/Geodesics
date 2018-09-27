@@ -22,9 +22,10 @@ struct Ions : Module {
 		LEAP_PARAM,
 		ENUMS(STATE_PARAMS, 2),// 3 states : global, local, global+local
 		PLANK_PARAM,
-		uncertainty_PARAM,
+		UNCERTANTY_PARAM,
 		RESETONRUN_PARAM,
 		STEPCLOCKS_PARAM,
+		// -- 0.6.3 ^^
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -35,6 +36,9 @@ struct Ions : Module {
 		PROB_INPUT,// CV_value/10  is added to PROB_PARAM, which is a 0 to 1 knob
 		ENUMS(OCTCV_INPUTS, 2),
 		ENUMS(STATECV_INPUTS, 2),
+		// -- 0.6.3 ^^
+		LEAP_INPUT,
+		UNCERTANTY_INPUT,
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -53,7 +57,7 @@ struct Ions : Module {
 		ENUMS(OCTA_LIGHTS, 3),// 0 is center, 1 is inside mirrors, 2 is outside mirrors
 		ENUMS(OCTB_LIGHTS, 3),
 		ENUMS(PLANK_LIGHT, 3),// room for blue, yellow, white
-		uncertainty_LIGHT,
+		UNCERTANTY_LIGHT,
 		ENUMS(JUMP_LIGHTS, 2),
 		RESETONRUN_LIGHT,
 		STEPCLOCKS_LIGHT,
@@ -326,7 +330,7 @@ struct Ions : Module {
 		}
 		
 		// Leap button
-		if (leapTrigger.process(params[LEAP_PARAM].value)) {
+		if (leapTrigger.process(params[LEAP_PARAM].value + inputs[LEAP_INPUT].value)) {
 			leap = !leap;
 		}
 
@@ -338,7 +342,7 @@ struct Ions : Module {
 		}
 
 		// uncertainty button
-		if (uncertaintyTrigger.process(params[uncertainty_PARAM].value)) {
+		if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].value + inputs[UNCERTANTY_INPUT].value)) {
 			uncertainty = !uncertainty;
 		}
 
@@ -506,7 +510,7 @@ struct Ions : Module {
 		lights[PLANK_LIGHT + 0].value = (quantize == 1) ? 1.0f : 0.0f;// Blue
 		lights[PLANK_LIGHT + 1].value = (quantize == 2) ? 1.0f : 0.0f;// Yellow
 		lights[PLANK_LIGHT + 2].value = (quantize == 3) ? 1.0f : 0.0f;// White
-		lights[uncertainty_LIGHT].value = uncertainty ? 1.0f : 0.0f;
+		lights[UNCERTANTY_LIGHT].value = uncertainty ? 1.0f : 0.0f;
 		lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
 		
 		// Range lights
@@ -603,8 +607,8 @@ struct IonsWidget : ModuleWidget {
 		// part of svg panel, no code required
 		
 		float colRulerCenter = box.size.x / 2.0f;
-		static constexpr float rowRulerAtomA = 125.5;
-		static constexpr float rowRulerAtomB = 251.5f;
+		static constexpr float rowRulerAtomA = 116.5;
+		static constexpr float rowRulerAtomB = 242.5f;
 		static constexpr float radius1 = 21.0f;
 		static constexpr float offset1 = 14.0f;
 		static constexpr float radius2 = 35.0f;
@@ -641,19 +645,15 @@ struct IonsWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(probX + 32.0f, probY), Port::INPUT, module, Ions::PROB_INPUT, &module->panelTheme));
 		
 		// Jump pulses
-		addOutput(createDynamicPort<GeoPort>(Vec(probX + 18.0f, probY - 37.0f), Port::OUTPUT, module, Ions::JUMP_OUTPUTS + 0, &module->panelTheme));		
-		addOutput(createDynamicPort<GeoPort>(Vec(probX + 18.0f, probY + 37.0f), Port::OUTPUT, module, Ions::JUMP_OUTPUTS + 1, &module->panelTheme));		
+		addOutput(createDynamicPort<GeoPort>(Vec(probX + 18.0f, probY - 37.2f), Port::OUTPUT, module, Ions::JUMP_OUTPUTS + 0, &module->panelTheme));		
+		addOutput(createDynamicPort<GeoPort>(Vec(probX + 18.0f, probY + 36.7f), Port::OUTPUT, module, Ions::JUMP_OUTPUTS + 1, &module->panelTheme));		
 		// Jump lights
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX, probY - 46.0f), module, Ions::JUMP_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX, probY + 46.0f), module, Ions::JUMP_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX - 3.0f, probY - 37.2f - 4.8f), module, Ions::JUMP_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(probX - 3.0f, probY + 36.7f + 5.0f), module, Ions::JUMP_LIGHTS + 1));
 		
-		// Leap light and button
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 86.5f, 62.5f), module, Ions::LEAP_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 77.5f, 50.5f), module, Ions::LEAP_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
-
 		// Plank light and button
-		addChild(createLightCentered<SmallLight<GeoBlueYellowWhiteLight>>(Vec(colRulerCenter + 86.5f, 62.5f), module, Ions::PLANK_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 77.5f, 50.5f), module, Ions::PLANK_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addChild(createLightCentered<SmallLight<GeoBlueYellowWhiteLight>>(Vec(233.5f, 60.5f), module, Ions::PLANK_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(225.5f, 48.5f), module, Ions::PLANK_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
 
 		// Octave buttons and lights
 		float octX = colRulerCenter + 107.0f;
@@ -675,8 +675,8 @@ struct IonsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX - 3.0f, octYB + 13.5f), module, Ions::OCTB_LIGHTS + 2));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(octX + 0.0f, octYB - 15.0f), module, Ions::OCTB_LIGHTS + 2));
 		// Oct CV inputs
-		addInput(createDynamicPort<GeoPort>(Vec(octX - 9.0f, octYA - 34.5), Port::INPUT, module, Ions::OCTCV_INPUTS + 0, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(octX - 9.0f, octYB + 34.5), Port::INPUT, module, Ions::OCTCV_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(octX - 7.0f, octYA - 31.0f), Port::INPUT, module, Ions::OCTCV_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(octX - 7.0f, octYB + 31.0f), Port::INPUT, module, Ions::OCTCV_INPUTS + 1, &module->panelTheme));
 		
 		// Blue electron lights
 		// top blue
@@ -719,7 +719,7 @@ struct IonsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter - offset1, rowRulerAtomA + offset1), module, Ions::YELLOW_LIGHTS + 15));
 
 		// Run jack, light and button
-		static constexpr float rowRulerRunJack = 344.5f;
+		static constexpr float rowRulerRunJack = 348.5f;
 		static constexpr float offsetRunJackX = 119.5f;
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetRunJackX, rowRulerRunJack), Port::INPUT, module, Ions::RUN_INPUT, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRunJackX + 18.0f, rowRulerRunJack), module, Ions::RUN_LIGHT));
@@ -756,12 +756,18 @@ struct IonsWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 21.0f, gclkY - 72.0f), Port::INPUT, module, Ions::CLK_INPUTS + 0, &module->panelTheme));
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 21.0f, gclkY + 72.0f), Port::INPUT, module, Ions::CLK_INPUTS + 1, &module->panelTheme));
 		// state inputs
-		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 11.0f, gclkY - 107.0f), Port::INPUT, module, Ions::STATECV_INPUTS + 0, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 11.0f, gclkY + 107.0f), Port::INPUT, module, Ions::STATECV_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 39.0f, gclkY - 28.0f), Port::INPUT, module, Ions::STATECV_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 39.0f, gclkY + 28.0f), Port::INPUT, module, Ions::STATECV_INPUTS + 1, &module->panelTheme));
 		
-		// uncertainty light and button
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 20.0f, gclkY), module, Ions::uncertainty_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX - 34.0f, gclkY), module, Ions::uncertainty_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		// Leap light, button and CV input
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 5.0f, 60.5f), module, Ions::LEAP_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX + 4.0f, 50.5f), module, Ions::LEAP_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 14.0f, 76.5f), Port::INPUT, module, Ions::LEAP_INPUT, &module->panelTheme));
+
+		// uncertainty light, button and CV input
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 5.0f, 298.5f), module, Ions::UNCERTANTY_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX + 4.0f, 310.5f), module, Ions::UNCERTANTY_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 14.0f, 282.5f), Port::INPUT, module, Ions::UNCERTANTY_INPUT, &module->panelTheme));
 
 	}
 };
