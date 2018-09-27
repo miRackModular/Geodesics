@@ -343,11 +343,11 @@ struct Branes : Module {
 				ret += 5.0f;
 		}
 		if (noiseRange[1]) {
-			if (sh >= 7 && sh <= 9) {// 0 to 1 instead of -5 to 5
+			if (sh >= 7 && sh <= 10) {// 0 to 1 instead of -5 to 5
 				ret += 5.0f;
 				ret *= 0.1f;
 			}
-			else if (sh >= 10) {// -1 to 1 instead of -5 to 5
+			else if (sh >= 11) {// -1 to 1 instead of -5 to 5
 				ret *= 0.2f;
 			}	
 		}
