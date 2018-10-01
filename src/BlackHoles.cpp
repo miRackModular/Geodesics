@@ -42,70 +42,43 @@ struct BlackHoles : Module {
 	// Constants
 	static constexpr float expBase = 50.0f;
 
-	// Need to save, with reset
+	
+	// Need to save
+	int panelTheme = 0;
 	bool isExponential[2];
 	bool wormhole;
 	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper BH, bit 1 is lower BH
 	
-	// Need to save, no reset
-	int panelTheme;
 	
-	// No need to save, with reset
-	// none
-	
-	// No need to save, no reset
+	// No need to save
 	SchmittTrigger expTriggers[2];
 	SchmittTrigger cvLevelTriggers[2];
 	SchmittTrigger wormholeTrigger;
 
 	
 	BlackHoles() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
-		// Need to save, no reset
-		panelTheme = 0;
-
-		// No need to save, no reset		
-		expTriggers[0].reset();
-		expTriggers[1].reset();
-		
 		onReset();
 	}
 
 	
-	// widgets are not yet created when module is created 
-	// even if widgets not created yet, can use params[] and should handle 0.0f value since step may call 
-	//   this before widget creation anyways
-	// called from the main thread if by constructor, called by engine thread if right-click initialization
-	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
-		// Need to save, with reset
-		cvMode = 0x3;
 		isExponential[0] = false;
 		isExponential[1] = false;
 		wormhole = true;
-		
-		// No need to save, with reset
-		// none
+		cvMode = 0x3;
 	}
 
 	
-	// widgets randomized before onRandomize() is called
-	// called by engine thread if right-click randomize
 	void onRandomize() override {
-		// Need to save, with reset
 		for (int i = 0; i < 2; i++) {
 			isExponential[i] = (randomu32() % 2) > 0;
 		}
 		wormhole = (randomu32() % 2) > 0;
-		
-		// No need to save, with reset
-		// none
 	}
 
 	
-	// called by main thread
 	json_t *toJson() override {
 		json_t *rootJ = json_object();
-		// Need to save (reset or not)
 
 		// isExponential
 		json_object_set_new(rootJ, "isExponential0", json_real(isExponential[0]));
@@ -124,11 +97,7 @@ struct BlackHoles : Module {
 	}
 
 	
-	// widgets have their fromJson() called before this fromJson() is called
-	// called by main thread
 	void fromJson(json_t *rootJ) override {
-		// Need to save (reset or not)
-
 		// isExponential
 		json_t *isExponential0J = json_object_get(rootJ, "isExponential0");
 		if (isExponential0J)
@@ -151,13 +120,9 @@ struct BlackHoles : Module {
 		json_t *cvModeJ = json_object_get(rootJ, "cvMode");
 		if (cvModeJ)
 			cvMode = json_integer_value(cvModeJ);
-
-		// No need to save, with reset
-		// none
 	}
 
 	
-	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
 		// Exponential buttons
 		for (int i = 0; i < 2; i++)
@@ -383,8 +348,6 @@ struct BlackHolesWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtonsX, rowRulerBlack1 + offsetButtonsY), module, BlackHoles::CVLEVEL_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButL, rowRulerBlack1 + offsetButtonsY + offsetLedVsButS), module, BlackHoles::CVBLEVEL_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButS, rowRulerBlack1 + offsetButtonsY + offsetLedVsButL), module, BlackHoles::CVBLEVEL_LIGHTS + 1));
-
-
 	}
 };
 

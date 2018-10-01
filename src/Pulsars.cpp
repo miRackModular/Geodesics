@@ -49,61 +49,41 @@ struct Pulsars : Module {
 	// Constants
 	static constexpr float epsilon = 0.0001f;// pulsar crossovers at epsilon and 1-epsilon in 0.0f to 1.0f space
 
-	// Need to save, with reset
+	
+	// Need to save
+	int panelTheme = 0;
+	int cvMode;// 0 is -5v to 5v, 1 is 0v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
 	bool isVoid[2];
 	bool isReverse[2];
 	bool isRandom[2];
-	int cvMode;// 0 is -5v to 5v, 1 is 0v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
 	
-	// Need to save, no reset
-	int panelTheme;
 	
-	// No need to save, with reset
+	// No need to save
+	bool topCross[2];
 	int posA;// always between 0 and 7
 	int posB;// always between 0 and 7
 	int posAnext;// always between 0 and 7
 	int posBnext;// always between 0 and 7
-	bool topCross[2];
-	
-	// No need to save, no reset
 	SchmittTrigger voidTriggers[2];
 	SchmittTrigger revTriggers[2];
 	SchmittTrigger rndTriggers[2];
 	SchmittTrigger cvLevelTriggers[2];
-	float lfoLights[2];
+	float lfoLights[2] = {0.0f, 0.0f};
 
 	
 	Pulsars() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
-		// Need to save, no reset
-		panelTheme = 0;
-		
-		// No need to save, no reset		
-		for (int i = 0; i < 2; i++) {
-			lfoLights[i] = 0.0f;
-			voidTriggers[i].reset();
-			revTriggers[i].reset();
-			rndTriggers[i].reset();
-		}
-		
 		onReset();
 	}
 
 	
-	// widgets are not yet created when module is created 
-	// even if widgets not created yet, can use params[] and should handle 0.0f value since step may call 
-	//   this before widget creation anyways
-	// called from the main thread if by constructor, called by engine thread if right-click initialization
-	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
-		// Need to save, with reset
 		cvMode = 0;
 		for (int i = 0; i < 2; i++) {
-			topCross[i] = false;
 			isVoid[i] = false;
 			isReverse[i] = false;
 			isRandom[i] = false;
+			topCross[i] = false;
 		}
-		// No need to save, with reset
 		posA = 0;// no need to check isVoid here, will be checked in step()
 		posB = 0;// no need to check isVoid here, will be checked in step()
 		posAnext = 1;// no need to check isVoid here, will be checked in step()
@@ -111,16 +91,12 @@ struct Pulsars : Module {
 	}
 
 	
-	// widgets randomized before onRandomize() is called
-	// called by engine thread if right-click randomize
 	void onRandomize() override {
-		// Need to save, with reset
 		for (int i = 0; i < 2; i++) {
 			isVoid[i] = (randomu32() % 2) > 0;
 			isReverse[i] = (randomu32() % 2) > 0;
 			isRandom[i] = (randomu32() % 2) > 0;
 		}
-		// No need to save, with reset
 		posA = randomu32() % 8;// no need to check isVoid here, will be checked in step()
 		posB = randomu32() % 8;// no need to check isVoid here, will be checked in step()
 		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
@@ -128,10 +104,8 @@ struct Pulsars : Module {
 	}
 
 	
-	// called by main thread
 	json_t *toJson() override {
 		json_t *rootJ = json_object();
-		// Need to save (reset or not)
 
 		// isVoid
 		json_object_set_new(rootJ, "isVoid0", json_real(isVoid[0]));
@@ -155,11 +129,7 @@ struct Pulsars : Module {
 	}
 
 	
-	// widgets have their fromJson() called before this fromJson() is called
-	// called by main thread
 	void fromJson(json_t *rootJ) override {
-		// Need to save (reset or not)
-
 		// isVoid
 		json_t *isVoid0J = json_object_get(rootJ, "isVoid0");
 		if (isVoid0J)
@@ -194,7 +164,6 @@ struct Pulsars : Module {
 		if (cvModeJ)
 			cvMode = json_integer_value(cvModeJ);
 
-		// No need to save, with reset
 		posA = 0;// no need to check isVoid here, will be checked in step()
 		posB = 0;// no need to check isVoid here, will be checked in step()
 		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
@@ -202,7 +171,6 @@ struct Pulsars : Module {
 	}
 
 	
-	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
 		// Void, Reverse and Random buttons
 		for (int i = 0; i < 2; i++) {
@@ -229,6 +197,7 @@ struct Pulsars : Module {
 		lfoVal[1] = inputs[LFO_INPUTS + 1].active ? inputs[LFO_INPUTS + 1].value : lfoVal[0];
 		for (int i = 0; i < 2; i++)
 			lfoVal[i] = clamp( (lfoVal[i] + ((cvMode & (0x1 << i)) == 0 ? 5.0f : 0.0f)) / 10.0f , 0.0f , 1.0f);
+		
 		
 		// Pulsar A
 		bool active8[8];
@@ -376,7 +345,6 @@ struct Pulsars : Module {
 		}
 		return posNext;
 	}
-
 };
 
 

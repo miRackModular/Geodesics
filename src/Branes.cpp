@@ -89,30 +89,29 @@ struct Branes : Module {
 	// S&H are numbered 0 to 6 in BraneA from lower left to lower right
 	// S&H are numbered 7 to 13 in BraneB from top right to top left
 	enum NoiseId {NONE, WHITE, PINK, RED, BLUE};//use negative value for inv phase
-	int noiseSources[14] = {PINK, RED, BLUE, WHITE, -BLUE, -RED, -PINK,   -PINK, -RED, -BLUE, WHITE, BLUE, RED, PINK};
+	int noiseSources[14] = {PINK, RED, BLUE, WHITE, BLUE, RED, PINK,   PINK, RED, BLUE, WHITE, BLUE, RED, PINK};
 
+	
 	// Need to save, with reset
+	int panelTheme = 0;
 	bool trigBypass[2];
 	bool noiseRange[2];
 	
-	// Need to save, no reset
-	int panelTheme;
 	
-	// No need to save, with reset
+	// No need to save
 	float heldOuts[14];
 	
-	// No need to save, no reset
+	
+	// No need to save
 	SchmittTrigger sampleTriggers[2];
 	SchmittTrigger trigBypassTriggers[2];
 	SchmittTrigger noiseRangeTriggers[2];
-	float trigLights[2];
-	
+	float trigLights[2] = {0.0f, 0.0f};
 	NoiseGenerator whiteNoise;
 	PinkFilter pinkFilter[2];
 	RCFilter redFilter[2];
 	RCFilter blueFilter[2];
 	PinkFilter pinkForBlueFilter[2];
-
 	bool cacheHitRed[2];// no need to init; index is braneIndex
 	float cacheValRed[2];
 	bool cacheHitBlue[2];// no need to init; index is braneIndex
@@ -122,16 +121,6 @@ struct Branes : Module {
 
 	
 	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
-		// Need to save, no reset
-		panelTheme = 0;
-		
-		// No need to save, no reset		
-		for (int i = 0; i < 2; i++) {
-			sampleTriggers[i].reset();
-			trigBypassTriggers[i].reset();
-			noiseRangeTriggers[i].reset();
-			trigLights[i] = 0.0f;
-		}
 		redFilter[0].setCutoff(441.0f / engineGetSampleRate());
 		redFilter[1].setCutoff(441.0f / engineGetSampleRate());
 		blueFilter[0].setCutoff(44100.0f / engineGetSampleRate());
@@ -141,43 +130,28 @@ struct Branes : Module {
 	}
 
 	
-	// widgets are not yet created when module is created 
-	// even if widgets not created yet, can use params[] and should handle 0.0f value since step may call 
-	//   this before widget creation anyways
-	// called from the main thread if by constructor, called by engine thread if right-click initialization
-	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
-		// Need to save, with reset
 		for (int i = 0; i < 2; i++) {
 			trigBypass[i] = false;
 			noiseRange[i] = false;
 		}
-		
-		// No need to save, with reset
 		for (int i = 0; i < 14; i++)
 			heldOuts[i] = 0.0f;
 	}
 
 	
-	// widgets randomized before onRandomize() is called
-	// called by engine thread if right-click randomize
 	void onRandomize() override {
-		// Need to save, with reset
 		for (int i = 0; i < 2; i++) {
 			trigBypass[i] = (randomu32() % 2) > 0;
 			noiseRange[i] = (randomu32() % 2) > 0;
 		}
-		
-		// No need to save, with reset
 		for (int i = 0; i < 14; i++)
 			heldOuts[i] = 0.0f;
 	}
 
 	
-	// called by main thread
 	json_t *toJson() override {
 		json_t *rootJ = json_object();
-		// Need to save (reset or not)
 
 		// trigBypass
 		json_object_set_new(rootJ, "trigBypass0", json_real(trigBypass[0]));
@@ -194,11 +168,7 @@ struct Branes : Module {
 	}
 
 	
-	// widgets have their fromJson() called before this fromJson() is called
-	// called by main thread
 	void fromJson(json_t *rootJ) override {
-		// Need to save (reset or not)
-
 		// trigBypass
 		json_t *trigBypass0J = json_object_get(rootJ, "trigBypass0");
 		if (trigBypass0J)
@@ -220,13 +190,11 @@ struct Branes : Module {
 		if (panelThemeJ)
 			panelTheme = json_integer_value(panelThemeJ);
 
-		// No need to save, with reset
 		for (int i = 0; i < 14; i++)
 			heldOuts[i] = 0.0f;
 	}
 
 	
-	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {		
 		// trigBypass buttons and cv inputs
 		for (int i = 0; i < 2; i++) {
@@ -301,7 +269,7 @@ struct Branes : Module {
 		// some of the code in here is from Joel Robichaud - Nohmad Noise module
 		float ret = 0.0f;
 		int braneIndex = sh < 7 ? 0 : 1;
-		int noiseIndex = abs( noiseSources[sh] );
+		int noiseIndex = noiseSources[sh];
 		if (noiseIndex == WHITE) {
 			ret = 5.0f * whiteNoise.white();
 		}
@@ -496,7 +464,7 @@ Model *modelBranes = Model::create<Branes, BranesWidget>("Geodesics", "Branes", 
 /*CHANGE LOG
 
 0.6.4:
-add noise range setting
+add noise range buttons
 
 0.6.2: 
 bug fix for stuck outputs, improve random noise non-correlation 

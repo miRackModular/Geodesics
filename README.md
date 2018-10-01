@@ -1,6 +1,17 @@
 # A Modular Collection for VCV Rack by Pyer and Marc Boulé
 
-This page shows a very brief overview of the modules, along with a link to the [user manual](GeodesicsUserManual063.pdf). For more information, including videos of the modules in use, please see the [Geodesics Website](https://www.pyer.be/geodesics.html). The modules are available in the [plugin manager](https://vcvrack.com/plugins.html) of [VCV Rack](https://vcvrack.com).
+This page shows a very brief overview of the modules. For more information, including videos of the modules in use, please see the [Geodesics Website](https://www.pyer.be/geodesics.html). The modules are available in the [plugin manager](https://vcvrack.com/plugins.html) of [VCV Rack](https://vcvrack.com). 
+
+* [User manual version 0.6.4](GeodesicsUserManual064.pdf)
+
+* [What's new in version 0.6.4](GeodesicsWhatsNew064.pdf)
+
+* [What's new in version 0.6.3](GeodesicsWhatsNew063.pdf)
+
+* [What's new in version 0.6.2](GeodesicsWhatsNew062.pdf)
+
+* [What's new in version 0.6.1](GeodesicsWhatsNew061.pdf)
+
 
 ![Geodesics](res/img/Blanks.jpg)
 
@@ -23,14 +34,6 @@ Each module comes with two panel options, namely White Light and Dark Matter.
 * [Branes](#branes): Colliding Sample and Hold.
 
 * [Ions](#ions): Atomic Duophonic Voltage Sequencer.
-
-A summary of changes for the different versions can be consulted below:
-
-* [Changes in version 0.6.3](GeodesicsWhatsNew063.pdf).
-
-* [Changes in version 0.6.2](GeodesicsWhatsNew062.pdf).
-
-* [Changes in version 0.6.1](GeodesicsWhatsNew061.pdf).
 
 
 

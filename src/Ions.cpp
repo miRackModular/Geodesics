@@ -71,7 +71,9 @@ struct Ions : Module {
 	const int cvMap[2][16] = {{0, 1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14},
 							  {0, 8, 9 ,10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7}};// map each of the 16 steps of a sequence step to a CV knob index (0-14)
 
+							  
 	// Need to save, with reset
+	int panelTheme = 0;
 	bool running;
 	bool resetOnRun;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
@@ -83,15 +85,10 @@ struct Ions : Module {
 	bool leap;
 	
 	
-	// Need to save, no reset
-	int panelTheme;
-	
-	// No need to save, with reset
+	// No need to save
 	long clockIgnoreOnReset;
 	float resetLight;
 	bool rangeInc[2];// true when 1-3-5 increasing, false when 5-3-1 decreasing
-	
-	// No need to save, no reset
 	SchmittTrigger runningTrigger;
 	SchmittTrigger clockTrigger;
 	SchmittTrigger clocksTriggers[2];
@@ -106,8 +103,8 @@ struct Ions : Module {
 	SchmittTrigger resetOnRunTrigger;
 	SchmittTrigger stepClocksTrigger;
 	PulseGenerator jumpPulses[2];
-	float jumpLights[2];
-	float stepClocksLight;
+	float jumpLights[2] = {0.0f, 0.0f};
+	float stepClocksLight = 0.0f;
 
 	
 	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
@@ -115,40 +112,11 @@ struct Ions : Module {
 	
 	
 	Ions() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
-		// Need to save, no reset
-		panelTheme = 0;
-		
-		// No need to save, no reset		
-		runningTrigger.reset();
-		clockTrigger.reset();
-		for (int i = 0; i < 2; i++) {
-			clocksTriggers[i].reset();
-			stateTriggers[i].reset();
-			octTriggers[i].reset();
-			stateCVTriggers[i].reset();
-			jumpPulses[i].reset();
-			jumpLights[i] = 0.0f;
-		}
-		stepClocksLight = 0.0f;
-		resetTrigger.reset();
-		leapTrigger.reset();
-		plankTrigger.reset();
-		plank2Trigger.reset();
-		uncertaintyTrigger.reset();
-		resetOnRunTrigger.reset();
-		stepClocksTrigger.reset();
-		
 		onReset();
 	}
 
 	
-	// widgets are not yet created when module is created 
-	// even if widgets not created yet, can use params[] and should handle 0.0f value since step may call 
-	//   this before widget creation anyways
-	// called from the main thread if by constructor, called by engine thread if right-click initialization
-	//   when called by constructor, module is created before the first step() is called
 	void onReset() override {
-		// Need to save, with reset
 		running = false;
 		resetOnRun = false;
 		quantize = 3;
@@ -157,37 +125,24 @@ struct Ions : Module {
 		for (int i = 0; i < 2; i++) {
 			states[i] = 0;
 			ranges[i] = 1;
+			rangeInc[i] = true;
 		}
 		leap = false;
 		initRun(true, false);
-		
-		// No need to save, with reset
-		for (int i = 0; i < 2; i++) {
-			rangeInc[i] = true;
-		}
 	}
 
 	
-	// widgets randomized before onRandomize() is called
-	// called by engine thread if right-click randomize
 	void onRandomize() override {
-		// Need to save, with reset
-		running = false;
-		resetOnRun = false;
 		quantize = randomu32() & 0x3;
 		//symmetry = false;
-		uncertainty = false;
+		uncertainty = (randomu32() % 2) > 0;
 		for (int i = 0; i < 2; i++) {
 			states[i] = randomu32() % 3;
 			ranges[i] = randomu32() % 3;
+			rangeInc[i] = true;
 		}
 		leap = (randomu32() % 2) > 0;
 		initRun(true, true);
-		
-		// No need to save, with reset
-		for (int i = 0; i < 2; i++) {
-			rangeInc[i] = true;
-		}
 	}
 	
 
@@ -206,10 +161,9 @@ struct Ions : Module {
 		resetLight = 0.0f;
 	}
 	
-	// called by main thread
+
 	json_t *toJson() override {
 		json_t *rootJ = json_object();
-		// Need to save (reset or not)
 
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
@@ -248,11 +202,7 @@ struct Ions : Module {
 	}
 
 	
-	// widgets have their fromJson() called before this fromJson() is called
-	// called by main thread
 	void fromJson(json_t *rootJ) override {
-		// Need to save (reset or not)
-
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -312,14 +262,12 @@ struct Ions : Module {
 		if (leapJ)
 			leap = json_is_true(leapJ);
 
-		// No need to save, with reset
 		initRun(true, false);
 		rangeInc[0] = true;
 		rangeInc[1] = true;
 	}
 
 	
-	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void step() override {	
 		float sampleTime = engineGetSampleTime();
 	
