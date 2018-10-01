@@ -88,7 +88,7 @@ struct Ions : Module {
 	// No need to save
 	long clockIgnoreOnReset;
 	float resetLight;
-	bool rangeInc[2];// true when 1-3-5 increasing, false when 5-3-1 decreasing
+	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	SchmittTrigger runningTrigger;
 	SchmittTrigger clockTrigger;
 	SchmittTrigger clocksTriggers[2];
@@ -125,7 +125,6 @@ struct Ions : Module {
 		for (int i = 0; i < 2; i++) {
 			states[i] = 0;
 			ranges[i] = 1;
-			rangeInc[i] = true;
 		}
 		leap = false;
 		initRun(true, false);
@@ -139,7 +138,6 @@ struct Ions : Module {
 		for (int i = 0; i < 2; i++) {
 			states[i] = randomu32() % 3;
 			ranges[i] = randomu32() % 3;
-			rangeInc[i] = true;
 		}
 		leap = (randomu32() % 2) > 0;
 		initRun(true, true);
