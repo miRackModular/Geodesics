@@ -118,6 +118,7 @@ struct Branes : Module {
 	float cacheValBlue[2];
 	bool cacheHitPink[2];// no need to init; index is braneIndex
 	float cacheValPink[2];
+	unsigned int lightRefreshCounter = 0;
 
 	
 	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -196,19 +197,24 @@ struct Branes : Module {
 
 	
 	void step() override {		
-		// trigBypass buttons and cv inputs
-		for (int i = 0; i < 2; i++) {
-			if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].value)) {
-				trigBypass[i] = !trigBypass[i];
+	
+		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
+			
+			// trigBypass buttons and cv inputs
+			for (int i = 0; i < 2; i++) {
+				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].value)) {
+					trigBypass[i] = !trigBypass[i];
+				}
 			}
-		}
+			
+			// noiseRange buttons and cv inputs
+			for (int i = 0; i < 2; i++) {
+				if (noiseRangeTriggers[i].process(params[NOISE_RANGE_PARAMS + i].value + inputs[NOISE_RANGE_INPUTS + i].value)) {
+					noiseRange[i] = !noiseRange[i];
+				}
+			}
 		
-		// noiseRange buttons and cv inputs
-		for (int i = 0; i < 2; i++) {
-			if (noiseRangeTriggers[i].process(params[NOISE_RANGE_PARAMS + i].value + inputs[NOISE_RANGE_INPUTS + i].value)) {
-				noiseRange[i] = !noiseRange[i];
-			}
-		}
+		}// userInputs refresh
 
 		// trig inputs
 		bool trigs[2];
@@ -226,9 +232,26 @@ struct Branes : Module {
 			cacheHitPink[i] = false;
 		}
 		
+		// detect unused brane and avoid noise when so (unused = not a single output connected)
+		int startSh = 7;
+		int endSh = 7;
+		for (int sh = 0; sh < 7; sh++) {
+			if (outputs[OUT_OUTPUTS + sh].active) {
+				startSh = 0;
+				break;
+			}
+		}
+		for (int sh = 7; sh < 14; sh++) {
+			if (outputs[OUT_OUTPUTS + sh].active) {
+				endSh = 14;
+				break;
+			}
+		}
+			
+		
 		// sample and hold outputs (noise continually generated or else stepping non-white on S&H only will not work well because of filters)
 		float noises[14];
-		for (int sh = 0; sh < 14; sh++) {
+		for (int sh = startSh; sh < endSh; sh++) {
 			noises[sh] = getNoise(sh);
 			if (outputs[OUT_OUTPUTS + sh].active) {
 				int braneIndex = sh < 7 ? 0 : 1;
@@ -251,17 +274,23 @@ struct Branes : Module {
 			}
 		}
 		
-		// Lights
-		for (int i = 0; i < 2; i++) {
-			float red = trigBypass[i] ? 1.0f : 0.0f;
-			float white = !trigBypass[i] ? trigLights[i] : 0.0f;
-			lights[BYPASS_CV_LIGHTS + i * 2 + 0].value = white;
-			lights[BYPASS_CV_LIGHTS + i * 2 + 1].value = red;
-			lights[BYPASS_TRIG_LIGHTS + i * 2 + 0].value = white;
-			lights[BYPASS_TRIG_LIGHTS + i * 2 + 1].value = red;
-			lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
-			trigLights[i] -= (trigLights[i] / lightLambda) * (float)engineGetSampleTime();
-		}
+		lightRefreshCounter++;
+		if (lightRefreshCounter >= displayRefreshStepSkips) {
+			lightRefreshCounter = 0;
+
+			// Lights
+			for (int i = 0; i < 2; i++) {
+				float red = trigBypass[i] ? 1.0f : 0.0f;
+				float white = !trigBypass[i] ? trigLights[i] : 0.0f;
+				lights[BYPASS_CV_LIGHTS + i * 2 + 0].value = white;
+				lights[BYPASS_CV_LIGHTS + i * 2 + 1].value = red;
+				lights[BYPASS_TRIG_LIGHTS + i * 2 + 0].value = white;
+				lights[BYPASS_TRIG_LIGHTS + i * 2 + 1].value = red;
+				lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
+				trigLights[i] -= (trigLights[i] / lightLambda) * (float)engineGetSampleTime() * displayRefreshStepSkips;
+			}
+			
+		}// lightRefreshCounter
 		
 	}// step()
 	
@@ -462,6 +491,11 @@ struct BranesWidget : ModuleWidget {
 Model *modelBranes = Model::create<Branes, BranesWidget>("Geodesics", "Branes", "Branes", SAMPLE_AND_HOLD_TAG);
 
 /*CHANGE LOG
+
+0.6.5:
+input refresh optimization
+step optimization of lights refresh
+optimize unused brane (turn of noise of a brane when all outputs of the given brane are unconnected)
 
 0.6.4:
 add noise range buttons

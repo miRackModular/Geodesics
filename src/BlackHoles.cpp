@@ -54,6 +54,7 @@ struct BlackHoles : Module {
 	SchmittTrigger expTriggers[2];
 	SchmittTrigger cvLevelTriggers[2];
 	SchmittTrigger wormholeTrigger;
+	unsigned int lightRefreshCounter = 0;
 
 	
 	BlackHoles() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -124,23 +125,26 @@ struct BlackHoles : Module {
 
 	
 	void step() override {		
-		// Exponential buttons
-		for (int i = 0; i < 2; i++)
-			if (expTriggers[i].process(params[EXP_PARAMS + i].value)) {
-				isExponential[i] = !isExponential[i];
-		}
-		
-		// Wormhole buttons
-		if (wormholeTrigger.process(params[WORMHOLE_PARAM].value)) {
-			wormhole = ! wormhole;
-		}
+		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 
-		// CV Level buttons
-		for (int i = 0; i < 2; i++) {
-			if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
-				cvMode ^= (0x1 << i);
-		}
+			// Exponential buttons
+			for (int i = 0; i < 2; i++)
+				if (expTriggers[i].process(params[EXP_PARAMS + i].value)) {
+					isExponential[i] = !isExponential[i];
+			}
+			
+			// Wormhole buttons
+			if (wormholeTrigger.process(params[WORMHOLE_PARAM].value)) {
+				wormhole = ! wormhole;
+			}
+
+			// CV Level buttons
+			for (int i = 0; i < 2; i++) {
+				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
+					cvMode ^= (0x1 << i);
+			}
 		
+		}// userInputs refresh
 		
 		// BlackHole 0 all outputs
 		float blackHole0 = 0.0f;
@@ -172,21 +176,27 @@ struct BlackHoles : Module {
 		}
 		outputs[BLACKHOLE_OUTPUTS + 1].value = clamp(blackHole1, -10.0f, 10.0f);
 
-		// Wormhole light
-		lights[WORMHOLE_LIGHT].value = (wormhole ? 1.0f : 0.0f);
-				
-		// isExponential lights
-		for (int i = 0; i < 2; i++)
-			lights[EXP_LIGHTS + i].value = isExponential[i] ? 1.0f : 0.0f;
+		lightRefreshCounter++;
+		if (lightRefreshCounter >= displayRefreshStepSkips) {
+			lightRefreshCounter = 0;
+
+			// Wormhole light
+			lights[WORMHOLE_LIGHT].value = (wormhole ? 1.0f : 0.0f);
+					
+			// isExponential lights
+			for (int i = 0; i < 2; i++)
+				lights[EXP_LIGHTS + i].value = isExponential[i] ? 1.0f : 0.0f;
+			
+			// CV Level lights
+			bool is5V = (cvMode & 0x1) == 0;
+			lights[CVALEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
+			lights[CVALEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
+			is5V = (cvMode & 0x2) == 0;
+			lights[CVBLEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
+			lights[CVBLEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
+
+		}// lightRefreshCounter
 		
-		// CV Level lights
-		bool is5V = (cvMode & 0x1) == 0;
-		lights[CVALEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
-		lights[CVALEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
-		is5V = (cvMode & 0x2) == 0;
-		lights[CVBLEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
-		lights[CVBLEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
-	
 	}// step()
 	
 	inline float calcChannel(float in, Param &level, Input &levelCV, bool isExp, int cvMode) {
@@ -354,6 +364,10 @@ struct BlackHolesWidget : ModuleWidget {
 Model *modelBlackHoles = Model::create<BlackHoles, BlackHolesWidget>("Geodesics", "BlackHoles", "BlackHoles", AMPLIFIER_TAG);
 
 /*CHANGE LOG
+
+0.6.5:
+input refresh optimization
+step optimization of lights refresh
 
 0.6.3:
 change wormhole behvior, simplified (no all unconnected criteria)

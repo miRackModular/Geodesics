@@ -105,6 +105,7 @@ struct Ions : Module {
 	PulseGenerator jumpPulses[2];
 	float jumpLights[2] = {0.0f, 0.0f};
 	float stepClocksLight = 0.0f;
+	unsigned int lightRefreshCounter = 0;
 
 	
 	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
@@ -272,80 +273,83 @@ struct Ions : Module {
 		//********** Buttons, knobs, switches and inputs **********
 	
 		// Run button
-		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].value)) {
+		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].value)) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
 			if (running)
 				initRun(resetOnRun, false);
 		}
 		
-		// Leap button
-		if (leapTrigger.process(params[LEAP_PARAM].value + inputs[LEAP_INPUT].value)) {
-			leap = !leap;
-		}
+		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 
-		// Plank buttons (quatize)
-		if (plankTrigger.process(params[PLANK_PARAM].value))
-			quantize ^= 0x1;
-		if (plank2Trigger.process(params[PLANK2_PARAM].value))
-			quantize ^= 0x2;
-
-		// uncertainty button
-		if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].value + inputs[UNCERTANTY_INPUT].value)) {
-			uncertainty = !uncertainty;
-		}
-
-		// Reset on Run button
-		if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].value)) {
-			resetOnRun = !resetOnRun;
-		}
-
-		// State buttons and CV inputs (state: 0 = global, 1 = local, 2 = both)
-		for (int i = 0; i < 2; i++) {
-			int stateTrig = stateTriggers[i].process(params[STATE_PARAMS + i].value);
-			if (inputs[STATECV_INPUTS + i].active) {
-				if (inputs[STATECV_INPUTS + i].value <= -1.0f)
-					states[i] = 1;
-				else if (inputs[STATECV_INPUTS + i].value < 1.0f)
-					states[i] = 2;
-				else 
-					states[i] = 0;
+			// Leap button
+			if (leapTrigger.process(params[LEAP_PARAM].value + inputs[LEAP_INPUT].value)) {
+				leap = !leap;
 			}
-			else if (stateTrig) {
-				states[i]++;
-				if (states[i] >= 3)
-					states[i] = 0;
+
+			// Plank buttons (quatize)
+			if (plankTrigger.process(params[PLANK_PARAM].value))
+				quantize ^= 0x1;
+			if (plank2Trigger.process(params[PLANK2_PARAM].value))
+				quantize ^= 0x2;
+
+			// uncertainty button
+			if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].value + inputs[UNCERTANTY_INPUT].value)) {
+				uncertainty = !uncertainty;
 			}
-		}
-		
-		// Range buttons and CV inputs
-		for (int i = 0; i < 2; i++) {
-			int rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
-			if (inputs[OCTCV_INPUTS + i].active) {
-				if (inputs[OCTCV_INPUTS + i].value <= -1.0f)
-					ranges[i] = 0;
-				else if (inputs[OCTCV_INPUTS + i].value < 1.0f)
-					ranges[i] = 1;
-				else 
-					ranges[i] = 2;
+
+			// Reset on Run button
+			if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].value)) {
+				resetOnRun = !resetOnRun;
 			}
-			else if (rangeTrig) {
-				if (rangeInc[i]) {
-					ranges[i]++;
-					if (ranges[i] >= 3) {
-						ranges[i] = 1;
-						rangeInc[i] = false;
-					}
+
+			// State buttons and CV inputs (state: 0 = global, 1 = local, 2 = both)
+			for (int i = 0; i < 2; i++) {
+				int stateTrig = stateTriggers[i].process(params[STATE_PARAMS + i].value);
+				if (inputs[STATECV_INPUTS + i].active) {
+					if (inputs[STATECV_INPUTS + i].value <= -1.0f)
+						states[i] = 1;
+					else if (inputs[STATECV_INPUTS + i].value < 1.0f)
+						states[i] = 2;
+					else 
+						states[i] = 0;
 				}
-				else {
-					ranges[i]--;
-					if (ranges[i] < 0) {
-						ranges[i] = 1;
-						rangeInc[i] = true;
-					}
+				else if (stateTrig) {
+					states[i]++;
+					if (states[i] >= 3)
+						states[i] = 0;
 				}
 			}
-		}
+			
+			// Range buttons and CV inputs
+			for (int i = 0; i < 2; i++) {
+				int rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
+				if (inputs[OCTCV_INPUTS + i].active) {
+					if (inputs[OCTCV_INPUTS + i].value <= -1.0f)
+						ranges[i] = 0;
+					else if (inputs[OCTCV_INPUTS + i].value < 1.0f)
+						ranges[i] = 1;
+					else 
+						ranges[i] = 2;
+				}
+				else if (rangeTrig) {
+					if (rangeInc[i]) {
+						ranges[i]++;
+						if (ranges[i] >= 3) {
+							ranges[i] = 1;
+							rangeInc[i] = false;
+						}
+					}
+					else {
+						ranges[i]--;
+						if (ranges[i] < 0) {
+							ranges[i] = 1;
+							rangeInc[i] = true;
+						}
+					}
+				}
+			}
 
+		}// userInputs refresh
 		
 
 		//********** Clock and reset **********
@@ -412,8 +416,6 @@ struct Ions : Module {
 			resetLight = 1.0f;
 			clockTrigger.reset();
 		}
-		else
-			resetLight -= (resetLight / lightLambda) * sampleTime;
 		
 		
 		//********** Outputs and lights **********
@@ -435,49 +437,56 @@ struct Ions : Module {
 			outputs[JUMP_OUTPUTS + i].value = jumpPulses[i].process((float)sampleTime) ? 10.0f : 0.0f;
 		}
 		
-		// Blue and Yellow lights
-		for (int i = 0; i < 16; i++) {
-			lights[BLUE_LIGHTS + i].value = (stepIndexes[0] == i ? 1.0f : 0.0f);
-			lights[YELLOW_LIGHTS + i].value = (stepIndexes[1] == i ? 1.0f : 0.0f);
-		}
-		
-		// Reset light
-		lights[RESET_LIGHT].value =	resetLight;	
-		
-		// Run light
-		lights[RUN_LIGHT].value = running ? 1.0f : 0.0f;
+		lightRefreshCounter++;
+		if (lightRefreshCounter >= displayRefreshStepSkips) {
+			lightRefreshCounter = 0;
 
-		// State lights
-		for (int i = 0; i < 2; i++) {
-			lights[GLOBAL_LIGHTS + i].value = (states[i] & 0x1) == 0 ? 0.5f : 0.0f;
-			lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 0.5f : 0.0f;
-		}
-		
-		// Leap, Plank, uncertainty and ResetOnRun lights
-		lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
-		lights[PLANK_LIGHTS + 0].value = (quantize & 0x1) ? 1.0f : 0.0f;// Blue
-		lights[PLANK_LIGHTS + 1].value = (quantize & 0x2) ? 1.0f : 0.0f;// Yellow
-		lights[UNCERTANTY_LIGHT].value = uncertainty ? 1.0f : 0.0f;
-		lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
-		
-		// Range lights
-		for (int i = 0; i < 3; i++) {
-			lights[OCTA_LIGHTS + i].value = (i <= ranges[0] ? 1.0f : 0.0f);
-			lights[OCTB_LIGHTS + i].value = (i <= ranges[1] ? 1.0f : 0.0f);
-		}
+			// Blue and Yellow lights
+			for (int i = 0; i < 16; i++) {
+				lights[BLUE_LIGHTS + i].value = (stepIndexes[0] == i ? 1.0f : 0.0f);
+				lights[YELLOW_LIGHTS + i].value = (stepIndexes[1] == i ? 1.0f : 0.0f);
+			}
+			
+			// Reset light
+			lights[RESET_LIGHT].value =	resetLight;	
+			resetLight -= (resetLight / lightLambda) * sampleTime * displayRefreshStepSkips;	
+			
+			// Run light
+			lights[RUN_LIGHT].value = running ? 1.0f : 0.0f;
 
-		// Jump lights
-		for (int i = 0; i < 2; i++) {
-			lights[JUMP_LIGHTS + i].value = jumpLights[i];
-			jumpLights[i] -= (jumpLights[i] / lightLambda) * sampleTime;
-		}
+			// State lights
+			for (int i = 0; i < 2; i++) {
+				lights[GLOBAL_LIGHTS + i].value = (states[i] & 0x1) == 0 ? 0.5f : 0.0f;
+				lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 0.5f : 0.0f;
+			}
+			
+			// Leap, Plank, uncertainty and ResetOnRun lights
+			lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
+			lights[PLANK_LIGHTS + 0].value = (quantize & 0x1) ? 1.0f : 0.0f;// Blue
+			lights[PLANK_LIGHTS + 1].value = (quantize & 0x2) ? 1.0f : 0.0f;// Yellow
+			lights[UNCERTANTY_LIGHT].value = uncertainty ? 1.0f : 0.0f;
+			lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
+			
+			// Range lights
+			for (int i = 0; i < 3; i++) {
+				lights[OCTA_LIGHTS + i].value = (i <= ranges[0] ? 1.0f : 0.0f);
+				lights[OCTB_LIGHTS + i].value = (i <= ranges[1] ? 1.0f : 0.0f);
+			}
 
-		// Step clocks light
-		if (stepClocksTrig)
-			stepClocksLight = 1.0f;
-		else
-			stepClocksLight -= (stepClocksLight / lightLambda) * sampleTime;
-		lights[STEPCLOCKS_LIGHT].value = stepClocksLight;
+			// Jump lights
+			for (int i = 0; i < 2; i++) {
+				lights[JUMP_LIGHTS + i].value = jumpLights[i];
+				jumpLights[i] -= (jumpLights[i] / lightLambda) * sampleTime * displayRefreshStepSkips;
+			}
+
+			// Step clocks light
+			if (stepClocksTrig)
+				stepClocksLight = 1.0f;
+			else
+				stepClocksLight -= (stepClocksLight / lightLambda) * sampleTime * displayRefreshStepSkips;
+			lights[STEPCLOCKS_LIGHT].value = stepClocksLight;
+		
+		}// lightRefreshCounter
 		
 		if (clockIgnoreOnReset > 0l)
 			clockIgnoreOnReset--;
@@ -725,6 +734,10 @@ struct IonsWidget : ModuleWidget {
 Model *modelIons = Model::create<Ions, IonsWidget>("Geodesics", "Ions", "Ions", SEQUENCER_TAG);
 
 /*CHANGE LOG
+
+0.6.5:
+input refresh optimization
+step optimization of lights refresh
 
 0.6.4:
 make separate buttons for plank constant (quantize)

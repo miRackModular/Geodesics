@@ -69,6 +69,7 @@ struct Pulsars : Module {
 	SchmittTrigger rndTriggers[2];
 	SchmittTrigger cvLevelTriggers[2];
 	float lfoLights[2] = {0.0f, 0.0f};
+	unsigned int lightRefreshCounter = 0;
 
 	
 	Pulsars() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -172,24 +173,29 @@ struct Pulsars : Module {
 
 	
 	void step() override {		
-		// Void, Reverse and Random buttons
-		for (int i = 0; i < 2; i++) {
-			if (voidTriggers[i].process(params[VOID_PARAMS + i].value + inputs[VOID_INPUTS + i].value)) {
-				isVoid[i] = !isVoid[i];
-			}
-			if (revTriggers[i].process(params[REV_PARAMS + i].value + inputs[REV_INPUTS + i].value)) {
-				isReverse[i] = !isReverse[i];
-			}
-			if (rndTriggers[i].process(params[RND_PARAMS + i].value)) {// + inputs[RND_INPUTS + i].value)) {
-				isRandom[i] = !isRandom[i];
-			}
-		}
 		
-		// CV Level buttons
-		for (int i = 0; i < 2; i++) {
-			if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
-				cvMode ^= (0x1 << i);
-		}
+		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
+
+			// Void, Reverse and Random buttons
+			for (int i = 0; i < 2; i++) {
+				if (voidTriggers[i].process(params[VOID_PARAMS + i].value + inputs[VOID_INPUTS + i].value)) {
+					isVoid[i] = !isVoid[i];
+				}
+				if (revTriggers[i].process(params[REV_PARAMS + i].value + inputs[REV_INPUTS + i].value)) {
+					isReverse[i] = !isReverse[i];
+				}
+				if (rndTriggers[i].process(params[RND_PARAMS + i].value)) {// + inputs[RND_INPUTS + i].value)) {
+					isRandom[i] = !isRandom[i];
+				}
+			}
+			
+			// CV Level buttons
+			for (int i = 0; i < 2; i++) {
+				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
+					cvMode ^= (0x1 << i);
+			}
+			
+		}// userInputs refresh
 
 		// LFO values (normalized to 0.0f to 1.0f space, clamped and offset adjusted depending cvMode)
 		float lfoVal[2];
@@ -277,26 +283,33 @@ struct Pulsars : Module {
 		}
 
 		
-		// Void, Reverse and Random lights
-		for (int i = 0; i < 2; i++) {
-			lights[VOID_LIGHTS + i].value = isVoid[i] ? 1.0f : 0.0f;
-			lights[REV_LIGHTS + i].value = isReverse[i] ? 1.0f : 0.0f;
-			lights[RND_LIGHTS + i].value = isRandom[i] ? 1.0f : 0.0f;
-		}
-		
-		// CV Level lights
-		bool isBiolar = (cvMode & 0x1) == 0;
-		lights[CVALEVEL_LIGHTS + 0].value = isBiolar ? 1.0f : 0.0f;
-		lights[CVALEVEL_LIGHTS + 1].value = isBiolar ? 0.0f : 1.0f;
-		isBiolar = (cvMode & 0x2) == 0;
-		lights[CVBLEVEL_LIGHTS + 0].value = isBiolar ? 1.0f : 0.0f;
-		lights[CVBLEVEL_LIGHTS + 1].value = isBiolar ? 0.0f : 1.0f;
+		lightRefreshCounter++;
+		if (lightRefreshCounter >= displayRefreshStepSkips) {
+			lightRefreshCounter = 0;
 
-		// LFO lights
-		for (int i = 0; i < 2; i++) {
-			lights[LFO_LIGHTS + i].value = lfoLights[i];
-			lfoLights[i] -= (lfoLights[i] / lightLambda) * (float)engineGetSampleTime();
-		}
+			// Void, Reverse and Random lights
+			for (int i = 0; i < 2; i++) {
+				lights[VOID_LIGHTS + i].value = isVoid[i] ? 1.0f : 0.0f;
+				lights[REV_LIGHTS + i].value = isReverse[i] ? 1.0f : 0.0f;
+				lights[RND_LIGHTS + i].value = isRandom[i] ? 1.0f : 0.0f;
+			}
+			
+			// CV Level lights
+			bool isBiolar = (cvMode & 0x1) == 0;
+			lights[CVALEVEL_LIGHTS + 0].value = isBiolar ? 1.0f : 0.0f;
+			lights[CVALEVEL_LIGHTS + 1].value = isBiolar ? 0.0f : 1.0f;
+			isBiolar = (cvMode & 0x2) == 0;
+			lights[CVBLEVEL_LIGHTS + 0].value = isBiolar ? 1.0f : 0.0f;
+			lights[CVBLEVEL_LIGHTS + 1].value = isBiolar ? 0.0f : 1.0f;
+
+			// LFO lights
+			for (int i = 0; i < 2; i++) {
+				lights[LFO_LIGHTS + i].value = lfoLights[i];
+				lfoLights[i] -= (lfoLights[i] / lightLambda) * (float)engineGetSampleTime() * displayRefreshStepSkips;
+			}
+			
+		}// lightRefreshCounter
+		
 	}// step()
 	
 	
@@ -522,6 +535,10 @@ struct PulsarsWidget : ModuleWidget {
 Model *modelPulsars = Model::create<Pulsars, PulsarsWidget>("Geodesics", "Pulsars", "Pulsars", MIXER_TAG);
 
 /*CHANGE LOG
+
+0.6.5:
+input refresh optimization
+step optimization of lights refresh
 
 0.6.1:
 add CV level modes buttons and lights, remove from right-click menu

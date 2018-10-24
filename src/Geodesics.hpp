@@ -35,6 +35,9 @@ extern Model *modelBlankInfo;
 static const float lightLambda = 0.075f;
 static const std::string lightPanelID = "White light edition";
 static const std::string darkPanelID = "Dark matter edition";
+static const unsigned int displayRefreshStepSkips = 256;
+static const unsigned int userInputsStepSkipMask = 0xF;// sub interval of displayRefreshStepSkips, since inputs should be more responsive than lights
+// above value should make it such that inputs are sampled > 1kHz so as to not miss 1ms triggers
 
 
 
