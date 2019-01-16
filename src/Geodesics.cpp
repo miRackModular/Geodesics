@@ -23,6 +23,7 @@ void init(rack::Plugin *p) {
 	p->addModel(modelPulsars);
 	p->addModel(modelBranes);
 	p->addModel(modelIons);
+	p->addModel(modelUncertainties);
 	p->addModel(modelBlankLogo);
 	p->addModel(modelBlankInfo);
 }

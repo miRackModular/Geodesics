@@ -26,6 +26,7 @@ extern Model *modelBlackHoles;
 extern Model *modelPulsars;
 extern Model *modelBranes;
 extern Model *modelIons;
+extern Model *modelUncertainties;
 extern Model *modelBlankLogo;
 extern Model *modelBlankInfo;
 
@@ -90,20 +91,26 @@ struct GeoKnob : DynamicSVGKnob {
 	}
 };
 
-struct GeoKnobRight : GeoKnob {
-	GeoKnobRight() {
-		orientationAngle = M_PI / 2.0f;
-	}
+struct GeoKnobTopRight : GeoKnob {
+	GeoKnobTopRight() {orientationAngle = M_PI / 4.0f;}
 };
-struct GeoKnobLeft : GeoKnob {
-	GeoKnobLeft() {
-		orientationAngle = M_PI / -2.0f;
-	}
+struct GeoKnobRight : GeoKnob {
+	GeoKnobRight() {orientationAngle = M_PI / 2.0f;}
+};
+struct GeoKnobBotRight : GeoKnob {
+	GeoKnobBotRight() {orientationAngle = 3.0f * M_PI / 4.0f;}
 };
 struct GeoKnobBottom : GeoKnob {
-	GeoKnobBottom() {
-		orientationAngle = M_PI;
-	}
+	GeoKnobBottom() {orientationAngle = M_PI;}
+};
+struct GeoKnobBotLeft : GeoKnob {
+	GeoKnobBotLeft() {orientationAngle = 5.0f * M_PI / 4.0f;}
+};
+struct GeoKnobLeft : GeoKnob {
+	GeoKnobLeft() {orientationAngle = M_PI / -2.0f;}
+};
+struct GeoKnobTopLeft : GeoKnob {
+	GeoKnobTopLeft() {orientationAngle = M_PI / -4.0f;}
 };
 
 
