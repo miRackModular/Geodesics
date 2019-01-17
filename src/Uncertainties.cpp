@@ -22,7 +22,7 @@ struct Uncertainties : Module {
 		ENUMS(CV_PARAMS, 16),// first 8 are blue, last 8 are yellow
 		ENUMS(PROB_PARAMS, 8),// prob knobs
 		ENUMS(OCT_PARAMS, 2),// energy
-		ENUMS(QUANTIZE_PARAM, 2),// plank
+		ENUMS(QUANTIZE_PARAMS, 2),// plank
 		ENUMS(STATE_PARAMS, 2),// state switch
 		ENUMS(FIXEDCV_PARAMS, 2),
 		ENUMS(EXTSIG_PARAMS, 2),
@@ -39,6 +39,7 @@ struct Uncertainties : Module {
 		ENUMS(STATE_INPUTS, 2),
 		ENUMS(OCT_INPUTS, 2),
 		ENUMS(EXTSIG_INPUTS, 2),
+		ENUMS(QUANTIZE_INPUTS, 2),
 		GPROB_INPUT,
 		NUM_INPUTS
 	};
@@ -48,16 +49,16 @@ struct Uncertainties : Module {
 	};
 	enum LightIds {
 		ENUMS(STEP_LIGHTS, 16),// first 8 are blue, last 8 are yellow
-		CV_LIGHT,// main output
+		ENUMS(CV_LIGHT, 2),// main output (room for blue/yellow)
 		RUN_LIGHT,
 		STEPCLOCKS_LIGHT,
 		RESET_LIGHT,
 		RESETONRUN_LIGHT,
-		ENUMS(LENGTH_LIGHTS, 8),
+		ENUMS(LENGTH_LIGHTS, 8),// all off when len = 8, north-west turns on when len = 7, north-west and west on when len = 6, etc
 		ENUMS(STATE_LIGHTS, 2),
 		ADD_LIGHT,
 		ENUMS(QUANTIZE_LIGHTS, 2),
-		ENUMS(ENERGY_LIGHTS, 10),// first 5 are blue, last 5 are yellow
+		ENUMS(ENERGY_LIGHTS, 6),// first 3 are blue, last 3 are yellow (symetrical so only 3 instead of 5 declared)
 		ENUMS(FIXEDCV_LIGHTS, 2),
 		ENUMS(EXTSIG_LIGHTS, 2),
 		ENUMS(RANDOM_LIGHTS, 2),
@@ -97,6 +98,10 @@ struct Uncertainties : Module {
 		running = false;
 		resetOnRun = false;
 		initRun(true);
+		
+		// for (int i = 0; i < NUM_LIGHTS; i++)
+			// lights[i].value = 1.0f;
+		// lights[CV_LIGHT + 1].value = 0.0f;
 	}
 
 	
@@ -265,9 +270,9 @@ struct UncertaintiesWidget : ModuleWidget {
 		static constexpr float offset2s = 27.5f;// small
 		
 		
-		// CV out and light
+		// CV out and light 
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerOutput), Port::OUTPUT, module, Uncertainties::CV_OUTPUT, &module->panelTheme));		
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter, rowRulerOutput - 21.5f), module, Uncertainties::CV_LIGHT));
+		addChild(createLightCentered<SmallLight<GeoBlueYellowLight>>(Vec(colRulerCenter, rowRulerOutput - 21.5f), module, Uncertainties::CV_LIGHT));
 		
 		// Blue CV knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput - radius1), module, Uncertainties::CV_PARAMS + 0, 0.0f, 1.0f, 0.5f, &module->panelTheme));
@@ -290,11 +295,96 @@ struct UncertaintiesWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerOutput - offset3), module, Uncertainties::CV_PARAMS + 8 + 7, 0.0f, 1.0f, 0.5f, &module->panelTheme));
 		
 		// Prob CV knobs
-		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + offset2s, rowRulerOutput - offset2b), module, Uncertainties::PROB_PARAMS + 0, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBotRight>(Vec(colRulerCenter + offset2b, rowRulerOutput - offset2s), module, Uncertainties::PROB_PARAMS + 1, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter + offset2b, rowRulerOutput + offset2s), module, Uncertainties::PROB_PARAMS + 2, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBotLeft>(Vec(colRulerCenter + offset2s, rowRulerOutput + offset2b), module, Uncertainties::PROB_PARAMS + 3, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		// TODO fix above 4 positions, do remaining 4
+		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + offset2s, rowRulerOutput - offset2b - 3), module, Uncertainties::PROB_PARAMS + 0, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBotRight>(Vec(colRulerCenter + offset2b, rowRulerOutput - offset2s - 8), module, Uncertainties::PROB_PARAMS + 1, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter + offset2b + 3, rowRulerOutput + offset2s), module, Uncertainties::PROB_PARAMS + 2, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBotLeft>(Vec(colRulerCenter + offset2s + 8, rowRulerOutput + offset2b), module, Uncertainties::PROB_PARAMS + 3, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobLeft>(Vec(colRulerCenter - offset2s, rowRulerOutput + offset2b + 3), module, Uncertainties::PROB_PARAMS + 4, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobTopLeft>(Vec(colRulerCenter - offset2b, rowRulerOutput + offset2s + 8), module, Uncertainties::PROB_PARAMS + 5, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset2b - 3, rowRulerOutput - offset2s), module, Uncertainties::PROB_PARAMS + 6, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobTopRight>(Vec(colRulerCenter - offset2s - 8, rowRulerOutput - offset2b), module, Uncertainties::PROB_PARAMS + 7, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		
+	
+		// Length jack, button and lights
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 116.5f, rowRulerOutput + 70.0f), Port::INPUT, module, Uncertainties::LENGTH_INPUT, &module->panelTheme));
+		static float lenButtonX = colRulerCenter + 130.5f;
+		static float lenButtonY = rowRulerOutput + 36.5f;
+		addParam(createDynamicParam<GeoPushButton>(Vec(lenButtonX, lenButtonY), module, Uncertainties::LENGTH_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX        , lenButtonY - 14.5f), module, Uncertainties::LENGTH_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX + 10.5f, lenButtonY - 10.5f), module, Uncertainties::LENGTH_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX + 14.5f, lenButtonY        ), module, Uncertainties::LENGTH_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX + 10.5f, lenButtonY + 10.5f), module, Uncertainties::LENGTH_LIGHTS + 3));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX        , lenButtonY + 14.5f), module, Uncertainties::LENGTH_LIGHTS + 4));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX - 10.5f, lenButtonY + 10.5f), module, Uncertainties::LENGTH_LIGHTS + 5));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX - 14.5f, lenButtonY        ), module, Uncertainties::LENGTH_LIGHTS + 6));
+		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX - 10.5f, lenButtonY - 10.5f), module, Uncertainties::LENGTH_LIGHTS + 7));
+		
+		// Clock inputs
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput + 36.5f), Port::INPUT, module, Uncertainties::CERTAIN_CLK_INPUT, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 116.5f, rowRulerOutput + 70.0f), Port::INPUT, module, Uncertainties::UNCERTAIN_CLK_INPUT, &module->panelTheme));
+		
+		// Switch, add, state (jacks, buttons, ligths)
+		// left side
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Uncertainties::STATE_INPUTS + 0, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 115.5f, rowRulerOutput - 69.0f), module, Uncertainties::STATE_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f - 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Uncertainties::STATE_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f + 3.0f, rowRulerOutput - 69.0f + 14.0f), module, Uncertainties::ADD_LIGHT + 0));
+		// right side
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Uncertainties::STATE_INPUTS + 1, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 115.5f, rowRulerOutput - 69.0f), module, Uncertainties::STATE_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 115.5f + 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Uncertainties::STATE_LIGHTS + 1));
+		
+		// Plank constant (jack, light and button)
+		// left side (blue)
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Uncertainties::QUANTIZE_INPUTS + 0, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 96.0f - 13.0f, rowRulerOutput - 96.0f - 13.0f), module, Uncertainties::QUANTIZE_LIGHTS + 0));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 96.0f - 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Uncertainties::QUANTIZE_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		// right side (yellow)
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Uncertainties::QUANTIZE_INPUTS + 1, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 96.0f + 13.0f, rowRulerOutput - 96.0f - 13.0f), module, Uncertainties::QUANTIZE_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 96.0f + 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Uncertainties::QUANTIZE_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		
+		// Energy (button and lights)
+		// left side (blue)
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 69.5f, rowRulerOutput - 116.0f), module, Uncertainties::OCT_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Uncertainties::ENERGY_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Uncertainties::ENERGY_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Uncertainties::ENERGY_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 10.0f, rowRulerOutput - 116.0f - 11.0f), module, Uncertainties::ENERGY_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f + 7.0f, rowRulerOutput - 116.0f + 12.0f), module, Uncertainties::ENERGY_LIGHTS + 2));
+		// right side (yellow)
+		// left side (blue)
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 69.5f, rowRulerOutput - 116.0f), module, Uncertainties::OCT_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Uncertainties::ENERGY_LIGHTS + 3 + 0));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Uncertainties::ENERGY_LIGHTS + 3 + 1));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Uncertainties::ENERGY_LIGHTS + 3 + 1));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 10.0f, rowRulerOutput - 116.0f - 11.0f), module, Uncertainties::ENERGY_LIGHTS + 3 + 2));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f - 7.0f, rowRulerOutput - 116.0f + 12.0f), module, Uncertainties::ENERGY_LIGHTS + 3 + 2));
+		
+		
+		
+		// Bottom row
+		
+		// Run jack, light and button
+		static constexpr float rowRulerRunJack = 380.0f - 32.5f;
+		static constexpr float offsetRunJackX = 119.5f;
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetRunJackX, rowRulerRunJack), Port::INPUT, module, Uncertainties::RUN_INPUT, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRunJackX + 18.0f, rowRulerRunJack), module, Uncertainties::RUN_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRunJackX + 33.0f, rowRulerRunJack), module, Uncertainties::RUN_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		
+		// Reset jack, light and button
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetRunJackX, rowRulerRunJack), Port::INPUT, module, Uncertainties::RESET_INPUT, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRunJackX - 18.0f, rowRulerRunJack), module, Uncertainties::RESET_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRunJackX - 33.0f, rowRulerRunJack), module, Uncertainties::RESET_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+	
+		static constexpr float offsetMagneticButton = 42.5f;
+		// Magnetic clock (step clocks)
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetMagneticButton - 15.0f, rowRulerRunJack), module, Uncertainties::STEPCLOCKS_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetMagneticButton, rowRulerRunJack), module, Uncertainties::STEPCLOCKS_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));			
+		// Reset on Run light and button
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetMagneticButton + 15.0f, rowRulerRunJack), module, Uncertainties::RESETONRUN_LIGHT));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetMagneticButton, rowRulerRunJack), module, Uncertainties::RESETONRUN_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		
 		
 	}
 };
