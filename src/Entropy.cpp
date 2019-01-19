@@ -72,7 +72,8 @@ struct Entropy : Module {
 	
 	// Constants
 	static constexpr float clockIgnoreOnResetDuration = 0.001f;// disable clock on powerup and reset for 1 ms (so that the first step plays)
-							  
+	enum SourceIds {SRC_CV, SRC_EXT, SRC_RND};
+	
 	// Need to save, with reset
 	int panelTheme = 0;
 	bool running;
@@ -81,14 +82,16 @@ struct Entropy : Module {
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
 	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
 	bool addMode;
+	int sources[2];// [0; ], first is blue, 2nd yellow; follows SourceIds
+	int stepIndex;
+	bool pipeBlue[8];
+	float randomCVs[2];// used in SRC_RND
 	
 	
 	// No need to save
 	long clockIgnoreOnReset;
 	float resetLight;
 	unsigned int lightRefreshCounter = 0;
-	int stepIndex;
-	bool pipeBlue[8];
 	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	SchmittTrigger runningTrigger;
 	SchmittTrigger plankTriggers[2];
@@ -101,6 +104,9 @@ struct Entropy : Module {
 	SchmittTrigger stepClockTrigger;
 	SchmittTrigger resetTrigger;
 	SchmittTrigger resetOnRunTrigger;
+	SchmittTrigger fixedSrcTriggers[2];
+	SchmittTrigger rndSrcTriggers[2];
+	SchmittTrigger extSrcTriggers[2];
 	float stepClockLight = 0.0f;
 	float stateSwitchLight = 0.0f;
 	
@@ -108,6 +114,10 @@ struct Entropy : Module {
 	inline void updatePipeBlue(int step) {
 		float effectiveKnob = params[PROB_PARAMS + step].value + -1.0f * (params[GPROB_PARAM].value + inputs[GPROB_INPUT].value / 5.0f);
 		pipeBlue[step] = effectiveKnob > randomUniform();
+	}
+	inline void updateRandomCVs() {
+		randomCVs[0] = randomUniform();
+		randomCVs[1] = randomUniform();
 	}
 	
 	
@@ -123,7 +133,8 @@ struct Entropy : Module {
 		quantize = 3;
 		addMode = false;
 		for (int i = 0; i < 2; i++) {
-			ranges[i] = 1;			
+			ranges[i] = 1;	
+			sources[i] = SRC_CV;
 		}
 		initRun(true, false);
 	}
@@ -149,6 +160,7 @@ struct Entropy : Module {
 			}
 			for (int i = 0; i < 8; i++)
 				updatePipeBlue(i);
+			updateRandomCVs();
 		}
 		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		resetLight = 0.0f;
@@ -179,6 +191,24 @@ struct Entropy : Module {
 
 		// addMode
 		json_object_set_new(rootJ, "addMode", json_boolean(addMode));
+
+		// sources
+		json_object_set_new(rootJ, "sources0", json_integer(sources[0]));
+		json_object_set_new(rootJ, "sources1", json_integer(sources[1]));
+
+		// stepIndex
+		json_object_set_new(rootJ, "stepIndex", json_integer(stepIndex));
+
+		// pipeBlue (only need to save the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
+		json_object_set_new(rootJ, "pipeBlue", json_boolean(pipeBlue[stepIndex]));
+		// json_t *pipeBlueJ = json_array();
+		// for (int i = 0; i < 8; i++)
+			// json_array_insert_new(pipeBlueJ, i, json_boolean(pipeBlue[i]));
+		// json_object_set_new(rootJ, "pipeBlue", pipeBlueJ);
+		
+		// randomCVs (only need to save the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
+		json_object_set_new(rootJ, "randomCVs0", json_real(randomCVs[0]));
+		json_object_set_new(rootJ, "randomCVs1", json_real(randomCVs[1]));
 
 		return rootJ;
 	}
@@ -223,7 +253,43 @@ struct Entropy : Module {
 		if (addModeJ)
 			addMode = json_is_true(addModeJ);
 
-		initRun(true, false);
+		// sources
+		json_t *sources0J = json_object_get(rootJ, "sources0");
+		if (sources0J)
+			sources[0] = json_integer_value(sources0J);
+		json_t *sources1J = json_object_get(rootJ, "sources1");
+		if (sources1J)
+			sources[1] = json_integer_value(sources1J);
+
+		// stepIndex
+		json_t *stepIndexJ = json_object_get(rootJ, "stepIndex");
+		if (stepIndexJ)
+			stepIndex = json_integer_value(stepIndexJ);
+
+		// pipeBlue (only saved the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
+		json_t *pipeBlueJ = json_object_get(rootJ, "pipeBlue");
+		if (pipeBlueJ)
+			pipeBlue[stepIndex] = json_is_true(pipeBlueJ);
+		
+		// json_t *pipeBlueJ = json_object_get(rootJ, "pipeBlue");
+		// if (pipeBlueJ) {
+			// for (int i = 0; i < 8; i++)
+			// {
+				// json_t *pipeBlueArrayJ = json_array_get(pipeBlueJ, i);
+				// if (pipeBlueArrayJ)
+					// pipeBlue[i] = json_integer_value(pipeBlueArrayJ);
+			// }			
+		// }		
+
+		// randomCVs (only saved the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
+		json_t *randomCVs0J = json_object_get(rootJ, "randomCVs0");
+		if (randomCVs0J)
+			randomCVs[0] = json_number_value(randomCVs0J);
+		json_t *randomCVs1J = json_object_get(rootJ, "randomCVs1");
+		if (randomCVs1J)
+			randomCVs[1] = json_number_value(randomCVs1J);
+
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		rangeInc[0] = true;
 		rangeInc[1] = true;
 	}
@@ -288,6 +354,16 @@ struct Entropy : Module {
 				}
 			}
 			
+			// Source buttons (fixedCV, random, ext)
+			for (int i = 0; i < 2; i++) {
+				if (rndSrcTriggers[i].process(params[RANDOM_PARAMS + i].value))
+					sources[i] = SRC_RND;
+				if (extSrcTriggers[i].process(params[EXTSIG_PARAMS + i].value))
+					sources[i] = SRC_EXT;
+				if (fixedSrcTriggers[i].process(params[FIXEDCV_PARAMS + i].value))
+					sources[i] = SRC_CV;
+			}
+			
 			// addMode
 			if (switchAddTrigger.process(params[SWITCHADD_PARAM].value + inputs[SWITCHADD_INPUT].value)) {
 				addMode = !addMode;
@@ -314,15 +390,36 @@ struct Entropy : Module {
 		if (running && clockIgnoreOnReset == 0l) {
 			if (certainClockTrig)
 				stepIndex++;
-			if (uncertainClockTrig)
-				stepIndex += (randomu32() & 0x7) + 1;
-			stepIndex &= 0x7;
-			updatePipeBlue(stepIndex);
+			if (uncertainClockTrig) {
+				int numSteps = 8;
+				int	prob = randomu32() % 1000;
+				if (prob < 175)
+					numSteps = 1;
+				else if (prob < 330) // 175 + 155
+					numSteps = 2;
+				else if (prob < 475) // 175 + 155 + 145
+					numSteps = 3;
+				else if (prob < 610) // 175 + 155 + 145 + 135
+					numSteps = 4;
+				else if (prob < 725) // 175 + 155 + 145 + 135 + 115
+					numSteps = 5;
+				else if (prob < 830) // 175 + 155 + 145 + 135 + 115 + 105
+					numSteps = 6;
+				else if (prob < 925) // 175 + 155 + 145 + 135 + 115 + 105 + 95
+					numSteps = 7;
+				stepIndex += numSteps;
+			}
+			if (certainClockTrig || uncertainClockTrig) {
+				stepIndex %= length;
+				updatePipeBlue(stepIndex);
+				updateRandomCVs();
+			}
 		}				
 		// Magnetic clock (step clock)
 		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].value)) {
 			if (++stepIndex >= length) stepIndex = 0;
 			updatePipeBlue(stepIndex);
+			updateRandomCVs();
 			stepClockLight = 1.0f;
 		}
 		
@@ -339,9 +436,9 @@ struct Entropy : Module {
 
 		// Output
 		if (addMode) 
-			outputs[CV_OUTPUT].value = getKnobCV(stepIndex, true) + getKnobCV(stepIndex, false);
+			outputs[CV_OUTPUT].value = getStepCV(stepIndex, true) + getStepCV(stepIndex, false);
 		else 
-			outputs[CV_OUTPUT].value = getKnobCV(stepIndex, pipeBlue[stepIndex]);
+			outputs[CV_OUTPUT].value = getStepCV(stepIndex, pipeBlue[stepIndex]);
 		
 		lightRefreshCounter++;
 		if (lightRefreshCounter >= displayRefreshStepSkips) {
@@ -388,6 +485,14 @@ struct Entropy : Module {
 			// State switch light
 			lights[STATESWITCH_LIGHT].value = stateSwitchLight;
 			stateSwitchLight -= (stateSwitchLight / lightLambda) * sampleTime * displayRefreshStepSkips;
+			
+			// Sources lights
+			for (int i = 0; i < 2; i++) {
+				lights[RANDOM_LIGHTS + i].value = (sources[i] == SRC_RND) ? 1.0f : 0.0f;
+				lights[EXTSIG_LIGHTS + i].value = (sources[i] == SRC_EXT) ? 1.0f : 0.0f;
+				lights[FIXEDCV_LIGHTS + i].value = (sources[i] == SRC_CV) ? 1.0f : 0.0f;
+			}
+			
 		}// lightRefreshCounter
 		
 		if (clockIgnoreOnReset > 0l)
@@ -395,18 +500,29 @@ struct Entropy : Module {
 	}// step()
 	
 	
-	float getKnobCV(int step, bool blue) {
-		float knobVal = params[CV_PARAMS + (blue ? 0 : 8) + step].value;
+	float getStepCV(int step, bool blue) {
+		int colorIndex = blue ? 0 : 1;
+		float knobVal = params[CV_PARAMS + (colorIndex << 3) + step].value;
 		float cv = 0.0f;
-		int range = ranges[blue ? 0 : 1];
-		if ( (blue && (quantize & 0x1) != 0) || (!blue && (quantize > 1)) ) {
-			cv = (knobVal * (float)(range * 2 + 1) - (float)range);
-			cv = quantizeCV(cv);
+		
+		if (sources[colorIndex] == SRC_RND) {
+			cv = randomCVs[colorIndex] * (knobVal * 10.0f - 5.0f);
 		}
-		else {
-			int maxCV = (range == 0 ? 1 : (range * 5));// maxCV is [1, 5, 10]
-			cv = knobVal * (float)(maxCV * 2) - (float)maxCV;
+		else if (sources[colorIndex] == SRC_EXT) {
+			cv = clamp(inputs[EXTSIG_INPUTS + colorIndex].value * (knobVal * 2.0f - 1.0f), -10.0f, 10.0f);
 		}
+		else {// SRC_CV
+			int range = ranges[colorIndex];
+			if ( (blue && (quantize & 0x1) != 0) || (!blue && (quantize > 1)) ) {
+				cv = (knobVal * (float)(range * 2 + 1) - (float)range);
+				cv = quantizeCV(cv);
+			}
+			else {
+				int maxCV = (range == 0 ? 1 : (range * 5));// maxCV is [1, 5, 10]
+				cv = knobVal * (float)(maxCV * 2) - (float)maxCV;
+			}
+		}
+		
 		return cv;
 	}
 	

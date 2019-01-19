@@ -261,7 +261,7 @@ struct Ions : Module {
 		if (leapJ)
 			leap = json_is_true(leapJ);
 
-		initRun(true, false);
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		rangeInc[0] = true;
 		rangeInc[1] = true;
 	}
