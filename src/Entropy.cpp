@@ -21,9 +21,10 @@ struct Entropy : Module {
 		LENGTH_PARAM,
 		ENUMS(CV_PARAMS, 16),// first 8 are blue, last 8 are yellow
 		ENUMS(PROB_PARAMS, 8),// prob knobs
-		ENUMS(OCT_PARAMS, 2),// energy
+		ENUMS(OCT_PARAMS, 2),// energy (range)
 		ENUMS(QUANTIZE_PARAMS, 2),// plank
-		ENUMS(STATE_PARAMS, 2),// state switch
+		STATESWITCH_PARAM,// state switch
+		SWITCHADD_PARAM,
 		ENUMS(FIXEDCV_PARAMS, 2),
 		ENUMS(EXTSIG_PARAMS, 2),
 		ENUMS(RANDOM_PARAMS, 2),
@@ -36,8 +37,9 @@ struct Entropy : Module {
 		LENGTH_INPUT,
 		RUN_INPUT,
 		RESET_INPUT,
-		ENUMS(STATE_INPUTS, 2),
-		ENUMS(OCT_INPUTS, 2),
+		STATESWITCH_INPUT,// state switch
+		SWITCHADD_INPUT,
+		ENUMS(OCTCV_INPUTS, 2),
 		ENUMS(EXTSIG_INPUTS, 2),
 		ENUMS(QUANTIZE_INPUTS, 2),
 		GPROB_INPUT,
@@ -55,10 +57,11 @@ struct Entropy : Module {
 		RESET_LIGHT,
 		RESETONRUN_LIGHT,
 		ENUMS(LENGTH_LIGHTS, 8),// all off when len = 8, north-west turns on when len = 7, north-west and west on when len = 6, etc
-		ENUMS(STATE_LIGHTS, 2),
+		STATESWITCH_LIGHT,
+		SWITCHADD_LIGHT,
 		ADD_LIGHT,
 		ENUMS(QUANTIZE_LIGHTS, 2),
-		ENUMS(ENERGY_LIGHTS, 6),// first 3 are blue, last 3 are yellow (symetrical so only 3 instead of 5 declared)
+		ENUMS(OCT_LIGHTS, 6),// first 3 are blue, last 3 are yellow (symetrical so only 3 instead of 5 declared); 0 is center, 1 is inside mirrors, 2 is outside mirrors
 		ENUMS(FIXEDCV_LIGHTS, 2),
 		ENUMS(EXTSIG_LIGHTS, 2),
 		ENUMS(RANDOM_LIGHTS, 2),
@@ -76,6 +79,8 @@ struct Entropy : Module {
 	bool resetOnRun;
 	int length;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
+	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
+	bool addMode;
 	
 	
 	// No need to save
@@ -84,18 +89,26 @@ struct Entropy : Module {
 	unsigned int lightRefreshCounter = 0;
 	int stepIndex;
 	bool pipeBlue[8];
+	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	SchmittTrigger runningTrigger;
 	SchmittTrigger plankTriggers[2];
 	SchmittTrigger lengthTrigger;
+	SchmittTrigger stateSwitchTrigger;
+	SchmittTrigger switchAddTrigger;
 	SchmittTrigger certainClockTrigger;
 	SchmittTrigger uncertainClockTrigger;
+	SchmittTrigger octTriggers[2];
 	SchmittTrigger stepClockTrigger;
 	SchmittTrigger resetTrigger;
 	SchmittTrigger resetOnRunTrigger;
 	float stepClockLight = 0.0f;
+	float stateSwitchLight = 0.0f;
 	
 	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
-	inline void updatePipeBlue(int step) {pipeBlue[step] = params[PROB_PARAMS + step].value > randomUniform();}
+	inline void updatePipeBlue(int step) {
+		float effectiveKnob = params[PROB_PARAMS + step].value + -1.0f * (params[GPROB_PARAM].value + inputs[GPROB_INPUT].value / 5.0f);
+		pipeBlue[step] = effectiveKnob > randomUniform();
+	}
 	
 	
 	Entropy() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
@@ -108,6 +121,10 @@ struct Entropy : Module {
 		resetOnRun = false;
 		length = 8;
 		quantize = 3;
+		addMode = false;
+		for (int i = 0; i < 2; i++) {
+			ranges[i] = 1;			
+		}
 		initRun(true, false);
 	}
 
@@ -115,6 +132,9 @@ struct Entropy : Module {
 	void onRandomize() override {
 		length = (randomu32() & 0x7) + 1;
 		quantize = randomu32() & 0x3;
+		for (int i = 0; i < 2; i++) {
+			ranges[i] = randomu32() % 3;
+		}
 		initRun(true, true);
 	}
 	
@@ -153,6 +173,13 @@ struct Entropy : Module {
 		// quantize
 		json_object_set_new(rootJ, "quantize", json_integer(quantize));
 
+		// ranges
+		json_object_set_new(rootJ, "ranges0", json_integer(ranges[0]));
+		json_object_set_new(rootJ, "ranges1", json_integer(ranges[1]));
+
+		// addMode
+		json_object_set_new(rootJ, "addMode", json_boolean(addMode));
+
 		return rootJ;
 	}
 
@@ -183,7 +210,22 @@ struct Entropy : Module {
 		if (quantizeJ)
 			quantize = json_integer_value(quantizeJ);
 
+		// ranges
+		json_t *ranges0J = json_object_get(rootJ, "ranges0");
+		if (ranges0J)
+			ranges[0] = json_integer_value(ranges0J);
+		json_t *ranges1J = json_object_get(rootJ, "ranges1");
+		if (ranges1J)
+			ranges[1] = json_integer_value(ranges1J);
+
+		// addMode
+		json_t *addModeJ = json_object_get(rootJ, "addMode");
+		if (addModeJ)
+			addMode = json_is_true(addModeJ);
+
 		initRun(true, false);
+		rangeInc[0] = true;
+		rangeInc[1] = true;
 	}
 
 	
@@ -201,8 +243,12 @@ struct Entropy : Module {
 		
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 
-			// Length button
-			if (lengthTrigger.process(params[LENGTH_PARAM].value)) {
+			// Length button and input
+			bool lengthTrig = lengthTrigger.process(params[LENGTH_PARAM].value);
+			if (inputs[LENGTH_INPUT].active) {
+				length = clamp(8 - (int)(inputs[LENGTH_INPUT].value * 7.0f / 10.0f + 0.5f)  , 1, 8);
+			}
+			else if (lengthTrig) {
 				if (length > 1) length--;
 				else length = 8;
 			}
@@ -213,12 +259,50 @@ struct Entropy : Module {
 			if (plankTriggers[1].process(params[QUANTIZE_PARAMS + 1].value))
 				quantize ^= 0x2;
 
+			// Range buttons and CV inputs
+			for (int i = 0; i < 2; i++) {
+				bool rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
+				if (inputs[OCTCV_INPUTS + i].active) {
+					if (inputs[OCTCV_INPUTS + i].value <= -1.0f)
+						ranges[i] = 0;
+					else if (inputs[OCTCV_INPUTS + i].value < 1.0f)
+						ranges[i] = 1;
+					else 
+						ranges[i] = 2;
+				}
+				else if (rangeTrig) {
+					if (rangeInc[i]) {
+						ranges[i]++;
+						if (ranges[i] >= 3) {
+							ranges[i] = 1;
+							rangeInc[i] = false;
+						}
+					}
+					else {
+						ranges[i]--;
+						if (ranges[i] < 0) {
+							ranges[i] = 1;
+							rangeInc[i] = true;
+						}
+					}
+				}
+			}
 			
+			// addMode
+			if (switchAddTrigger.process(params[SWITCHADD_PARAM].value + inputs[SWITCHADD_INPUT].value)) {
+				addMode = !addMode;
+			}		
+		
+			// StateSwitch
+			if (stateSwitchTrigger.process(params[STATESWITCH_PARAM].value + inputs[STATESWITCH_INPUT].value)) {
+				pipeBlue[stepIndex] = !pipeBlue[stepIndex];
+				stateSwitchLight = 1.0f;
+			}		
+		
 			// Reset on Run button
 			if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].value)) {
 				resetOnRun = !resetOnRun;
 			}		
-		
 		}// userInputs refresh
 		
 
@@ -226,18 +310,20 @@ struct Entropy : Module {
 		
 		// Clocks
 		bool certainClockTrig = certainClockTrigger.process(inputs[CERTAIN_CLK_INPUT].value);
-		// bool uncertainClockTrig = uncertainClockTrigger.process(inputs[UNCERTAIN_CLK_INPUT].value);
-		bool stepClockTrig = stepClockTrigger.process(params[STEPCLOCK_PARAM].value);
+		bool uncertainClockTrig = uncertainClockTrigger.process(inputs[UNCERTAIN_CLK_INPUT].value);
 		if (running && clockIgnoreOnReset == 0l) {
-			if (certainClockTrig) {
-				if (++stepIndex >= length) stepIndex = 0;
-				updatePipeBlue(stepIndex);
-			}
+			if (certainClockTrig)
+				stepIndex++;
+			if (uncertainClockTrig)
+				stepIndex += (randomu32() & 0x7) + 1;
+			stepIndex &= 0x7;
+			updatePipeBlue(stepIndex);
 		}				
 		// Magnetic clock (step clock)
-		if (stepClockTrig) {
+		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].value)) {
 			if (++stepIndex >= length) stepIndex = 0;
 			updatePipeBlue(stepIndex);
+			stepClockLight = 1.0f;
 		}
 		
 		// Reset
@@ -252,7 +338,10 @@ struct Entropy : Module {
 		//********** Outputs and lights **********
 
 		// Output
-		outputs[CV_OUTPUT].value = 0.0f;
+		if (addMode) 
+			outputs[CV_OUTPUT].value = getKnobCV(stepIndex, true) + getKnobCV(stepIndex, false);
+		else 
+			outputs[CV_OUTPUT].value = getKnobCV(stepIndex, pipeBlue[stepIndex]);
 		
 		lightRefreshCounter++;
 		if (lightRefreshCounter >= displayRefreshStepSkips) {
@@ -281,19 +370,45 @@ struct Entropy : Module {
 				lights[STEP_LIGHTS + i].value = (pipeBlue[i] && stepIndex == i) ? 1.0f : 0.0f;
 				lights[STEP_LIGHTS + 8 + i].value = (!pipeBlue[i] && stepIndex == i) ? 1.0f : 0.0f;
 			}
+			
+			// Range (energy) lights
+			for (int i = 0; i < 3; i++) {
+				lights[OCT_LIGHTS + i].value = (i <= ranges[0] ? 1.0f : 0.0f);
+				lights[OCT_LIGHTS + 3 + i].value = (i <= ranges[1] ? 1.0f : 0.0f);
+			}
 				
 			// Step clocks light
-			if (stepClockTrig)
-				stepClockLight = 1.0f;
-			else
-				stepClockLight -= (stepClockLight / lightLambda) * sampleTime * displayRefreshStepSkips;
 			lights[STEPCLOCK_LIGHT].value = stepClockLight;
+			stepClockLight -= (stepClockLight / lightLambda) * sampleTime * displayRefreshStepSkips;
 
+			// Swtich add light
+			lights[SWITCHADD_LIGHT].value = (addMode ? 0.0f : 1.0f);
+			lights[ADD_LIGHT].value = (addMode ? 1.0f : 0.0f);
+			
+			// State switch light
+			lights[STATESWITCH_LIGHT].value = stateSwitchLight;
+			stateSwitchLight -= (stateSwitchLight / lightLambda) * sampleTime * displayRefreshStepSkips;
 		}// lightRefreshCounter
 		
 		if (clockIgnoreOnReset > 0l)
 			clockIgnoreOnReset--;
 	}// step()
+	
+	
+	float getKnobCV(int step, bool blue) {
+		float knobVal = params[CV_PARAMS + (blue ? 0 : 8) + step].value;
+		float cv = 0.0f;
+		int range = ranges[blue ? 0 : 1];
+		if ( (blue && (quantize & 0x1) != 0) || (!blue && (quantize > 1)) ) {
+			cv = (knobVal * (float)(range * 2 + 1) - (float)range);
+			cv = quantizeCV(cv);
+		}
+		else {
+			int maxCV = (range == 0 ? 1 : (range * 5));// maxCV is [1, 5, 10]
+			cv = knobVal * (float)(maxCV * 2) - (float)maxCV;
+		}
+		return cv;
+	}
 	
 };
 
@@ -435,47 +550,47 @@ struct EntropyWidget : ModuleWidget {
 		
 		// Switch, add, state (jacks, buttons, ligths)
 		// left side
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Entropy::STATE_INPUTS + 0, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 115.5f, rowRulerOutput - 69.0f), module, Entropy::STATE_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f - 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Entropy::STATE_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f + 3.0f, rowRulerOutput - 69.0f + 14.0f), module, Entropy::ADD_LIGHT + 0));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Entropy::SWITCHADD_INPUT, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 115.5f, rowRulerOutput - 69.0f), module, Entropy::SWITCHADD_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f - 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Entropy::SWITCHADD_LIGHT));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f + 3.0f, rowRulerOutput - 69.0f + 14.0f), module, Entropy::ADD_LIGHT));
 		// right side
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Entropy::STATE_INPUTS + 1, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 115.5f, rowRulerOutput - 69.0f), module, Entropy::STATE_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 115.5f + 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Entropy::STATE_LIGHTS + 1));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Entropy::STATESWITCH_INPUT, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 115.5f, rowRulerOutput - 69.0f), module, Entropy::STATESWITCH_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 115.5f + 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Entropy::STATESWITCH_LIGHT));
 		
 		// Plank constant (jack, light and button)
 		// left side (blue)
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Entropy::QUANTIZE_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Entropy::OCTCV_INPUTS + 0, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 96.0f - 13.0f, rowRulerOutput - 96.0f - 13.0f), module, Entropy::QUANTIZE_LIGHTS + 0));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 96.0f - 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Entropy::QUANTIZE_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		// right side (yellow)
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Entropy::QUANTIZE_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Entropy::OCTCV_INPUTS + 1, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 96.0f + 13.0f, rowRulerOutput - 96.0f - 13.0f), module, Entropy::QUANTIZE_LIGHTS + 1));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 96.0f + 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Entropy::QUANTIZE_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
 		// Energy (button and lights)
 		// left side (blue)
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 69.5f, rowRulerOutput - 116.0f), module, Entropy::OCT_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Entropy::ENERGY_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Entropy::ENERGY_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Entropy::ENERGY_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 10.0f, rowRulerOutput - 116.0f - 11.0f), module, Entropy::ENERGY_LIGHTS + 2));
-		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f + 7.0f, rowRulerOutput - 116.0f + 12.0f), module, Entropy::ENERGY_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Entropy::OCT_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Entropy::OCT_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Entropy::OCT_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 10.0f, rowRulerOutput - 116.0f - 11.0f), module, Entropy::OCT_LIGHTS + 2));
+		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f + 7.0f, rowRulerOutput - 116.0f + 12.0f), module, Entropy::OCT_LIGHTS + 2));
 		// right side (yellow)
 		// left side (blue)
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 69.5f, rowRulerOutput - 116.0f), module, Entropy::OCT_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Entropy::ENERGY_LIGHTS + 3 + 0));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Entropy::ENERGY_LIGHTS + 3 + 1));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Entropy::ENERGY_LIGHTS + 3 + 1));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 10.0f, rowRulerOutput - 116.0f - 11.0f), module, Entropy::ENERGY_LIGHTS + 3 + 2));
-		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f - 7.0f, rowRulerOutput - 116.0f + 12.0f), module, Entropy::ENERGY_LIGHTS + 3 + 2));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Entropy::OCT_LIGHTS + 3 + 0));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Entropy::OCT_LIGHTS + 3 + 1));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Entropy::OCT_LIGHTS + 3 + 1));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 10.0f, rowRulerOutput - 116.0f - 11.0f), module, Entropy::OCT_LIGHTS + 3 + 2));
+		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f - 7.0f, rowRulerOutput - 116.0f + 12.0f), module, Entropy::OCT_LIGHTS + 3 + 2));
 		
 		
 		// Top portion
-		static constexpr float rowRulerTop = rowRulerOutput - 149.5f;
+		static constexpr float rowRulerTop = rowRulerOutput - 150.0f;
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerTop - 30.5f), Port::INPUT, module, Entropy::GPROB_INPUT, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerTop), module, Entropy::GPROB_PARAM, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerTop), module, Entropy::GPROB_PARAM, -1.0f, 1.0f, 0.0f, &module->panelTheme));
 		
 		// Left side top
 		// ext

@@ -322,7 +322,7 @@ struct Ions : Module {
 			
 			// Range buttons and CV inputs
 			for (int i = 0; i < 2; i++) {
-				int rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
+				bool rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
 				if (inputs[OCTCV_INPUTS + i].active) {
 					if (inputs[OCTCV_INPUTS + i].value <= -1.0f)
 						ranges[i] = 0;
@@ -398,8 +398,10 @@ struct Ions : Module {
 			}
 			
 			// Magnetic clock (step clock)
-			if (stepClocksTrig)
+			if (stepClocksTrig) {
+				stepClocksLight = 1.0f;// will be done twice, but no problem
 				jumpCount += stepElectron(i, leap);
+			}
 			
 			// Jump occurred feedback
 			if ((jumpCount & 0x1) != 0) {
@@ -480,11 +482,8 @@ struct Ions : Module {
 			}
 
 			// Step clocks light
-			if (stepClocksTrig)
-				stepClocksLight = 1.0f;
-			else
-				stepClocksLight -= (stepClocksLight / lightLambda) * sampleTime * displayRefreshStepSkips;
 			lights[STEPCLOCKS_LIGHT].value = stepClocksLight;
+			stepClocksLight -= (stepClocksLight / lightLambda) * sampleTime * displayRefreshStepSkips;
 		
 		}// lightRefreshCounter
 		
