@@ -464,8 +464,8 @@ struct Entropy : Module {
 			lights[CV_LIGHT + 0].value = pipeBlue[stepIndex] ? 1.0f : 0.0f;
 			lights[CV_LIGHT + 1].value = (!pipeBlue[stepIndex]) ? 1.0f : 0.0f;
 			for (int i = 0; i < 8; i++) {
-				lights[STEP_LIGHTS + i].value = (pipeBlue[i] && stepIndex == i) ? 1.0f : 0.0f;
-				lights[STEP_LIGHTS + 8 + i].value = (!pipeBlue[i] && stepIndex == i) ? 1.0f : 0.0f;
+				lights[STEP_LIGHTS + i].value = ((pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
+				lights[STEP_LIGHTS + 8 + i].value = ((!pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
 			}
 			
 			// Range (energy) lights

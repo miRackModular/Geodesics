@@ -77,7 +77,7 @@ struct Branes : Module {
 		NUM_OUTPUTS
 	};
 	enum LightIds {
-		ENUMS(BYPASS_CV_LIGHTS, 2 * 2),// room for white-red
+		ENUMS(UNUSED1, 2 * 2),// no longer used
 		ENUMS(BYPASS_TRIG_LIGHTS, 2 * 2),// room for white-red
 		// -- 0.6.3 ^^
 		ENUMS(NOISE_RANGE_LIGHTS, 2),
@@ -282,8 +282,6 @@ struct Branes : Module {
 			for (int i = 0; i < 2; i++) {
 				float red = trigBypass[i] ? 1.0f : 0.0f;
 				float white = !trigBypass[i] ? trigLights[i] : 0.0f;
-				lights[BYPASS_CV_LIGHTS + i * 2 + 0].value = white;
-				lights[BYPASS_CV_LIGHTS + i * 2 + 1].value = red;
 				lights[BYPASS_TRIG_LIGHTS + i * 2 + 0].value = white;
 				lights[BYPASS_TRIG_LIGHTS + i * 2 + 1].value = red;
 				lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
@@ -467,12 +465,12 @@ struct BranesWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 315.5f), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 0, &module->panelTheme));
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 50.5f), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 1, &module->panelTheme));
 		// Bypass LEDs near buttons
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 327.5f), module, Branes::BYPASS_CV_LIGHTS + 0 * 2));
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 38.5f), module, Branes::BYPASS_CV_LIGHTS + 1 * 2));
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 327.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
+		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 38.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
 				
 		// Bypass LEDs in branes
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 5.5f, rowRulerHoldA + 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 5.5f, rowRulerHoldB - 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
+		// addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 5.5f, rowRulerHoldA + 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
+		// addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 5.5f, rowRulerHoldB - 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
 		
 		// Noise range
 		// Range buttons
