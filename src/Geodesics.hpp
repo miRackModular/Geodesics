@@ -199,4 +199,6 @@ struct GeoBlueYellowLight : GeoGrayModuleLight {
 
 // Other
 
+int getWeighted1to8random();
+
 #endif

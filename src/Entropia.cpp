@@ -203,10 +203,6 @@ struct Entropia : Module {
 
 		// pipeBlue (only need to save the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
 		json_object_set_new(rootJ, "pipeBlue", json_boolean(pipeBlue[stepIndex]));
-		// json_t *pipeBlueJ = json_array();
-		// for (int i = 0; i < 8; i++)
-			// json_array_insert_new(pipeBlueJ, i, json_boolean(pipeBlue[i]));
-		// json_object_set_new(rootJ, "pipeBlue", pipeBlueJ);
 		
 		// randomCVs (only need to save the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
 		json_object_set_new(rootJ, "randomCVs0", json_real(randomCVs[0]));
@@ -272,16 +268,6 @@ struct Entropia : Module {
 		json_t *pipeBlueJ = json_object_get(rootJ, "pipeBlue");
 		if (pipeBlueJ)
 			pipeBlue[stepIndex] = json_is_true(pipeBlueJ);
-		
-		// json_t *pipeBlueJ = json_object_get(rootJ, "pipeBlue");
-		// if (pipeBlueJ) {
-			// for (int i = 0; i < 8; i++)
-			// {
-				// json_t *pipeBlueArrayJ = json_array_get(pipeBlueJ, i);
-				// if (pipeBlueArrayJ)
-					// pipeBlue[i] = json_integer_value(pipeBlueArrayJ);
-			// }			
-		// }		
 
 		// randomCVs (only saved the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
 		json_t *randomCVs0J = json_object_get(rootJ, "randomCVs0");
@@ -394,23 +380,7 @@ struct Entropia : Module {
 			if (certainClockTrig)
 				stepIndex++;
 			if (uncertainClockTrig) {
-				int numSteps = 8;
-				int	prob = randomu32() % 1000;
-				if (prob < 175)
-					numSteps = 1;
-				else if (prob < 330) // 175 + 155
-					numSteps = 2;
-				else if (prob < 475) // 175 + 155 + 145
-					numSteps = 3;
-				else if (prob < 610) // 175 + 155 + 145 + 135
-					numSteps = 4;
-				else if (prob < 725) // 175 + 155 + 145 + 135 + 115
-					numSteps = 5;
-				else if (prob < 830) // 175 + 155 + 145 + 135 + 115 + 105
-					numSteps = 6;
-				else if (prob < 925) // 175 + 155 + 145 + 135 + 115 + 105 + 95
-					numSteps = 7;
-				stepIndex += numSteps;
+				stepIndex += getWeighted1to8random();
 			}
 			if (certainClockTrig || uncertainClockTrig) {
 				stepIndex %= length;
@@ -440,7 +410,7 @@ struct Entropia : Module {
 
 		// Output
 		if (addMode) 
-			outputs[CV_OUTPUT].value = getStepCV(stepIndex, true) + getStepCV(stepIndex, false);
+			outputs[CV_OUTPUT].value = getStepCV(stepIndex, true) + (pipeBlue[stepIndex] ? 0.0f : getStepCV(stepIndex, false));
 		else 
 			outputs[CV_OUTPUT].value = getStepCV(stepIndex, pipeBlue[stepIndex]);
 		
@@ -465,13 +435,13 @@ struct Entropia : Module {
 			lights[QUANTIZE_LIGHTS + 1].value = (quantize & 0x2) ? 1.0f : 0.0f;// Yellow
 
 			// step and main output lights (GeoBlueYellowWhiteLight)
-			lights[CV_LIGHT + 0].value = (pipeBlue[stepIndex] && !addMode) ? 1.0f * cvLight : 0.0f;
+			lights[CV_LIGHT + 0].value = (pipeBlue[stepIndex]) ? 1.0f * cvLight : 0.0f;
 			lights[CV_LIGHT + 1].value = (!pipeBlue[stepIndex] && !addMode) ? 1.0f * cvLight : 0.0f;
-			lights[CV_LIGHT + 2].value = (addMode) ? 1.0f * cvLight : 0.0f;
+			lights[CV_LIGHT + 2].value = (!pipeBlue[stepIndex] && addMode) ? 1.0f * cvLight : 0.0f;
 			cvLight -= (cvLight / lightLambda) * sampleTime * displayRefreshStepSkips;	
 			for (int i = 0; i < 8; i++) {
 				lights[STEP_LIGHTS + i].value = ((pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
-				lights[STEP_LIGHTS + 8 + i].value = ((!pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
+				lights[STEP_LIGHTS + 8 + i].value = ((!pipeBlue[i]) && stepIndex == i) ? 1.0f : 0.0f;
 			}
 			
 			// Range (energy) lights

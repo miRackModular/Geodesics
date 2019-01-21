@@ -368,23 +368,7 @@ struct Ions : Module {
 				localClockTrig &= (states[i] >= 1);
 				if (localClockTrig) {
 					if (uncertainty) {// local clock modified by uncertainty
-						int numSteps = 8;
-						int	prob = randomu32() % 1000;
-						if (prob < 175)
-							numSteps = 1;
-						else if (prob < 330) // 175 + 155
-							numSteps = 2;
-						else if (prob < 475) // 175 + 155 + 145
-							numSteps = 3;
-						else if (prob < 610) // 175 + 155 + 145 + 135
-							numSteps = 4;
-						else if (prob < 725) // 175 + 155 + 145 + 135 + 115
-							numSteps = 5;
-						else if (prob < 830) // 175 + 155 + 145 + 135 + 115 + 105
-							numSteps = 6;
-						else if (prob < 925) // 175 + 155 + 145 + 135 + 115 + 105 + 95
-							numSteps = 7;
-						for (int n = 0; n < numSteps; n++)
+						for (int n = 0; n < getWeighted1to8random(); n++)
 							jumpCount += stepElectron(i, leap);
 					}
 					else 

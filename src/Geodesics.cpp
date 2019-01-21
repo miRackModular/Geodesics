@@ -27,3 +27,27 @@ void init(rack::Plugin *p) {
 	p->addModel(modelBlankLogo);
 	p->addModel(modelBlankInfo);
 }
+
+
+
+
+// other
+
+int getWeighted1to8random() {
+	int	prob = randomu32() % 1000;
+	if (prob < 175)
+		return 1;
+	else if (prob < 330) // 175 + 155
+		return 2;
+	else if (prob < 475) // 175 + 155 + 145
+		return 3;
+	else if (prob < 610) // 175 + 155 + 145 + 135
+		return 4;
+	else if (prob < 725) // 175 + 155 + 145 + 135 + 115
+		return 5;
+	else if (prob < 830) // 175 + 155 + 145 + 135 + 115 + 105
+		return 6;
+	else if (prob < 925) // 175 + 155 + 145 + 135 + 115 + 105 + 95
+		return 7;
+	return 8;
+}
