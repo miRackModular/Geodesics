@@ -622,14 +622,14 @@ struct EntropiaWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerOutput - offset3), module, Entropia::CV_PARAMS + 8 + 7, 0.0f, 1.0f, 0.5f, &module->panelTheme));
 		
 		// Prob CV knobs
-		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + offset2s, rowRulerOutput - offset2b - 3), module, Entropia::PROB_PARAMS + 0, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBotRight>(Vec(colRulerCenter + offset2b, rowRulerOutput - offset2s - 8), module, Entropia::PROB_PARAMS + 1, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter + offset2b + 3, rowRulerOutput + offset2s), module, Entropia::PROB_PARAMS + 2, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBotLeft>(Vec(colRulerCenter + offset2s + 8, rowRulerOutput + offset2b), module, Entropia::PROB_PARAMS + 3, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobLeft>(Vec(colRulerCenter - offset2s, rowRulerOutput + offset2b + 3), module, Entropia::PROB_PARAMS + 4, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobTopLeft>(Vec(colRulerCenter - offset2b, rowRulerOutput + offset2s + 8), module, Entropia::PROB_PARAMS + 5, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset2b - 3, rowRulerOutput - offset2s), module, Entropia::PROB_PARAMS + 6, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobTopRight>(Vec(colRulerCenter - offset2s - 7.5f, rowRulerOutput - offset2b + 1.0f), module, Entropia::PROB_PARAMS + 7, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + offset2s, rowRulerOutput - offset2b - 3), module, Entropia::PROB_PARAMS + 0, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBotRight>(Vec(colRulerCenter + offset2b, rowRulerOutput - offset2s - 8), module, Entropia::PROB_PARAMS + 1, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter + offset2b + 3, rowRulerOutput + offset2s), module, Entropia::PROB_PARAMS + 2, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobBotLeft>(Vec(colRulerCenter + offset2s + 8, rowRulerOutput + offset2b), module, Entropia::PROB_PARAMS + 3, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobLeft>(Vec(colRulerCenter - offset2s, rowRulerOutput + offset2b + 3), module, Entropia::PROB_PARAMS + 4, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobTopLeft>(Vec(colRulerCenter - offset2b, rowRulerOutput + offset2s + 8), module, Entropia::PROB_PARAMS + 5, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset2b - 3, rowRulerOutput - offset2s), module, Entropia::PROB_PARAMS + 6, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobTopRight>(Vec(colRulerCenter - offset2s - 7.5f, rowRulerOutput - offset2b + 1.0f), module, Entropia::PROB_PARAMS + 7, 0.0f, 1.0f, 1.0f, &module->panelTheme));
 		
 		// Blue step lights	
 		float radiusBL = 228.5f - 155.5f;// radius blue lights
