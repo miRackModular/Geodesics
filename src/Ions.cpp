@@ -118,7 +118,7 @@ struct Ions : Module {
 
 	
 	void onReset() override {
-		running = false;
+		running = true;
 		resetOnRun = false;
 		quantize = 3;
 		//symmetry = false;
@@ -129,6 +129,7 @@ struct Ions : Module {
 		}
 		leap = false;
 		initRun(true, false);
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 	}
 
 	
@@ -156,7 +157,6 @@ struct Ions : Module {
 				stepIndexes[1] = 0;
 			}
 		}
-		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		resetLight = 0.0f;
 	}
 	
@@ -261,7 +261,6 @@ struct Ions : Module {
 		if (leapJ)
 			leap = json_is_true(leapJ);
 
-		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		rangeInc[0] = true;
 		rangeInc[1] = true;
 	}
@@ -275,8 +274,10 @@ struct Ions : Module {
 		// Run button
 		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].value)) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
-			if (running)
-				initRun(resetOnRun, false);
+			if (running && resetOnRun) {
+				initRun(true, false);
+				clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+			}
 		}
 		
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
@@ -415,6 +416,7 @@ struct Ions : Module {
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
 			initRun(true, uncertainty);
+			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			resetLight = 1.0f;
 			clockTrigger.reset();
 		}

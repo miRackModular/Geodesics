@@ -51,7 +51,7 @@ struct Entropy : Module {
 	};
 	enum LightIds {
 		ENUMS(STEP_LIGHTS, 16),// first 8 are blue, last 8 are yellow
-		ENUMS(CV_LIGHT, 2),// main output (room for blue/yellow)
+		ENUMS(CV_LIGHT, 3),// main output (room for Blue-Yellow-White)
 		RUN_LIGHT,
 		STEPCLOCK_LIGHT,
 		RESET_LIGHT,
@@ -65,7 +65,6 @@ struct Entropy : Module {
 		ENUMS(FIXEDCV_LIGHTS, 2),
 		ENUMS(EXTSIG_LIGHTS, 2),
 		ENUMS(RANDOM_LIGHTS, 2),
-		OUTPUT_LIGHT,
 		NUM_LIGHTS
 	};
 	
@@ -91,6 +90,7 @@ struct Entropy : Module {
 	// No need to save
 	long clockIgnoreOnReset;
 	float resetLight;
+	float cvLight;
 	unsigned int lightRefreshCounter = 0;
 	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	SchmittTrigger runningTrigger;
@@ -118,6 +118,7 @@ struct Entropy : Module {
 	inline void updateRandomCVs() {
 		randomCVs[0] = randomUniform();
 		randomCVs[1] = randomUniform();
+		cvLight = 1.0f;// this could be elsewhere since no relevance to randomCVs, but ok here
 	}
 	
 	
@@ -127,7 +128,7 @@ struct Entropy : Module {
 
 	
 	void onReset() override {
-		running = false;
+		running = true;
 		resetOnRun = false;
 		length = 8;
 		quantize = 3;
@@ -137,6 +138,7 @@ struct Entropy : Module {
 			sources[i] = SRC_CV;
 		}
 		initRun(true, false);
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 	}
 
 	
@@ -162,8 +164,8 @@ struct Entropy : Module {
 				updatePipeBlue(i);
 			updateRandomCVs();
 		}
-		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		resetLight = 0.0f;
+		cvLight = 0.0f;
 	}
 	
 
@@ -289,7 +291,6 @@ struct Entropy : Module {
 		if (randomCVs1J)
 			randomCVs[1] = json_number_value(randomCVs1J);
 
-		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 		rangeInc[0] = true;
 		rangeInc[1] = true;
 	}
@@ -303,8 +304,10 @@ struct Entropy : Module {
 		// Run button
 		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].value)) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
-			if (running)
-				initRun(resetOnRun, false);
+			if (running && resetOnRun) {
+				initRun(true, false);
+				clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+			}
 		}
 		
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
@@ -426,6 +429,7 @@ struct Entropy : Module {
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
 			initRun(true, false);
+			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			resetLight = 1.0f;
 			certainClockTrigger.reset();
 			uncertainClockTrigger.reset();
@@ -460,9 +464,11 @@ struct Entropy : Module {
 			lights[QUANTIZE_LIGHTS + 0].value = (quantize & 0x1) ? 1.0f : 0.0f;// Blue
 			lights[QUANTIZE_LIGHTS + 1].value = (quantize & 0x2) ? 1.0f : 0.0f;// Yellow
 
-			// step and main output lights
-			lights[CV_LIGHT + 0].value = pipeBlue[stepIndex] ? 1.0f : 0.0f;
-			lights[CV_LIGHT + 1].value = (!pipeBlue[stepIndex]) ? 1.0f : 0.0f;
+			// step and main output lights (GeoBlueYellowWhiteLight)
+			lights[CV_LIGHT + 0].value = (pipeBlue[stepIndex] && !addMode) ? 1.0f * cvLight : 0.0f;
+			lights[CV_LIGHT + 1].value = (!pipeBlue[stepIndex] && !addMode) ? 1.0f * cvLight : 0.0f;
+			lights[CV_LIGHT + 2].value = (addMode) ? 1.0f * cvLight : 0.0f;
+			cvLight -= (cvLight / lightLambda) * sampleTime * displayRefreshStepSkips;	
 			for (int i = 0; i < 8; i++) {
 				lights[STEP_LIGHTS + i].value = ((pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
 				lights[STEP_LIGHTS + 8 + i].value = ((!pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
@@ -593,7 +599,7 @@ struct EntropyWidget : ModuleWidget {
 		
 		// CV out and light 
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerOutput), Port::OUTPUT, module, Entropy::CV_OUTPUT, &module->panelTheme));		
-		addChild(createLightCentered<SmallLight<GeoBlueYellowLight>>(Vec(colRulerCenter, rowRulerOutput - 21.5f), module, Entropy::CV_LIGHT));
+		addChild(createLightCentered<SmallLight<GeoBlueYellowWhiteLight>>(Vec(colRulerCenter, rowRulerOutput - 21.5f), module, Entropy::CV_LIGHT));
 		
 		// Blue CV knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput - radius1), module, Entropy::CV_PARAMS + 0, 0.0f, 1.0f, 0.5f, &module->panelTheme));
