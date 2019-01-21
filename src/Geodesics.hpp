@@ -26,7 +26,7 @@ extern Model *modelBlackHoles;
 extern Model *modelPulsars;
 extern Model *modelBranes;
 extern Model *modelIons;
-extern Model *modelEntropy;
+extern Model *modelEntropia;
 extern Model *modelBlankLogo;
 extern Model *modelBlankInfo;
 
