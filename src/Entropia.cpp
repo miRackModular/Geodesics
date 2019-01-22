@@ -667,9 +667,9 @@ struct EntropiaWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput + 36.5f), Port::INPUT, module, Entropia::CERTAIN_CLK_INPUT, &module->panelTheme));
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 116.5f, rowRulerOutput + 70.0f), Port::INPUT, module, Entropia::UNCERTAIN_CLK_INPUT, &module->panelTheme));
 		// Clock source button and LEDs
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(40, 380-115), module, Entropia::CLKSRC_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(46, 380-99), module, Entropia::CLKSRC_LIGHTS + 1));
-		addParam(createDynamicParam<GeoPushButton>(Vec(49, 380-111), module, Entropia::CLKSRC_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(43.0f, 256.5f), module, Entropia::CLKSRC_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(55.0f, 284.5f), module, Entropia::CLKSRC_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(46.0f, 272.5f), module, Entropia::CLKSRC_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		
 		
 		// Switch, add, state (jacks, buttons, ligths)
