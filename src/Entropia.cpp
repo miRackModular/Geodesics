@@ -29,6 +29,7 @@ struct Entropia : Module {
 		ENUMS(EXTSIG_PARAMS, 2),
 		ENUMS(RANDOM_PARAMS, 2),
 		GPROB_PARAM,
+		CLKSRC_PARAM,
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -65,6 +66,7 @@ struct Entropia : Module {
 		ENUMS(FIXEDCV_LIGHTS, 2),
 		ENUMS(EXTSIG_LIGHTS, 2),
 		ENUMS(RANDOM_LIGHTS, 2),
+		ENUMS(CLKSRC_LIGHTS, 2),// certain, uncertain
 		NUM_LIGHTS
 	};
 	
@@ -85,6 +87,7 @@ struct Entropia : Module {
 	int stepIndex;
 	bool pipeBlue[8];
 	float randomCVs[2];// used in SRC_RND
+	int clkSource;// which clock to use (0 = both, 1 = certain only, 2 = uncertain only)
 	
 	
 	// No need to save
@@ -107,6 +110,7 @@ struct Entropia : Module {
 	SchmittTrigger fixedSrcTriggers[2];
 	SchmittTrigger rndSrcTriggers[2];
 	SchmittTrigger extSrcTriggers[2];
+	SchmittTrigger clkSrcTrigger;
 	float stepClockLight = 0.0f;
 	float stateSwitchLight = 0.0f;
 	
@@ -137,6 +141,7 @@ struct Entropia : Module {
 			ranges[i] = 1;	
 			sources[i] = SRC_CV;
 		}
+		clkSource = 0;
 		initRun(true, false);
 		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 	}
@@ -145,9 +150,11 @@ struct Entropia : Module {
 	void onRandomize() override {
 		length = (randomu32() & 0x7) + 1;
 		quantize = randomu32() & 0x3;
+		addMode = (randomu32() & 0x1) == 1;
 		for (int i = 0; i < 2; i++) {
 			ranges[i] = randomu32() % 3;
 		}
+		clkSource = randomu32() % 3;
 		initRun(true, true);
 	}
 	
@@ -207,6 +214,9 @@ struct Entropia : Module {
 		// randomCVs (only need to save the one corresponding to stepIndex, since others will get regenerated when moving to those steps)
 		json_object_set_new(rootJ, "randomCVs0", json_real(randomCVs[0]));
 		json_object_set_new(rootJ, "randomCVs1", json_real(randomCVs[1]));
+
+		// clkSource
+		json_object_set_new(rootJ, "clkSource", json_integer(clkSource));
 
 		return rootJ;
 	}
@@ -276,6 +286,11 @@ struct Entropia : Module {
 		json_t *randomCVs1J = json_object_get(rootJ, "randomCVs1");
 		if (randomCVs1J)
 			randomCVs[1] = json_number_value(randomCVs1J);
+
+		// clkSource
+		json_t *clkSourceJ = json_object_get(rootJ, "clkSource");
+		if (clkSourceJ)
+			clkSource = json_integer_value(clkSourceJ);
 
 		rangeInc[0] = true;
 		rangeInc[1] = true;
@@ -367,7 +382,12 @@ struct Entropia : Module {
 			// Reset on Run button
 			if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].value)) {
 				resetOnRun = !resetOnRun;
-			}		
+			}	
+
+			if (clkSrcTrigger.process(params[CLKSRC_PARAM].value)) {
+				if (++clkSource > 2)
+					clkSource = 0;
+			}
 		}// userInputs refresh
 		
 
@@ -377,8 +397,11 @@ struct Entropia : Module {
 		bool certainClockTrig = certainClockTrigger.process(inputs[CERTAIN_CLK_INPUT].value);
 		bool uncertainClockTrig = uncertainClockTrigger.process(inputs[UNCERTAIN_CLK_INPUT].value);
 		if (running && clockIgnoreOnReset == 0l) {
-			if (certainClockTrig)
+			certainClockTrig &= (clkSource < 2);
+			if (certainClockTrig) {
 				stepIndex++;
+			}
+			uncertainClockTrig &= ((clkSource & 0x1) == 0);
 			if (uncertainClockTrig) {
 				stepIndex += getWeighted1to8random();
 			}
@@ -468,6 +491,10 @@ struct Entropia : Module {
 				lights[EXTSIG_LIGHTS + i].value = (sources[i] == SRC_EXT) ? 1.0f : 0.0f;
 				lights[FIXEDCV_LIGHTS + i].value = (sources[i] == SRC_CV) ? 1.0f : 0.0f;
 			}
+			
+			// Clock source lights
+			lights[CLKSRC_LIGHTS + 0].value = (clkSource < 2) ? 1.0f : 0.0f;
+			lights[CLKSRC_LIGHTS + 1].value = ((clkSource & 0x1) == 0) ? 1.0f : 0.0f;
 			
 		}// lightRefreshCounter
 		
@@ -639,6 +666,11 @@ struct EntropiaWidget : ModuleWidget {
 		// Clock inputs
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput + 36.5f), Port::INPUT, module, Entropia::CERTAIN_CLK_INPUT, &module->panelTheme));
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 116.5f, rowRulerOutput + 70.0f), Port::INPUT, module, Entropia::UNCERTAIN_CLK_INPUT, &module->panelTheme));
+		// Clock source button and LEDs
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(40, 380-115), module, Entropia::CLKSRC_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(46, 380-99), module, Entropia::CLKSRC_LIGHTS + 1));
+		addParam(createDynamicParam<GeoPushButton>(Vec(49, 380-111), module, Entropia::CLKSRC_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		
 		
 		// Switch, add, state (jacks, buttons, ligths)
 		// left side
