@@ -127,6 +127,8 @@ struct Entropia : Module {
 	
 	
 	Entropia() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
+		for (int i = 0; i < 8; i++)
+			params[Entropia::PROB_PARAMS + i].value = 1.0f;// HACK since params not initialized properly yet, remove this in Rack 1.0
 		onReset();
 	}
 
