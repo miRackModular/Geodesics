@@ -72,6 +72,7 @@ struct Entropia : Module {
 	
 	
 	// Constants
+	static constexpr float clockIgnoreOnResetDuration = 0.001f;// disable clock on powerup and reset for 1 ms (so that the first step plays)
 	enum SourceIds {SRC_CV, SRC_EXT, SRC_RND};
 	
 	// Need to save, with reset
@@ -90,6 +91,7 @@ struct Entropia : Module {
 	
 	
 	// No need to save
+	long clockIgnoreOnReset;
 	float resetLight;
 	float cvLight;
 	unsigned int lightRefreshCounter = 0;
@@ -143,6 +145,7 @@ struct Entropia : Module {
 		}
 		clkSource = 0;
 		initRun(true, false);
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 	}
 
 	
@@ -306,6 +309,7 @@ struct Entropia : Module {
 			running = !running;
 			if (running && resetOnRun) {
 				initRun(true, false);
+				clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			}
 		}
 		
@@ -391,30 +395,22 @@ struct Entropia : Module {
 
 		//********** Clock and reset **********
 		
-		// Reset
-		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
-			initRun(true, false);
-			resetLight = 1.0f;
-			certainClockTrigger.reset();
-			uncertainClockTrigger.reset();
-		}
-		
 		// Clocks
-		if (running) {
-			bool certainClockTrig = certainClockTrigger.process(inputs[CERTAIN_CLK_INPUT].value) && (clkSource < 2);
-			bool uncertainClockTrig = uncertainClockTrigger.process(inputs[UNCERTAIN_CLK_INPUT].value) && ((clkSource & 0x1) == 0);
-			if (!resetTrigger.isHigh()) {
-				if (certainClockTrig) {
-					stepIndex++;
-				}
-				if (uncertainClockTrig) {
-					stepIndex += getWeighted1to8random();
-				}
-				if (certainClockTrig || uncertainClockTrig) {
-					stepIndex %= length;
-					updatePipeBlue(stepIndex);
-					updateRandomCVs();
-				}
+		bool certainClockTrig = certainClockTrigger.process(inputs[CERTAIN_CLK_INPUT].value);
+		bool uncertainClockTrig = uncertainClockTrigger.process(inputs[UNCERTAIN_CLK_INPUT].value);
+		if (running && clockIgnoreOnReset == 0l) {
+			certainClockTrig &= (clkSource < 2);
+			if (certainClockTrig) {
+				stepIndex++;
+			}
+			uncertainClockTrig &= ((clkSource & 0x1) == 0);
+			if (uncertainClockTrig) {
+				stepIndex += getWeighted1to8random();
+			}
+			if (certainClockTrig || uncertainClockTrig) {
+				stepIndex %= length;
+				updatePipeBlue(stepIndex);
+				updateRandomCVs();
 			}
 		}				
 		// Magnetic clock (step clock)
@@ -423,6 +419,15 @@ struct Entropia : Module {
 			updatePipeBlue(stepIndex);
 			updateRandomCVs();
 			stepClockLight = 1.0f;
+		}
+		
+		// Reset
+		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
+			initRun(true, false);
+			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+			resetLight = 1.0f;
+			certainClockTrigger.reset();
+			uncertainClockTrigger.reset();
 		}
 		
 		
@@ -439,7 +444,6 @@ struct Entropia : Module {
 			lightRefreshCounter = 0;
 
 			// Reset light
-			if (resetTrigger.isHigh()) resetLight = 1.0f;
 			lights[RESET_LIGHT].value =	resetLight;	
 			resetLight -= (resetLight / lightLambda) * sampleTime * displayRefreshStepSkips;	
 			
@@ -495,6 +499,9 @@ struct Entropia : Module {
 			lights[CLKSRC_LIGHTS + 1].value = ((clkSource & 0x1) == 0) ? 1.0f : 0.0f;
 			
 		}// lightRefreshCounter
+		
+		if (clockIgnoreOnReset > 0l)
+			clockIgnoreOnReset--;
 	}// step()
 	
 	
