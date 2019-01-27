@@ -274,8 +274,9 @@ struct Ions : Module {
 		// Run button
 		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].value)) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
-			if (running && resetOnRun) {
-				initRun(true, false);
+			if (running ) {
+				if (resetOnRun)
+					initRun(true, false);
 				clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			}
 		}
