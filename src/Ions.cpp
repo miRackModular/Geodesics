@@ -391,9 +391,11 @@ struct Ions : Module {
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
 			initRun(true, uncertainty);
-			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			resetLight = 1.0f;
+			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			clockTrigger.reset();
+			clocksTriggers[0].reset();
+			clocksTriggers[1].reset();
 		}
 		
 		

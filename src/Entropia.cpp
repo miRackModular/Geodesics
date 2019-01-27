@@ -425,8 +425,8 @@ struct Entropia : Module {
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
 			initRun(true, false);
-			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			resetLight = 1.0f;
+			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			certainClockTrigger.reset();
 			uncertainClockTrigger.reset();
 		}
