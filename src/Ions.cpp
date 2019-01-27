@@ -67,7 +67,6 @@ struct Ions : Module {
 	
 	
 	// Constants
-	static constexpr float clockIgnoreOnResetDuration = 0.001f;// disable clock on powerup and reset for 1 ms (so that the first step plays)
 	const int cvMap[2][16] = {{0, 1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14},
 							  {0, 8, 9 ,10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7}};// map each of the 16 steps of a sequence step to a CV knob index (0-14)
 
@@ -77,7 +76,6 @@ struct Ions : Module {
 	bool running;
 	bool resetOnRun;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
-	//bool symmetry;
 	bool uncertainty;
 	int stepIndexes[2];// position of electrons (sequencers)
 	int states[2];// which clocks to use (0 = global, 1 = local, 2 = both)
@@ -121,7 +119,6 @@ struct Ions : Module {
 		running = true;
 		resetOnRun = false;
 		quantize = 3;
-		//symmetry = false;
 		uncertainty = false;
 		for (int i = 0; i < 2; i++) {
 			states[i] = 0;
@@ -135,7 +132,6 @@ struct Ions : Module {
 	
 	void onRandomize() override {
 		quantize = randomu32() & 0x3;
-		//symmetry = false;
 		uncertainty = (randomu32() % 2) > 0;
 		for (int i = 0; i < 2; i++) {
 			states[i] = randomu32() % 3;
@@ -172,9 +168,6 @@ struct Ions : Module {
 		
 		// quantize
 		json_object_set_new(rootJ, "quantize", json_integer(quantize));
-		
-		// symmetry
-		//json_object_set_new(rootJ, "symmetry", json_boolean(symmetry));
 		
 		// uncertainty
 		json_object_set_new(rootJ, "uncertainty", json_boolean(uncertainty));
@@ -216,11 +209,6 @@ struct Ions : Module {
 		json_t *quantizeJ = json_object_get(rootJ, "quantize");
 		if (quantizeJ)
 			quantize = json_integer_value(quantizeJ);
-
-		// symmetry
-		//json_t *symmetryJ = json_object_get(rootJ, "symmetry");
-		//if (symmetryJ)
-			//symmetry = json_is_true(symmetryJ);
 
 		// uncertainty
 		json_t *uncertaintyJ = json_object_get(rootJ, "uncertainty");
@@ -277,7 +265,8 @@ struct Ions : Module {
 			if (running ) {
 				if (resetOnRun)
 					initRun(true, false);
-				clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+				if (resetOnRun || clockIgnoreOnRun)
+					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			}
 		}
 		
@@ -357,8 +346,10 @@ struct Ions : Module {
 		//********** Clock and reset **********
 		
 		// Clocks
-		bool globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].value);
 		bool stepClocksTrig = stepClocksTrigger.process(params[STEPCLOCKS_PARAM].value);
+		bool globalClockTrig = false;
+		if (running && clockIgnoreOnReset == 0l)
+			globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].value);// keep outside of loop, only need to call once per step()
 		for (int i = 0; i < 2; i++) {
 			int jumpCount = 0;
 			
@@ -395,8 +386,7 @@ struct Ions : Module {
 				jumpLights[i] = 1.0f;				
 			}
 		}
-		//if (symmetry)
-			//stepIndexes[1] = stepIndexes[0];
+		
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {

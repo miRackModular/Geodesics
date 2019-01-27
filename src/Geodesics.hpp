@@ -33,6 +33,9 @@ extern Model *modelBlankInfo;
 
 
 // General constants
+static const bool clockIgnoreOnRun = false;
+//static const bool retrigGatesOnReset = true; no need yet, since no geodesic sequencers emit gates
+static constexpr float clockIgnoreOnResetDuration = 0.001f;// disable clock on powerup and reset for 1 ms (so that the first step plays)
 static const float lightLambda = 0.075f;
 static const std::string lightPanelID = "White light edition";
 static const std::string darkPanelID = "Dark matter edition";

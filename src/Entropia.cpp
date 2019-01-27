@@ -72,7 +72,6 @@ struct Entropia : Module {
 	
 	
 	// Constants
-	static constexpr float clockIgnoreOnResetDuration = 0.001f;// disable clock on powerup and reset for 1 ms (so that the first step plays)
 	enum SourceIds {SRC_CV, SRC_EXT, SRC_RND};
 	
 	// Need to save, with reset
@@ -310,7 +309,8 @@ struct Entropia : Module {
 			if (running) {
 				if (resetOnRun)
 					initRun(true, false);
-				clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+				if (resetOnRun || clockIgnoreOnRun)
+					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			}
 		}
 		
@@ -396,10 +396,10 @@ struct Entropia : Module {
 
 		//********** Clock and reset **********
 		
-		// Clocks
-		bool certainClockTrig = certainClockTrigger.process(inputs[CERTAIN_CLK_INPUT].value);
-		bool uncertainClockTrig = uncertainClockTrigger.process(inputs[UNCERTAIN_CLK_INPUT].value);
+		// External clocks
 		if (running && clockIgnoreOnReset == 0l) {
+			bool certainClockTrig = certainClockTrigger.process(inputs[CERTAIN_CLK_INPUT].value);
+			bool uncertainClockTrig = uncertainClockTrigger.process(inputs[UNCERTAIN_CLK_INPUT].value);
 			certainClockTrig &= (clkSource < 2);
 			if (certainClockTrig) {
 				stepIndex++;
@@ -414,7 +414,7 @@ struct Entropia : Module {
 				updateRandomCVs();
 			}
 		}				
-		// Magnetic clock (step clock)
+		// Magnetic clock (manual step clock)
 		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].value)) {
 			if (++stepIndex >= length) stepIndex = 0;
 			updatePipeBlue(stepIndex);
