@@ -302,7 +302,7 @@ struct Entropia : Module {
 
 	
 	void step() override {
-		static const long crossFadeStepsToGoInit = 200;
+		float crossFadeTime = 0.005f;
 		float sampleTime = engineGetSampleTime();
 	
 		//********** Buttons, knobs, switches and inputs **********
@@ -414,7 +414,7 @@ struct Entropia : Module {
 			}
 			if (certainClockTrig || uncertainClockTrig) {
 				stepIndex %= length;
-				crossFadeStepsToGo = crossFadeStepsToGoInit;
+				crossFadeStepsToGo = (long)(crossFadeTime * engineGetSampleRate());;
 				updatePipeBlue(stepIndex);
 				updateRandomCVs();
 			}
@@ -422,7 +422,7 @@ struct Entropia : Module {
 		// Magnetic clock (manual step clock)
 		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].value)) {
 			if (++stepIndex >= length) stepIndex = 0;
-			crossFadeStepsToGo = crossFadeStepsToGoInit;
+			crossFadeStepsToGo = (long)(crossFadeTime * engineGetSampleRate());
 			updatePipeBlue(stepIndex);
 			updateRandomCVs();
 			stepClockLight = 1.0f;
@@ -443,6 +443,7 @@ struct Entropia : Module {
 		// Output
 		if (crossFadeStepsToGo > 0)
 		{
+			long crossFadeStepsToGoInit = (long)(crossFadeTime * engineGetSampleRate());
 			float fadeRatio = ((float)crossFadeStepsToGo) / ((float)crossFadeStepsToGoInit);
 			outputs[CV_OUTPUT].value = calcOutput(stepIndexOld) * fadeRatio + calcOutput(stepIndex) * (1.0f - fadeRatio);
 			crossFadeStepsToGo--;
