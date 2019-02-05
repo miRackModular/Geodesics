@@ -90,6 +90,8 @@ struct Entropia : Module {
 	
 	
 	// No need to save
+	int stepIndexOld;// when equal to stepIndex, crossfade (antipop) is finished, when not equal, crossfade until counter 0, then set to stepIndex
+	long crossFadeStepsToGo;
 	long clockIgnoreOnReset;
 	float resetLight;
 	float cvLight;
@@ -143,7 +145,7 @@ struct Entropia : Module {
 			sources[i] = SRC_CV;
 		}
 		clkSource = 0;
-		initRun(true, false);
+		initRun(false);
 		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 	}
 
@@ -156,22 +158,22 @@ struct Entropia : Module {
 			ranges[i] = randomu32() % 3;
 		}
 		clkSource = randomu32() % 3;
-		initRun(true, true);
+		initRun(true);
 	}
 	
 
-	void initRun(bool hard, bool randomize) {// run button activated or run edge in run input jack
-		if (hard) {
-			if (randomize) {
-				stepIndex = randomu32() % length;
-			}
-			else {
-				stepIndex = 0;
-			}
-			for (int i = 0; i < 8; i++)
-				updatePipeBlue(i);
-			updateRandomCVs();
+	void initRun(bool randomize) {
+		if (randomize) {
+			stepIndex = randomu32() % length;
 		}
+		else {
+			stepIndex = 0;
+		}
+		stepIndexOld = 0;
+		crossFadeStepsToGo = 0;
+		for (int i = 0; i < 8; i++)
+			updatePipeBlue(i);
+		updateRandomCVs();
 		resetLight = 0.0f;
 		cvLight = 0.0f;
 	}
@@ -295,10 +297,12 @@ struct Entropia : Module {
 
 		rangeInc[0] = true;
 		rangeInc[1] = true;
+		stepIndexOld = stepIndex;
 	}
 
 	
-	void step() override {	
+	void step() override {
+		static const long crossFadeStepsToGoInit = 200;
 		float sampleTime = engineGetSampleTime();
 	
 		//********** Buttons, knobs, switches and inputs **********
@@ -308,7 +312,7 @@ struct Entropia : Module {
 			running = !running;
 			if (running) {
 				if (resetOnRun)
-					initRun(true, false);
+					initRun(false);
 				if (resetOnRun || clockIgnoreOnRun)
 					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			}
@@ -410,6 +414,7 @@ struct Entropia : Module {
 			}
 			if (certainClockTrig || uncertainClockTrig) {
 				stepIndex %= length;
+				crossFadeStepsToGo = crossFadeStepsToGoInit;
 				updatePipeBlue(stepIndex);
 				updateRandomCVs();
 			}
@@ -417,6 +422,7 @@ struct Entropia : Module {
 		// Magnetic clock (manual step clock)
 		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].value)) {
 			if (++stepIndex >= length) stepIndex = 0;
+			crossFadeStepsToGo = crossFadeStepsToGoInit;
 			updatePipeBlue(stepIndex);
 			updateRandomCVs();
 			stepClockLight = 1.0f;
@@ -424,7 +430,7 @@ struct Entropia : Module {
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
-			initRun(true, false);
+			initRun(false);
 			resetLight = 1.0f;
 			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			certainClockTrigger.reset();
@@ -435,10 +441,16 @@ struct Entropia : Module {
 		//********** Outputs and lights **********
 
 		// Output
-		if (addMode) 
-			outputs[CV_OUTPUT].value = getStepCV(stepIndex, true) + (pipeBlue[stepIndex] ? 0.0f : getStepCV(stepIndex, false));
-		else 
-			outputs[CV_OUTPUT].value = getStepCV(stepIndex, pipeBlue[stepIndex]);
+		if (crossFadeStepsToGo > 0)
+		{
+			float fadeRatio = ((float)crossFadeStepsToGo) / ((float)crossFadeStepsToGoInit);
+			outputs[CV_OUTPUT].value = calcOutput(stepIndexOld) * fadeRatio + calcOutput(stepIndex) * (1.0f - fadeRatio);
+			crossFadeStepsToGo--;
+			if (crossFadeStepsToGo == 0)
+				stepIndexOld = stepIndex;
+		}
+		else
+			outputs[CV_OUTPUT].value = calcOutput(stepIndex);
 		
 		lightRefreshCounter++;
 		if (lightRefreshCounter >= displayRefreshStepSkips) {
@@ -505,6 +517,11 @@ struct Entropia : Module {
 			clockIgnoreOnReset--;
 	}// step()
 	
+	inline float calcOutput(int stepIdx) {
+		if (addMode) 
+			return getStepCV(stepIdx, true) + (pipeBlue[stepIdx] ? 0.0f : getStepCV(stepIdx, false));
+		return getStepCV(stepIdx, pipeBlue[stepIdx]);
+	}
 	
 	float getStepCV(int step, bool blue) {
 		int colorIndex = blue ? 0 : 1;
