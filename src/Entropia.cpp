@@ -78,6 +78,7 @@ struct Entropia : Module {
 	int panelTheme = 0;
 	bool running;
 	bool resetOnRun;
+	bool crossFadeActive;
 	int length;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
 	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
@@ -137,6 +138,7 @@ struct Entropia : Module {
 	void onReset() override {
 		running = true;
 		resetOnRun = false;
+		crossFadeActive = true;
 		length = 8;
 		quantize = 3;
 		addMode = false;
@@ -191,6 +193,9 @@ struct Entropia : Module {
 		// resetOnRun
 		json_object_set_new(rootJ, "resetOnRun", json_boolean(resetOnRun));
 
+		// crossFadeActive
+		json_object_set_new(rootJ, "crossFadeActive", json_boolean(crossFadeActive));
+
 		// length
 		json_object_set_new(rootJ, "length", json_integer(length));
 
@@ -240,6 +245,11 @@ struct Entropia : Module {
 		json_t *resetOnRunJ = json_object_get(rootJ, "resetOnRun");
 		if (resetOnRunJ)
 			resetOnRun = json_is_true(resetOnRunJ);
+
+		// crossFadeActive
+		json_t *crossFadeActiveJ = json_object_get(rootJ, "crossFadeActive");
+		if (crossFadeActiveJ)
+			crossFadeActive = json_is_true(crossFadeActiveJ);
 
 		// length
 		json_t *lengthJ = json_object_get(rootJ, "length");
@@ -441,7 +451,7 @@ struct Entropia : Module {
 		//********** Outputs and lights **********
 
 		// Output
-		if (crossFadeStepsToGo > 0)
+		if (crossFadeStepsToGo > 0 && crossFadeActive)
 		{
 			long crossFadeStepsToGoInit = (long)(crossFadeTime * engineGetSampleRate());
 			float fadeRatio = ((float)crossFadeStepsToGo) / ((float)crossFadeStepsToGoInit);
@@ -533,7 +543,7 @@ struct Entropia : Module {
 			cv = randomCVs[colorIndex] * (knobVal * 10.0f - 5.0f);
 		}
 		else if (sources[colorIndex] == SRC_EXT) {
-			cv = clamp(inputs[EXTSIG_INPUTS + colorIndex].value * (knobVal * 2.0f - 1.0f), -10.0f, 10.0f);
+			cv = clamp(inputs[EXTSIG_INPUTS + colorIndex].value * knobVal, -10.0f, 10.0f);
 		}
 		else {// SRC_CV
 			int range = ranges[colorIndex];
