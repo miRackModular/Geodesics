@@ -30,6 +30,7 @@ struct Entropia : Module {
 		ENUMS(RANDOM_PARAMS, 2),
 		GPROB_PARAM,
 		CLKSRC_PARAM,
+		ENUMS(EXTAUDIO_PARAMS, 2),
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -67,6 +68,8 @@ struct Entropia : Module {
 		ENUMS(EXTSIG_LIGHTS, 2),
 		ENUMS(RANDOM_LIGHTS, 2),
 		ENUMS(CLKSRC_LIGHTS, 2),// certain, uncertain
+		ENUMS(EXTAUDIO_LIGHTS, 2),
+		ENUMS(EXTCV_LIGHTS, 2),
 		NUM_LIGHTS
 	};
 	
@@ -78,9 +81,9 @@ struct Entropia : Module {
 	int panelTheme = 0;
 	bool running;
 	bool resetOnRun;
-	bool crossFadeActive;
 	int length;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
+	int audio;// bit0 = blue has audio src (else is cv), bit1 = yellow has audio src (else is cv)
 	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
 	bool addMode;
 	int sources[2];// [0; ], first is blue, 2nd yellow; follows SourceIds
@@ -112,6 +115,7 @@ struct Entropia : Module {
 	SchmittTrigger fixedSrcTriggers[2];
 	SchmittTrigger rndSrcTriggers[2];
 	SchmittTrigger extSrcTriggers[2];
+	SchmittTrigger extAudioTriggers[2];
 	SchmittTrigger clkSrcTrigger;
 	float stepClockLight = 0.0f;
 	float stateSwitchLight = 0.0f;
@@ -138,9 +142,9 @@ struct Entropia : Module {
 	void onReset() override {
 		running = true;
 		resetOnRun = false;
-		crossFadeActive = true;
 		length = 8;
 		quantize = 3;
+		audio = 0;
 		addMode = false;
 		for (int i = 0; i < 2; i++) {
 			ranges[i] = 1;	
@@ -193,14 +197,14 @@ struct Entropia : Module {
 		// resetOnRun
 		json_object_set_new(rootJ, "resetOnRun", json_boolean(resetOnRun));
 
-		// crossFadeActive
-		json_object_set_new(rootJ, "crossFadeActive", json_boolean(crossFadeActive));
-
 		// length
 		json_object_set_new(rootJ, "length", json_integer(length));
 
 		// quantize
 		json_object_set_new(rootJ, "quantize", json_integer(quantize));
+
+		// audio
+		json_object_set_new(rootJ, "audio", json_integer(audio));
 
 		// ranges
 		json_object_set_new(rootJ, "ranges0", json_integer(ranges[0]));
@@ -246,11 +250,6 @@ struct Entropia : Module {
 		if (resetOnRunJ)
 			resetOnRun = json_is_true(resetOnRunJ);
 
-		// crossFadeActive
-		json_t *crossFadeActiveJ = json_object_get(rootJ, "crossFadeActive");
-		if (crossFadeActiveJ)
-			crossFadeActive = json_is_true(crossFadeActiveJ);
-
 		// length
 		json_t *lengthJ = json_object_get(rootJ, "length");
 		if (lengthJ)
@@ -260,6 +259,11 @@ struct Entropia : Module {
 		json_t *quantizeJ = json_object_get(rootJ, "quantize");
 		if (quantizeJ)
 			quantize = json_integer_value(quantizeJ);
+
+		// audio
+		json_t *audioJ = json_object_get(rootJ, "audio");
+		if (audioJ)
+			audio = json_integer_value(audioJ);
 
 		// ranges
 		json_t *ranges0J = json_object_get(rootJ, "ranges0");
@@ -383,6 +387,8 @@ struct Entropia : Module {
 					sources[i] = SRC_EXT;
 				if (fixedSrcTriggers[i].process(params[FIXEDCV_PARAMS + i].value))
 					sources[i] = SRC_CV;
+				if (extAudioTriggers[i].process(params[EXTAUDIO_PARAMS + i].value))
+					audio ^= (1 << i);
 			}
 			
 			// addMode
@@ -451,7 +457,10 @@ struct Entropia : Module {
 		//********** Outputs and lights **********
 
 		// Output
-		if (crossFadeStepsToGo > 0 && crossFadeActive)
+		int crossFadeActive = audio;
+		if (sources[0] != SRC_EXT) crossFadeActive &= ~0x1;
+		if (sources[1] != SRC_EXT) crossFadeActive &= ~0x2;
+		if (crossFadeStepsToGo > 0 && crossFadeActive != 0)
 		{
 			long crossFadeStepsToGoInit = (long)(crossFadeTime * engineGetSampleRate());
 			float fadeRatio = ((float)crossFadeStepsToGo) / ((float)crossFadeStepsToGoInit);
@@ -511,12 +520,18 @@ struct Entropia : Module {
 			lights[STATESWITCH_LIGHT].value = stateSwitchLight;
 			stateSwitchLight -= (stateSwitchLight / lightLambda) * sampleTime * displayRefreshStepSkips;
 			
-			// Sources lights
 			for (int i = 0; i < 2; i++) {
+				// Sources lights
 				lights[RANDOM_LIGHTS + i].value = (sources[i] == SRC_RND) ? 1.0f : 0.0f;
 				lights[EXTSIG_LIGHTS + i].value = (sources[i] == SRC_EXT) ? 1.0f : 0.0f;
 				lights[FIXEDCV_LIGHTS + i].value = (sources[i] == SRC_CV) ? 1.0f : 0.0f;
+				
+				// Audio lights
+				lights[EXTAUDIO_LIGHTS + i].value = ((audio & (1 << i)) != 0) ? 1.0f : 0.0f;
+				lights[EXTCV_LIGHTS + i].value = ((audio & (1 << i)) == 0) ? 1.0f : 0.0f;
 			}
+			
+			
 			
 			// Clock source lights
 			lights[CLKSRC_LIGHTS + 0].value = (clkSource < 2) ? 1.0f : 0.0f;
@@ -762,6 +777,11 @@ struct EntropiaWidget : ModuleWidget {
 		// fixed cv
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - buttonOffsetX, rowRulerTop + buttonOffsetY), module, Entropia::FIXEDCV_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - lightOffsetX, rowRulerTop + lightOffsetY), module, Entropia::FIXEDCV_LIGHTS + 0));
+		// audio
+		addParam(createDynamicParam<GeoPushButton>(Vec(38.5f, 380.0f - 325.5f), module, Entropia::EXTAUDIO_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(40.0f, 380.0f - 311.5f), module, Entropia::EXTAUDIO_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(48.5f, 380.0f - 315.5f), module, Entropia::EXTCV_LIGHTS + 0));
+		
 		
 		// Right side top
 		// ext
@@ -774,6 +794,10 @@ struct EntropiaWidget : ModuleWidget {
 		// fixed cv
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + buttonOffsetX, rowRulerTop + buttonOffsetY), module, Entropia::FIXEDCV_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + lightOffsetX, rowRulerTop + lightOffsetY), module, Entropia::FIXEDCV_LIGHTS + 1));
+		// audio
+		addParam(createDynamicParam<GeoPushButton>(Vec(315.0f - 38.5f, 380.0f - 325.5f), module, Entropia::EXTAUDIO_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(315.0f - 40.0f, 380.0f - 311.5f), module, Entropia::EXTAUDIO_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(315.0f - 48.5f, 380.0f - 315.5f), module, Entropia::EXTCV_LIGHTS + 1));
 		
 		
 		
