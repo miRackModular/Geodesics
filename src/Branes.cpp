@@ -490,6 +490,9 @@ Model *modelBranes = Model::create<Branes, BranesWidget>("Geodesics", "Branes", 
 
 /*CHANGE LOG
 
+0.6.6:
+swap noise range and trigger bypass and add new svg showing noise range settings
+
 0.6.5:
 input refresh optimization
 step optimization of lights refresh

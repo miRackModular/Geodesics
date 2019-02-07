@@ -831,6 +831,10 @@ Model *modelEntropia = Model::create<Entropia, EntropiaWidget>("Geodesics", "Ent
 
 /*CHANGE LOG
 
+0.6.6:
+add audio/cv switch for ext source, and activate anti-pop when at least one channel has audio input
+make step knobs select a gain rather that attenuverter for ext sources
+
 0.6.5:
 created
 
