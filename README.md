@@ -34,6 +34,9 @@ Each module comes with two panel options, namely White Light and Dark Matter.
 
 * [Entropia](#entropia): Thermodynamic Microstate Sequencer.
 
+For sequencer modules, more detailed information on how to set up clocks, resets and run states can be found in the Impromptu Modular [manual](https://github.com/MarcBoule/ImpromptuModular#on-resets-clocks-and-run-states-).
+
+
 
 ## Black Holes <a id="blackholes"></a>
 
