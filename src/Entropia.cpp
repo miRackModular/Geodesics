@@ -537,7 +537,7 @@ struct Entropia : Module {
 			lights[CLKSRC_LIGHTS + 0].value = (clkSource < 2) ? 1.0f : 0.0f;
 			lights[CLKSRC_LIGHTS + 1].value = ((clkSource & 0x1) == 0) ? 1.0f : 0.0f;
 			
-		}// lightRefreshCounter
+		}// lightRefreshCounter((audio & (1 << i)) != 0)
 		
 		if (clockIgnoreOnReset > 0l)
 			clockIgnoreOnReset--;
@@ -558,7 +558,8 @@ struct Entropia : Module {
 			cv = randomCVs[colorIndex] * (knobVal * 10.0f - 5.0f);
 		}
 		else if (sources[colorIndex] == SRC_EXT) {
-			cv = clamp(inputs[EXTSIG_INPUTS + colorIndex].value * knobVal * 2.0f, -10.0f, 10.0f);
+			float extOffset = ((audio & (1 << colorIndex)) != 0) ? 0.0f : -1.0f;
+			cv = clamp(inputs[EXTSIG_INPUTS + colorIndex].value * (knobVal * 2.0f + extOffset), -10.0f, 10.0f);
 		}
 		else {// SRC_CV
 			int range = ranges[colorIndex];
