@@ -558,7 +558,7 @@ struct Entropia : Module {
 			cv = randomCVs[colorIndex] * (knobVal * 10.0f - 5.0f);
 		}
 		else if (sources[colorIndex] == SRC_EXT) {
-			cv = clamp(inputs[EXTSIG_INPUTS + colorIndex].value * knobVal, -10.0f, 10.0f);
+			cv = clamp(inputs[EXTSIG_INPUTS + colorIndex].value * knobVal * 2.0f, -10.0f, 10.0f);
 		}
 		else {// SRC_CV
 			int range = ranges[colorIndex];
