@@ -537,7 +537,7 @@ struct Entropia : Module {
 			lights[CLKSRC_LIGHTS + 0].value = (clkSource < 2) ? 1.0f : 0.0f;
 			lights[CLKSRC_LIGHTS + 1].value = ((clkSource & 0x1) == 0) ? 1.0f : 0.0f;
 			
-		}// lightRefreshCounter((audio & (1 << i)) != 0)
+		}// lightRefreshCounter
 		
 		if (clockIgnoreOnReset > 0l)
 			clockIgnoreOnReset--;
