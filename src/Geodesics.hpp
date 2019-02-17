@@ -73,8 +73,6 @@ struct GeoPushButton : DynamicSVGSwitch, MomentarySwitch {
 	GeoPushButton() {// only one skin for now
 		addFrameAll(SVG::load(assetPlugin(plugin, "res/general/PushButton1_0.svg")));
 		addFrameAll(SVG::load(assetPlugin(plugin, "res/general/PushButton1_1.svg")));
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_0.svg"))); // no dark psuhbutton in Geodesics for now
-		//addFrameAll(SVG::load(assetPlugin(plugin, "res/dark/comp/CKD6b_1.svg"))); // no dark psuhbutton in Geodesics for now
 	}
 };
 
@@ -88,7 +86,7 @@ struct GeoKnob : DynamicSVGKnob {
 		maxAngle = 0.73*M_PI;
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
-		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if know is small (taken from IMSmallKnob)
+		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if knob is small (taken from IMSmallKnob)
 		addFrameAll(SVG::load(assetPlugin(plugin, "res/WhiteLight/Knob-WL.svg")));
 		addFrameAll(SVG::load(assetPlugin(plugin, "res/DarkMatter/Knob-DM.svg")));
 	}
