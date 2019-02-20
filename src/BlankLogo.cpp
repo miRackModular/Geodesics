@@ -57,7 +57,7 @@ struct BlankLogo : Module {
 	float song[5] = {7.0f/12.0f, 9.0f/12.0f, 5.0f/12.0f, 5.0f/12.0f - 1.0f, 0.0f/12.0f};
 
 	LowFrequencyOscillator oscillatorClk;
-	SchmittTrigger clkTrigger;
+	Trigger clkTrigger;
 	
 	
 	BlankLogo() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {

@@ -101,22 +101,22 @@ struct Entropia : Module {
 	float cvLight;
 	unsigned int lightRefreshCounter = 0;
 	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
-	SchmittTrigger runningTrigger;
-	SchmittTrigger plankTriggers[2];
-	SchmittTrigger lengthTrigger;
-	SchmittTrigger stateSwitchTrigger;
-	SchmittTrigger switchAddTrigger;
-	SchmittTrigger certainClockTrigger;
-	SchmittTrigger uncertainClockTrigger;
-	SchmittTrigger octTriggers[2];
-	SchmittTrigger stepClockTrigger;
-	SchmittTrigger resetTrigger;
-	SchmittTrigger resetOnRunTrigger;
-	SchmittTrigger fixedSrcTriggers[2];
-	SchmittTrigger rndSrcTriggers[2];
-	SchmittTrigger extSrcTriggers[2];
-	SchmittTrigger extAudioTriggers[2];
-	SchmittTrigger clkSrcTrigger;
+	Trigger runningTrigger;
+	Trigger plankTriggers[2];
+	Trigger lengthTrigger;
+	Trigger stateSwitchTrigger;
+	Trigger switchAddTrigger;
+	Trigger certainClockTrigger;
+	Trigger uncertainClockTrigger;
+	Trigger octTriggers[2];
+	Trigger stepClockTrigger;
+	Trigger resetTrigger;
+	Trigger resetOnRunTrigger;
+	Trigger fixedSrcTriggers[2];
+	Trigger rndSrcTriggers[2];
+	Trigger extSrcTriggers[2];
+	Trigger extAudioTriggers[2];
+	Trigger clkSrcTrigger;
 	float stepClockLight = 0.0f;
 	float stateSwitchLight = 0.0f;
 	

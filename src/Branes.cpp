@@ -103,9 +103,9 @@ struct Branes : Module {
 	
 	
 	// No need to save
-	SchmittTrigger sampleTriggers[2];
-	SchmittTrigger trigBypassTriggers[2];
-	SchmittTrigger noiseRangeTriggers[2];
+	Trigger sampleTriggers[2];
+	Trigger trigBypassTriggers[2];
+	Trigger noiseRangeTriggers[2];
 	float trigLights[2] = {0.0f, 0.0f};
 	NoiseGenerator whiteNoise;
 	PinkFilter pinkFilter[2];

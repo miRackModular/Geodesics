@@ -64,10 +64,10 @@ struct Pulsars : Module {
 	int posB;// always between 0 and 7
 	int posAnext;// always between 0 and 7
 	int posBnext;// always between 0 and 7
-	SchmittTrigger voidTriggers[2];
-	SchmittTrigger revTriggers[2];
-	SchmittTrigger rndTriggers[2];
-	SchmittTrigger cvLevelTriggers[2];
+	Trigger voidTriggers[2];
+	Trigger revTriggers[2];
+	Trigger rndTriggers[2];
+	Trigger cvLevelTriggers[2];
 	float lfoLights[2] = {0.0f, 0.0f};
 	unsigned int lightRefreshCounter = 0;
 

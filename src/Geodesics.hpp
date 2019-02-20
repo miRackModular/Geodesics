@@ -200,6 +200,36 @@ struct GeoBlueYellowLight : GeoGrayModuleLight {
 
 // Other
 
+struct Trigger : SchmittTrigger {
+	// implements a 0.1V - 1.0V SchmittTrigger (include/dsp/digital.hpp) instead of 
+	//   calling SchmittTriggerInstance.process(math::rescale(in, 0.1f, 1.f, 0.f, 1.f))
+	bool process(float in) {
+		switch (state) {
+			case LOW:
+				if (in >= 1.0f) {
+					state = HIGH;
+					return true;
+				}
+				break;
+			case HIGH:
+				if (in <= 0.1f) {
+					state = LOW;
+				}
+				break;
+			default:
+				if (in >= 1.0f) {
+					state = HIGH;
+				}
+				else if (in <= 0.1f) {
+					state = LOW;
+				}
+				break;
+		}
+		return false;
+	}	
+};	
+
+
 int getWeighted1to8random();
 
 #endif

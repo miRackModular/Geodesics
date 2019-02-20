@@ -51,9 +51,9 @@ struct BlackHoles : Module {
 	
 	
 	// No need to save
-	SchmittTrigger expTriggers[2];
-	SchmittTrigger cvLevelTriggers[2];
-	SchmittTrigger wormholeTrigger;
+	Trigger expTriggers[2];
+	Trigger cvLevelTriggers[2];
+	Trigger wormholeTrigger;
 	unsigned int lightRefreshCounter = 0;
 
 	
