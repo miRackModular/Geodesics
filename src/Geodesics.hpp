@@ -16,8 +16,6 @@
 #include "GeoWidgets.hpp"
 #include "dsp/digital.hpp"
 
-using namespace rack;
-
 
 extern Plugin *plugin;
 
