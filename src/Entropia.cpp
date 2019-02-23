@@ -151,30 +151,18 @@ struct Entropia : Module {
 			sources[i] = SRC_CV;
 		}
 		clkSource = 0;
-		initRun(false);
+		initRun();
 		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 	}
 
 	
 	void onRandomize() override {
-		length = (randomu32() & 0x7) + 1;
-		quantize = randomu32() & 0x3;
-		addMode = (randomu32() & 0x1) == 1;
-		for (int i = 0; i < 2; i++) {
-			ranges[i] = randomu32() % 3;
-		}
-		clkSource = randomu32() % 3;
-		initRun(true);
+		initRun();
 	}
 	
 
-	void initRun(bool randomize) {
-		if (randomize) {
-			stepIndex = randomu32() % length;
-		}
-		else {
-			stepIndex = 0;
-		}
+	void initRun() {
+		stepIndex = 0;
 		stepIndexOld = 0;
 		crossFadeStepsToGo = 0;
 		for (int i = 0; i < 8; i++)
@@ -326,7 +314,7 @@ struct Entropia : Module {
 			running = !running;
 			if (running) {
 				if (resetOnRun)
-					initRun(false);
+					initRun();
 				if (resetOnRun || clockIgnoreOnRun)
 					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			}
@@ -446,7 +434,7 @@ struct Entropia : Module {
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
-			initRun(false);
+			initRun();
 			resetLight = 1.0f;
 			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			certainClockTrigger.reset();

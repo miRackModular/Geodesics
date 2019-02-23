@@ -125,33 +125,20 @@ struct Ions : Module {
 			ranges[i] = 1;
 		}
 		leap = false;
-		initRun(true, false);
+		initRun(true);
 		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 	}
 
 	
 	void onRandomize() override {
-		quantize = randomu32() & 0x3;
-		uncertainty = (randomu32() % 2) > 0;
-		for (int i = 0; i < 2; i++) {
-			states[i] = randomu32() % 3;
-			ranges[i] = randomu32() % 3;
-		}
-		leap = (randomu32() % 2) > 0;
-		initRun(true, true);
+		initRun(true);
 	}
 	
 
-	void initRun(bool hard, bool randomize) {// run button activated or run edge in run input jack
+	void initRun(bool hard) {// run button activated or run edge in run input jack
 		if (hard) {
-			if (randomize) {
-				stepIndexes[0] = randomu32() % 16;
-				stepIndexes[1] = randomu32() % 16;
-			}
-			else {
-				stepIndexes[0] = 0;
-				stepIndexes[1] = 0;
-			}
+			stepIndexes[0] = 0;
+			stepIndexes[1] = 0;
 		}
 		resetLight = 0.0f;
 	}
@@ -264,7 +251,7 @@ struct Ions : Module {
 			running = !running;
 			if (running ) {
 				if (resetOnRun)
-					initRun(true, false);
+					initRun(true);
 				if (resetOnRun || clockIgnoreOnRun)
 					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			}
@@ -390,7 +377,7 @@ struct Ions : Module {
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
-			initRun(true, uncertainty);
+			initRun(true);
 			resetLight = 1.0f;
 			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
 			clockTrigger.reset();
