@@ -68,11 +68,9 @@ void DynamicSVGKnob::addFrameAll(std::shared_ptr<Svg> svg) {
 }
 
 void DynamicSVGKnob::setOrientation(float angle) {
-
 	tw->removeChild(sw);
 	TransformWidget *tw2 = new TransformWidget();
 	tw2->addChild(sw);
-	tw2->identity();
 	tw->addChild(tw2);
 
 	Vec center = sw->box.getCenter();
