@@ -542,6 +542,14 @@ struct PulsarsWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB - offsetJacks - offsetLFO), true, module, Pulsars::LFO_INPUTS + 1, module ? &module->panelTheme : NULL));		
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 1));
 	}
+	
+	void step() override {
+		if (module) {
+			lightPanel->visible = ((((Pulsars*)module)->panelTheme) == 0);
+			darkPanel->visible  = ((((Pulsars*)module)->panelTheme) == 1);
+		}
+		Widget::step();
+	}
 };
 
 Model *modelPulsars = createModel<Pulsars, PulsarsWidget>("Pulsars");

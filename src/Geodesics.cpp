@@ -20,7 +20,7 @@ void init(rack::Plugin *p) {
 
 	p->addModel(modelBlackHoles);
 	p->addModel(modelPulsars);
-	// p->addModel(modelBranes);
+	p->addModel(modelBranes);
 	// p->addModel(modelIons);
 	p->addModel(modelEntropia);
 	p->addModel(modelBlankLogo);

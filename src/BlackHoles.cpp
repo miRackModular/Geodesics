@@ -319,7 +319,6 @@ struct BlackHolesWidget : ModuleWidget {
 		// BlackHole0 center output
 		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerBlack0), false, module, BlackHoles::BLACKHOLE_OUTPUTS + 0, module ? &module->panelTheme : NULL));
 
-				
 		// BlackHole1 knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerBlack1 - radiusOut), module, BlackHoles::LEVEL_PARAMS + 4, module ? &module->panelTheme : NULL));
 		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + radiusOut, rowRulerBlack1), module, BlackHoles::LEVEL_PARAMS + 5, module ? &module->panelTheme : NULL));
@@ -355,7 +354,7 @@ struct BlackHolesWidget : ModuleWidget {
 		
 		
 		// BlackHole0 Exp button and light
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtonsX, rowRulerBlack0 + offsetButtonsY), module, BlackHoles::EXP_PARAMS + 0, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetButtonsX, rowRulerBlack0 + offsetButtonsY), module, BlackHoles::EXP_PARAMS + 0, module ? &module->panelTheme : NULL));	
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetButtonsX + offsetLedVsBut, rowRulerBlack0 + offsetButtonsY - offsetLedVsBut - 1.0f), module, BlackHoles::EXP_LIGHTS + 0));
 		
 		// BlackHole1 Exp button and light

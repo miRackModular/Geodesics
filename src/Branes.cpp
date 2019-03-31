@@ -109,8 +109,8 @@ struct Branes : Module {
 	float trigLights[2] = {0.0f, 0.0f};
 	NoiseGenerator whiteNoise;
 	PinkFilter pinkFilter[2];
-	RCFilter redFilter[2];
-	RCFilter blueFilter[2];
+	dsp::RCFilter redFilter[2];
+	dsp::RCFilter blueFilter[2];
 	PinkFilter pinkForBlueFilter[2];
 	bool cacheHitRed[2];// no need to init; index is braneIndex
 	float cacheValRed[2];
@@ -124,10 +124,16 @@ struct Branes : Module {
 	Branes() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		
-		redFilter[0].setCutoff(441.0f / engineGetSampleRate());
-		redFilter[1].setCutoff(441.0f / engineGetSampleRate());
-		blueFilter[0].setCutoff(44100.0f / engineGetSampleRate());
-		blueFilter[1].setCutoff(44100.0f / engineGetSampleRate());
+		configParam(TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Top brane bypass");
+		configParam(TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Bottom brane bypass");
+		configParam(NOISE_RANGE_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Top brane noise range");
+		configParam(NOISE_RANGE_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Bottom brane noise range");		
+		
+		float sampleRate = APP->engine->getSampleRate();
+		redFilter[0].setCutoff(441.0f / sampleRate);
+		redFilter[1].setCutoff(441.0f / sampleRate);
+		blueFilter[0].setCutoff(44100.0f / sampleRate);
+		blueFilter[1].setCutoff(44100.0f / sampleRate);
 		
 		onReset();
 	}
@@ -145,8 +151,8 @@ struct Branes : Module {
 	
 	void onRandomize() override {
 		for (int i = 0; i < 2; i++) {
-			trigBypass[i] = (randomu32() % 2) > 0;
-			noiseRange[i] = (randomu32() % 2) > 0;
+			trigBypass[i] = (random::u32() % 2) > 0;
+			noiseRange[i] = (random::u32() % 2) > 0;
 		}
 		for (int i = 0; i < 14; i++)
 			heldOuts[i] = 0.0f;
@@ -287,7 +293,7 @@ struct Branes : Module {
 				lights[BYPASS_TRIG_LIGHTS + i * 2 + 0].value = white;
 				lights[BYPASS_TRIG_LIGHTS + i * 2 + 1].value = red;
 				lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
-				trigLights[i] -= (trigLights[i] / lightLambda) * (float)engineGetSampleTime() * displayRefreshStepSkips;
+				trigLights[i] -= (trigLights[i] / lightLambda) * (float)args.sampleTime * displayRefreshStepSkips;
 			}
 			
 		}// lightRefreshCounter
@@ -394,13 +400,15 @@ struct BranesWidget : ModuleWidget {
 	BranesWidget(Branes *module) {
 		setModule(module);
 
-		// Main panel from Inkscape
-        DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/WhiteLight/Branes-WL.svg")));
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/DarkMatter/Branes-DM.svg")));
-        box.size = panel->box.size;
-        panel->mode = &module->panelTheme;
-        addChild(panel);
+		// Main panels from Inkscape
+        lightPanel = new SvgPanel();
+        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Branes-WL.svg")));
+        box.size = lightPanel->box.size;
+        addChild(lightPanel);
+        darkPanel = new SvgPanel();
+		darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Branes-DM.svg")));
+		darkPanel->visible = false;
+		addChild(darkPanel);
 
 		// Screws 
 		// part of svg panel, no code required
@@ -461,8 +469,8 @@ struct BranesWidget : ModuleWidget {
 		
 		// Trigger bypass (aka Vibrations)
 		// Bypass buttons
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 334.5f), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 31.5f), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 334.5f), module, Branes::TRIG_BYPASS_PARAMS + 0, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 31.5f), module, Branes::TRIG_BYPASS_PARAMS + 1, module ? &module->panelTheme : NULL));
 		// Bypass cv inputs
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 315.5f), true, module, Branes::TRIG_BYPASS_INPUTS + 0, module ? &module->panelTheme : NULL));
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 50.5f), true, module, Branes::TRIG_BYPASS_INPUTS + 1, module ? &module->panelTheme : NULL));
@@ -476,8 +484,8 @@ struct BranesWidget : ModuleWidget {
 		
 		// Noise range
 		// Range buttons
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 334.5f), module, Branes::NOISE_RANGE_PARAMS + 0, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 31.5f), module, Branes::NOISE_RANGE_PARAMS + 1, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 334.5f), module, Branes::NOISE_RANGE_PARAMS + 0, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 31.5f), module, Branes::NOISE_RANGE_PARAMS + 1, module ? &module->panelTheme : NULL));
 		// Range cv inputs
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 315.5f), true, module, Branes::NOISE_RANGE_INPUTS + 0, module ? &module->panelTheme : NULL));
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 50.5f), true, module, Branes::NOISE_RANGE_INPUTS + 1, module ? &module->panelTheme : NULL));
@@ -486,9 +494,17 @@ struct BranesWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 38.5f), module, Branes::NOISE_RANGE_LIGHTS + 1));
 
 	}
+	
+	void step() override {
+		if (module) {
+			lightPanel->visible = ((((Branes*)module)->panelTheme) == 0);
+			darkPanel->visible  = ((((Branes*)module)->panelTheme) == 1);
+		}
+		Widget::step();
+	}
 };
 
-Model *modelBranes = Model::create<Branes, BranesWidget>("Geodesics", "Branes", "Branes", SAMPLE_AND_HOLD_TAG);
+Model *modelBranes = createModel<Branes, BranesWidget>("Branes");
 
 /*CHANGE LOG
 

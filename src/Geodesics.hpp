@@ -72,6 +72,7 @@ struct BlankPort : SvgPort {
 
 struct GeoPushButton : DynamicSVGSwitch {
 	GeoPushButton() {// only one skin for now
+		momentary = true;
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/general/PushButton1_0.svg")));
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/general/PushButton1_1.svg")));
 	}

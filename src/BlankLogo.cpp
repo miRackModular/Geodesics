@@ -151,7 +151,6 @@ struct BlankLogoWidget : ModuleWidget {
 		menu->addChild(darkItem);
 	}	
 
-
 	BlankLogoWidget(BlankLogo *module) {
 		setModule(module);
 

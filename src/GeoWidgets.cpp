@@ -41,7 +41,7 @@ void DynamicSVGSwitch::addFrameAll(std::shared_ptr<Svg> svg) {
 
 void DynamicSVGSwitch::step() {
     if(mode != NULL && *mode != oldMode) {
-        if ((*mode) == 0) {
+        if ((*mode) == 0|| framesAll.size() < 4) {
 			frames[0]=framesAll[0];
 			frames[1]=framesAll[1];
 		}
