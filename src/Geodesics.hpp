@@ -14,10 +14,13 @@
 
 #include "rack.hpp"
 #include "GeoWidgets.hpp"
-#include "dsp/digital.hpp"
 
 
-extern Plugin *plugin;
+using namespace rack;
+
+
+extern Plugin *pluginInstance;
+
 
 // All modules that are part of plugin go here
 extern Model *modelBlackHoles;
@@ -52,25 +55,25 @@ struct GeoPort : DynamicSVGPort {
 	GeoPort() {
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
-		addFrame(SVG::load(assetPlugin(plugin, "res/WhiteLight/Jack-WL.svg")));
-		addFrame(SVG::load(assetPlugin(plugin, "res/DarkMatter/Jack-DM.svg")));
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Jack-WL.svg")));
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Jack-DM.svg")));
 	}
 };
 
-struct BlankPort : SVGPort {
+struct BlankPort : SvgPort {
 	BlankPort() {
 		shadow->opacity = 0.0;
-		setSVG(SVG::load(assetPlugin(plugin, "res/general/Otrsp-01.svg")));
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/general/Otrsp-01.svg")));
 	}
 };
 
 
 // Buttons and switches
 
-struct GeoPushButton : DynamicSVGSwitch, MomentarySwitch {
+struct GeoPushButton : DynamicSVGSwitch {
 	GeoPushButton() {// only one skin for now
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/general/PushButton1_0.svg")));
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/general/PushButton1_1.svg")));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/general/PushButton1_0.svg")));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/general/PushButton1_1.svg")));
 	}
 };
 
@@ -85,31 +88,31 @@ struct GeoKnob : DynamicSVGKnob {
 		shadow->blurRadius = 10.0;
 		shadow->opacity = 0.8;
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if knob is small (taken from IMSmallKnob)
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/WhiteLight/Knob-WL.svg")));
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/DarkMatter/Knob-DM.svg")));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Knob-WL.svg")));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Knob-DM.svg")));
 	}
 };
 
 struct GeoKnobTopRight : GeoKnob {
-	GeoKnobTopRight() {orientationAngle = M_PI / 4.0f;}
+	GeoKnobTopRight() {setOrientation(M_PI / 4.0f);}
 };
 struct GeoKnobRight : GeoKnob {
-	GeoKnobRight() {orientationAngle = M_PI / 2.0f;}
+	GeoKnobRight() {setOrientation(M_PI / 2.0f);}
 };
 struct GeoKnobBotRight : GeoKnob {
-	GeoKnobBotRight() {orientationAngle = 3.0f * M_PI / 4.0f;}
+	GeoKnobBotRight() {setOrientation(3.0f * M_PI / 4.0f);}
 };
 struct GeoKnobBottom : GeoKnob {
-	GeoKnobBottom() {orientationAngle = M_PI;}
+	GeoKnobBottom() {setOrientation(M_PI);}
 };
 struct GeoKnobBotLeft : GeoKnob {
-	GeoKnobBotLeft() {orientationAngle = 5.0f * M_PI / 4.0f;}
+	GeoKnobBotLeft() {setOrientation(5.0f * M_PI / 4.0f);}
 };
 struct GeoKnobLeft : GeoKnob {
-	GeoKnobLeft() {orientationAngle = M_PI / -2.0f;}
+	GeoKnobLeft() {setOrientation(M_PI / -2.0f);}
 };
 struct GeoKnobTopLeft : GeoKnob {
-	GeoKnobTopLeft() {orientationAngle = M_PI / -4.0f;}
+	GeoKnobTopLeft() {setOrientation(M_PI / -4.0f);}
 };
 
 
@@ -118,8 +121,8 @@ struct BlankCKnob : DynamicSVGKnob {
 		minAngle = -0.73*M_PI;
 		maxAngle = 0.73*M_PI;
 		shadow->opacity = 0.0;
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/WhiteLight/C-WL.svg")));
-		addFrameAll(SVG::load(assetPlugin(plugin, "res/DarkMatter/C-DM.svg")));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/C-WL.svg")));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/C-DM.svg")));
 	}
 };
 
@@ -133,100 +136,81 @@ struct GeoGrayModuleLight : ModuleLightWidget {
 		borderColor = nvgRGB(0x1d, 0x1d, 0x1b);//nvgRGBA(0, 0, 0, 0x60);
 	}
 	
-	void drawLight(NVGcontext *vg) override { // from LightWidget.cpp (only nvgStrokeWidth of border was changed)
+	void drawLight(const DrawArgs &args) override { // from app/LightWidget.cpp (only nvgStrokeWidth of border was changed)
 		float radius = box.size.x / 2.0;
 
-		nvgBeginPath(vg);
-		nvgCircle(vg, radius, radius, radius);
+		nvgBeginPath(args.vg);
+		nvgCircle(args.vg, radius, radius, radius);
 
 		// Background
-		nvgFillColor(vg, bgColor);
-		nvgFill(vg);
+		if (bgColor.a > 0.0) {
+			nvgFillColor(args.vg, bgColor);
+			nvgFill(args.vg);
+		}
 
 		// Foreground
-		nvgFillColor(vg, color);
-		nvgFill(vg);
+		if (color.a > 0.0) {
+			nvgFillColor(args.vg, color);
+			nvgFill(args.vg);
+		}
 
 		// Border
-		nvgStrokeWidth(vg, 1.0);// 0.5);
-		nvgStrokeColor(vg, borderColor);
-		nvgStroke(vg);
+		if (borderColor.a > 0.0) {
+			nvgStrokeWidth(args.vg, 1.0);//0.5);
+			nvgStrokeColor(args.vg, borderColor);
+			nvgStroke(args.vg);
+		}
 	}
-	
 };
 
 struct GeoWhiteLight : GeoGrayModuleLight {
 	GeoWhiteLight() {
-		addBaseColor(COLOR_WHITE);
+		addBaseColor(SCHEME_WHITE);
 	}
 };
 struct GeoBlueLight : GeoGrayModuleLight {
 	GeoBlueLight() {
-		addBaseColor(COLOR_BLUE);
+		addBaseColor(SCHEME_BLUE);
 	}
 };
 struct GeoRedLight : GeoGrayModuleLight {
 	GeoRedLight() {
-		addBaseColor(COLOR_RED);
+		addBaseColor(SCHEME_RED);
 	}
 };
 struct GeoYellowLight : GeoGrayModuleLight {
 	GeoYellowLight() {
-		addBaseColor(COLOR_YELLOW);
+		addBaseColor(SCHEME_YELLOW);
 	}
 };
 struct GeoWhiteRedLight : GeoGrayModuleLight {
 	GeoWhiteRedLight() {
-		addBaseColor(COLOR_WHITE);
-		addBaseColor(COLOR_RED);
+		addBaseColor(SCHEME_WHITE);
+		addBaseColor(SCHEME_RED);
 	}
 };
 struct GeoBlueYellowWhiteLight : GeoGrayModuleLight {
 	GeoBlueYellowWhiteLight() {
-		addBaseColor(COLOR_BLUE);
-		addBaseColor(COLOR_YELLOW);
-		addBaseColor(COLOR_WHITE);
+		addBaseColor(SCHEME_BLUE);
+		addBaseColor(SCHEME_YELLOW);
+		addBaseColor(SCHEME_WHITE);
 	}
 };
 struct GeoBlueYellowLight : GeoGrayModuleLight {
 	GeoBlueYellowLight() {
-		addBaseColor(COLOR_BLUE);
-		addBaseColor(COLOR_YELLOW);
+		addBaseColor(SCHEME_BLUE);
+		addBaseColor(SCHEME_YELLOW);
 	}
 };
 
 
 // Other
 
-struct Trigger : SchmittTrigger {
+struct Trigger : dsp::SchmittTrigger {
 	// implements a 0.1V - 1.0V SchmittTrigger (include/dsp/digital.hpp) instead of 
 	//   calling SchmittTriggerInstance.process(math::rescale(in, 0.1f, 1.f, 0.f, 1.f))
-	bool process(float in) {
-		switch (state) {
-			case LOW:
-				if (in >= 1.0f) {
-					state = HIGH;
-					return true;
-				}
-				break;
-			case HIGH:
-				if (in <= 0.1f) {
-					state = LOW;
-				}
-				break;
-			default:
-				if (in >= 1.0f) {
-					state = HIGH;
-				}
-				else if (in <= 0.1f) {
-					state = LOW;
-				}
-				break;
-		}
-		return false;
-	}	
+	bool process(float in);
 };	
-
 
 int getWeighted1to8random();
 

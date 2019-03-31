@@ -123,16 +123,57 @@ struct Entropia : Module {
 	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
 	inline void updatePipeBlue(int step) {
 		float effectiveKnob = params[PROB_PARAMS + step].value + -1.0f * (params[GPROB_PARAM].value + inputs[GPROB_INPUT].value / 5.0f);
-		pipeBlue[step] = effectiveKnob > randomUniform();
+		pipeBlue[step] = effectiveKnob > random::uniform();
 	}
 	inline void updateRandomCVs() {
-		randomCVs[0] = randomUniform();
-		randomCVs[1] = randomUniform();
+		randomCVs[0] = random::uniform();
+		randomCVs[1] = random::uniform();
 		cvLight = 1.0f;// this could be elsewhere since no relevance to randomCVs, but ok here
 	}
 	
 	
-	Entropia() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
+	Entropia() {
+		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+
+		char strBuf[32];				
+		for (int i = 0; i < 8; i++) {// Blue CV knobs
+			snprintf(strBuf, 32, "Blue CV step %i", i + 1);		
+			configParam(CV_PARAMS + i, 0.0f, 1.0f, 0.5f, strBuf);
+		}
+		for (int i = 0; i < 8; i++) {// Yellow CV knobs
+			snprintf(strBuf, 32, "Yellow CV step %i", i + 1);		
+			configParam(CV_PARAMS + 8 + i, 0.0f, 1.0f, 0.5f, strBuf);
+		}
+		for (int i = 0; i < 8; i++) {// Prob knobs
+			snprintf(strBuf, 32, "Probability step %i", i + 1);		
+			configParam(PROB_PARAMS + i, 0.0f, 1.0f, 1.0f, strBuf);
+		}
+
+		configParam(LENGTH_PARAM, 0.0f, 1.0f, 0.0f, "Length");
+		configParam(CLKSRC_PARAM, 0.0f, 1.0f, 0.0f, "Clock sources");
+		
+		configParam(SWITCHADD_PARAM, 0.0f, 1.0f, 0.0f, "Add");
+		configParam(STATESWITCH_PARAM, 0.0f, 1.0f, 0.0f, "Invert microstate");
+		configParam(QUANTIZE_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Quantize (plank) blue");
+		configParam(QUANTIZE_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Quantize (plank) yellow");
+		
+		configParam(OCT_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Octaves blue");
+		configParam(OCT_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Octaves yellow");
+		configParam(GPROB_PARAM, -1.0f, 1.0f, 0.0f, "Global probability");
+		
+		configParam(EXTSIG_PARAMS + 0, 0.0f, 1.0f, 0.0f, "External signal blue");
+		configParam(RANDOM_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Random blue");
+		configParam(FIXEDCV_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Fixed CV blue");
+		configParam(EXTAUDIO_PARAMS + 0, 0.0f, 1.0f, 0.0f, "CV/audio blue");
+		configParam(EXTSIG_PARAMS + 1, 0.0f, 1.0f, 0.0f, "External signal yellow");
+		configParam(RANDOM_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Random yellow");
+		configParam(FIXEDCV_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Fixed CV yellow");
+		configParam(EXTAUDIO_PARAMS + 1, 0.0f, 1.0f, 0.0f, "CV/audio yellow");
+		configParam(RUN_PARAM, 0.0f, 1.0f, 0.0f, "Run");	
+		configParam(RESET_PARAM, 0.0f, 1.0f, 0.0f, "Reset");	
+		configParam(STEPCLOCK_PARAM, 0.0f, 1.0f, 0.0f, "Magnetic clock");			
+		configParam(RESETONRUN_PARAM, 0.0f, 1.0f, 0.0f, "Reset on run");				
+						
 		for (int i = 0; i < 8; i++)
 			params[Entropia::PROB_PARAMS + i].value = 1.0f;// HACK since params not initialized properly yet, remove this in Rack 1.0
 		onReset();
@@ -152,7 +193,7 @@ struct Entropia : Module {
 		}
 		clkSource = 0;
 		initRun();
-		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * APP->engine->getSampleRate());
 	}
 
 	
@@ -173,7 +214,7 @@ struct Entropia : Module {
 	}
 	
 
-	json_t *toJson() override {
+	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
 		// panelTheme
@@ -222,7 +263,7 @@ struct Entropia : Module {
 	}
 
 	
-	void fromJson(json_t *rootJ) override {
+	void dataFromJson(json_t *rootJ) override {
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -303,9 +344,8 @@ struct Entropia : Module {
 	}
 
 	
-	void step() override {
+	void process(const ProcessArgs &args) override {
 		float crossFadeTime = 0.005f;
-		float sampleTime = engineGetSampleTime();
 	
 		//********** Buttons, knobs, switches and inputs **********
 	
@@ -316,7 +356,7 @@ struct Entropia : Module {
 				if (resetOnRun)
 					initRun();
 				if (resetOnRun || clockIgnoreOnRun)
-					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
 			}
 		}
 		
@@ -418,7 +458,7 @@ struct Entropia : Module {
 			}
 			if (certainClockTrig || uncertainClockTrig) {
 				stepIndex %= length;
-				crossFadeStepsToGo = (long)(crossFadeTime * engineGetSampleRate());;
+				crossFadeStepsToGo = (long)(crossFadeTime * args.sampleRate);;
 				updatePipeBlue(stepIndex);
 				updateRandomCVs();
 			}
@@ -426,7 +466,7 @@ struct Entropia : Module {
 		// Magnetic clock (manual step clock)
 		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].value)) {
 			if (++stepIndex >= length) stepIndex = 0;
-			crossFadeStepsToGo = (long)(crossFadeTime * engineGetSampleRate());
+			crossFadeStepsToGo = (long)(crossFadeTime * args.sampleRate);
 			updatePipeBlue(stepIndex);
 			updateRandomCVs();
 			stepClockLight = 1.0f;
@@ -436,7 +476,7 @@ struct Entropia : Module {
 		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
 			initRun();
 			resetLight = 1.0f;
-			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * engineGetSampleRate());
+			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
 			certainClockTrigger.reset();
 			uncertainClockTrigger.reset();
 		}
@@ -450,7 +490,7 @@ struct Entropia : Module {
 		if (sources[1] != SRC_EXT) crossFadeActive &= ~0x2;
 		if (crossFadeStepsToGo > 0 && crossFadeActive != 0)
 		{
-			long crossFadeStepsToGoInit = (long)(crossFadeTime * engineGetSampleRate());
+			long crossFadeStepsToGoInit = (long)(crossFadeTime * args.sampleRate);
 			float fadeRatio = ((float)crossFadeStepsToGo) / ((float)crossFadeStepsToGoInit);
 			outputs[CV_OUTPUT].value = calcOutput(stepIndexOld) * fadeRatio + calcOutput(stepIndex) * (1.0f - fadeRatio);
 			crossFadeStepsToGo--;
@@ -466,7 +506,7 @@ struct Entropia : Module {
 
 			// Reset light
 			lights[RESET_LIGHT].value =	resetLight;	
-			resetLight -= (resetLight / lightLambda) * sampleTime * displayRefreshStepSkips;	
+			resetLight -= (resetLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;	
 			
 			// Run light
 			lights[RUN_LIGHT].value = running ? 1.0f : 0.0f;
@@ -484,7 +524,7 @@ struct Entropia : Module {
 			lights[CV_LIGHT + 0].value = (pipeBlue[stepIndex]) ? 1.0f * cvLight : 0.0f;
 			lights[CV_LIGHT + 1].value = (!pipeBlue[stepIndex] && !addMode) ? 1.0f * cvLight : 0.0f;
 			lights[CV_LIGHT + 2].value = (!pipeBlue[stepIndex] && addMode) ? 1.0f * cvLight : 0.0f;
-			cvLight -= (cvLight / lightLambda) * sampleTime * displayRefreshStepSkips;	
+			cvLight -= (cvLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;	
 			for (int i = 0; i < 8; i++) {
 				lights[STEP_LIGHTS + i].value = ((pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
 				lights[STEP_LIGHTS + 8 + i].value = ((!pipeBlue[i]) && stepIndex == i) ? 1.0f : 0.0f;
@@ -498,7 +538,7 @@ struct Entropia : Module {
 				
 			// Step clocks light
 			lights[STEPCLOCK_LIGHT].value = stepClockLight;
-			stepClockLight -= (stepClockLight / lightLambda) * sampleTime * displayRefreshStepSkips;
+			stepClockLight -= (stepClockLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;
 
 			// Swtich add light
 			lights[SWITCHADD_LIGHT].value = (addMode ? 0.0f : 1.0f);
@@ -506,7 +546,7 @@ struct Entropia : Module {
 			
 			// State switch light
 			lights[STATESWITCH_LIGHT].value = stateSwitchLight;
-			stateSwitchLight -= (stateSwitchLight / lightLambda) * sampleTime * displayRefreshStepSkips;
+			stateSwitchLight -= (stateSwitchLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;
 			
 			for (int i = 0; i < 2; i++) {
 				// Sources lights
@@ -568,20 +608,20 @@ struct Entropia : Module {
 
 
 struct EntropiaWidget : ModuleWidget {
+	SvgPanel* lightPanel;
+	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
 		Entropia *module;
 		int theme;
-		void onAction(EventAction &e) override {
+		void onAction(const widget::ActionEvent &e) override {
 			module->panelTheme = theme;
 		}
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
 		}
 	};
-	Menu *createContextMenu() override {
-		Menu *menu = ModuleWidget::createContextMenu();
-
+	void appendContextMenu(Menu *menu) override {
 		MenuLabel *spacerLabel = new MenuLabel();
 		menu->addChild(spacerLabel);
 
@@ -603,18 +643,20 @@ struct EntropiaWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
-
-		return menu;
 	}	
 	
-	EntropiaWidget(Entropia *module) : ModuleWidget(module) {
-		// Main panel from Inkscape
-        DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/WhiteLight/Entropia-WL.svg")));
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/DarkMatter/Entropia-DM.svg")));
-        box.size = panel->box.size;
-        panel->mode = &module->panelTheme;
-        addChild(panel);
+	EntropiaWidget(Entropia *module) {
+		setModule(module);
+
+		// Main panels from Inkscape
+        lightPanel = new SvgPanel();
+        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Entropia-WL.svg")));
+        box.size = lightPanel->box.size;
+        addChild(lightPanel);
+        darkPanel = new SvgPanel();
+		darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Entropia-DM.svg")));
+		darkPanel->visible = false;
+		addChild(darkPanel);
 
 		// Screws 
 		// part of svg panel, no code required
@@ -630,38 +672,38 @@ struct EntropiaWidget : ModuleWidget {
 		
 		
 		// CV out and light 
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerOutput), Port::OUTPUT, module, Entropia::CV_OUTPUT, &module->panelTheme));		
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerOutput), false, module, Entropia::CV_OUTPUT, module ? &module->panelTheme : NULL));		
 		addChild(createLightCentered<SmallLight<GeoBlueYellowWhiteLight>>(Vec(colRulerCenter, rowRulerOutput - 21.5f), module, Entropia::CV_LIGHT));
 		
 		// Blue CV knobs
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput - radius1), module, Entropia::CV_PARAMS + 0, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset1, rowRulerOutput - offset1), module, Entropia::CV_PARAMS + 1, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius1, rowRulerOutput), module, Entropia::CV_PARAMS + 2, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset1, rowRulerOutput + offset1), module, Entropia::CV_PARAMS + 3, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput + radius1), module, Entropia::CV_PARAMS + 4, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset1, rowRulerOutput + offset1), module, Entropia::CV_PARAMS + 5, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius1, rowRulerOutput), module, Entropia::CV_PARAMS + 6, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset1, rowRulerOutput - offset1), module, Entropia::CV_PARAMS + 7, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput - radius1), module, Entropia::CV_PARAMS + 0, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset1, rowRulerOutput - offset1), module, Entropia::CV_PARAMS + 1, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius1, rowRulerOutput), module, Entropia::CV_PARAMS + 2, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset1, rowRulerOutput + offset1), module, Entropia::CV_PARAMS + 3, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput + radius1), module, Entropia::CV_PARAMS + 4, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset1, rowRulerOutput + offset1), module, Entropia::CV_PARAMS + 5, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius1, rowRulerOutput), module, Entropia::CV_PARAMS + 6, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset1, rowRulerOutput - offset1), module, Entropia::CV_PARAMS + 7, module ? &module->panelTheme : NULL));
 
 		// Yellow CV knobs
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput - radius3), module, Entropia::CV_PARAMS + 8 + 0, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerOutput - offset3), module, Entropia::CV_PARAMS + 8 + 1, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius3, rowRulerOutput), module, Entropia::CV_PARAMS + 8 + 2, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerOutput + offset3), module, Entropia::CV_PARAMS + 8 + 3, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput + radius3), module, Entropia::CV_PARAMS + 8 + 4, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerOutput + offset3), module, Entropia::CV_PARAMS + 8 + 5, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius3, rowRulerOutput), module, Entropia::CV_PARAMS + 8 + 6, 0.0f, 1.0f, 0.5f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerOutput - offset3), module, Entropia::CV_PARAMS + 8 + 7, 0.0f, 1.0f, 0.5f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput - radius3), module, Entropia::CV_PARAMS + 8 + 0, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerOutput - offset3), module, Entropia::CV_PARAMS + 8 + 1, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + radius3, rowRulerOutput), module, Entropia::CV_PARAMS + 8 + 2, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offset3, rowRulerOutput + offset3), module, Entropia::CV_PARAMS + 8 + 3, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerOutput + radius3), module, Entropia::CV_PARAMS + 8 + 4, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerOutput + offset3), module, Entropia::CV_PARAMS + 8 + 5, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - radius3, rowRulerOutput), module, Entropia::CV_PARAMS + 8 + 6, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset3, rowRulerOutput - offset3), module, Entropia::CV_PARAMS + 8 + 7, module ? &module->panelTheme : NULL));
 		
 		// Prob CV knobs
-		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + offset2s, rowRulerOutput - offset2b - 3), module, Entropia::PROB_PARAMS + 0, 0.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBotRight>(Vec(colRulerCenter + offset2b, rowRulerOutput - offset2s - 8), module, Entropia::PROB_PARAMS + 1, 0.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter + offset2b + 3, rowRulerOutput + offset2s), module, Entropia::PROB_PARAMS + 2, 0.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobBotLeft>(Vec(colRulerCenter + offset2s + 8, rowRulerOutput + offset2b), module, Entropia::PROB_PARAMS + 3, 0.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobLeft>(Vec(colRulerCenter - offset2s, rowRulerOutput + offset2b + 3), module, Entropia::PROB_PARAMS + 4, 0.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobTopLeft>(Vec(colRulerCenter - offset2b, rowRulerOutput + offset2s + 8), module, Entropia::PROB_PARAMS + 5, 0.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset2b - 3, rowRulerOutput - offset2s), module, Entropia::PROB_PARAMS + 6, 0.0f, 1.0f, 1.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnobTopRight>(Vec(colRulerCenter - offset2s - 7.5f, rowRulerOutput - offset2b + 1.0f), module, Entropia::PROB_PARAMS + 7, 0.0f, 1.0f, 1.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoKnobRight>(Vec(colRulerCenter + offset2s, rowRulerOutput - offset2b - 3), module, Entropia::PROB_PARAMS + 0, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnobBotRight>(Vec(colRulerCenter + offset2b, rowRulerOutput - offset2s - 8), module, Entropia::PROB_PARAMS + 1, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnobBottom>(Vec(colRulerCenter + offset2b + 3, rowRulerOutput + offset2s), module, Entropia::PROB_PARAMS + 2, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnobBotLeft>(Vec(colRulerCenter + offset2s + 8, rowRulerOutput + offset2b), module, Entropia::PROB_PARAMS + 3, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnobLeft>(Vec(colRulerCenter - offset2s, rowRulerOutput + offset2b + 3), module, Entropia::PROB_PARAMS + 4, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnobTopLeft>(Vec(colRulerCenter - offset2b, rowRulerOutput + offset2s + 8), module, Entropia::PROB_PARAMS + 5, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offset2b - 3, rowRulerOutput - offset2s), module, Entropia::PROB_PARAMS + 6, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnobTopRight>(Vec(colRulerCenter - offset2s - 7.5f, rowRulerOutput - offset2b + 1.0f), module, Entropia::PROB_PARAMS + 7, module ? &module->panelTheme : NULL));
 		
 		// Blue step lights	
 		float radiusBL = 228.5f - 155.5f;// radius blue lights
@@ -685,10 +727,10 @@ struct EntropiaWidget : ModuleWidget {
 	
 	
 		// Length jack, button and lights
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 116.5f, rowRulerOutput + 70.0f), Port::INPUT, module, Entropia::LENGTH_INPUT, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 116.5f, rowRulerOutput + 70.0f), true, module, Entropia::LENGTH_INPUT, module ? &module->panelTheme : NULL));
 		static float lenButtonX = colRulerCenter + 130.5f;
 		static float lenButtonY = rowRulerOutput + 36.5f;
-		addParam(createDynamicParam<GeoPushButton>(Vec(lenButtonX, lenButtonY), module, Entropia::LENGTH_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(lenButtonX, lenButtonY), module, Entropia::LENGTH_PARAM, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX        , lenButtonY - 14.5f), module, Entropia::LENGTH_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX + 10.5f, lenButtonY - 10.5f), module, Entropia::LENGTH_LIGHTS + 1));
 		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX + 14.5f, lenButtonY        ), module, Entropia::LENGTH_LIGHTS + 2));
@@ -699,38 +741,38 @@ struct EntropiaWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoRedLight>>(Vec(lenButtonX - 10.5f, lenButtonY - 10.5f), module, Entropia::LENGTH_LIGHTS + 7));
 		
 		// Clock inputs
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput + 36.5f), Port::INPUT, module, Entropia::CERTAIN_CLK_INPUT, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 116.5f, rowRulerOutput + 70.0f), Port::INPUT, module, Entropia::UNCERTAIN_CLK_INPUT, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput + 36.5f), true, module, Entropia::CERTAIN_CLK_INPUT, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 116.5f, rowRulerOutput + 70.0f), true, module, Entropia::UNCERTAIN_CLK_INPUT, module ? &module->panelTheme : NULL));
 		// Clock source button and LEDs
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(43.0f, 256.5f), module, Entropia::CLKSRC_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(55.0f, 284.5f), module, Entropia::CLKSRC_LIGHTS + 1));
-		addParam(createDynamicParam<GeoPushButton>(Vec(46.0f, 272.5f), module, Entropia::CLKSRC_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(46.0f, 272.5f), module, Entropia::CLKSRC_PARAM, module ? &module->panelTheme : NULL));
 		
 		
 		// Switch, add, state (jacks, buttons, ligths)
 		// left side
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Entropia::SWITCHADD_INPUT, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 115.5f, rowRulerOutput - 69.0f), module, Entropia::SWITCHADD_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 130.5f, rowRulerOutput - 36.0f), true, module, Entropia::SWITCHADD_INPUT, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 115.5f, rowRulerOutput - 69.0f), module, Entropia::SWITCHADD_PARAM, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f - 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Entropia::SWITCHADD_LIGHT));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 115.5f + 3.0f, rowRulerOutput - 69.0f + 14.0f), module, Entropia::ADD_LIGHT));
 		// right side
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 130.5f, rowRulerOutput - 36.0f), Port::INPUT, module, Entropia::STATESWITCH_INPUT, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 115.5f, rowRulerOutput - 69.0f), module, Entropia::STATESWITCH_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 130.5f, rowRulerOutput - 36.0f), true, module, Entropia::STATESWITCH_INPUT, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 115.5f, rowRulerOutput - 69.0f), module, Entropia::STATESWITCH_PARAM, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 115.5f + 7.0f, rowRulerOutput - 69.0f + 13.0f), module, Entropia::STATESWITCH_LIGHT));
 		
 		// Plank constant (jack, light and button)
 		// left side (blue)
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Entropia::OCTCV_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 96.0f, rowRulerOutput - 96.0f), true, module, Entropia::OCTCV_INPUTS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 96.0f - 13.0f, rowRulerOutput - 96.0f - 13.0f), module, Entropia::QUANTIZE_LIGHTS + 0));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 96.0f - 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Entropia::QUANTIZE_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 96.0f - 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Entropia::QUANTIZE_PARAMS + 0, module ? &module->panelTheme : NULL));
 		// right side (yellow)
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 96.0f, rowRulerOutput - 96.0f), Port::INPUT, module, Entropia::OCTCV_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 96.0f, rowRulerOutput - 96.0f), true, module, Entropia::OCTCV_INPUTS + 1, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 96.0f + 13.0f, rowRulerOutput - 96.0f - 13.0f), module, Entropia::QUANTIZE_LIGHTS + 1));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 96.0f + 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Entropia::QUANTIZE_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 96.0f + 23.0f, rowRulerOutput - 96.0f - 23.0f), module, Entropia::QUANTIZE_PARAMS + 1, module ? &module->panelTheme : NULL));
 		
 		// Energy (button and lights)
 		// left side (blue)
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 69.5f, rowRulerOutput - 116.0f), module, Entropia::OCT_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 69.5f, rowRulerOutput - 116.0f), module, Entropia::OCT_PARAMS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Entropia::OCT_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Entropia::OCT_LIGHTS + 1));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f - 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Entropia::OCT_LIGHTS + 1));
@@ -738,7 +780,7 @@ struct EntropiaWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 69.5f + 7.0f, rowRulerOutput - 116.0f + 12.0f), module, Entropia::OCT_LIGHTS + 2));
 		// right side (yellow)
 		// left side (blue)
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 69.5f, rowRulerOutput - 116.0f), module, Entropia::OCT_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 69.5f, rowRulerOutput - 116.0f), module, Entropia::OCT_PARAMS + 1, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 12.0f, rowRulerOutput - 116.0f + 9.0f), module, Entropia::OCT_LIGHTS + 3 + 0));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 15.0f, rowRulerOutput - 116.0f - 1.0f), module, Entropia::OCT_LIGHTS + 3 + 1));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 69.5f + 3.0f, rowRulerOutput - 116.0f + 14.0f), module, Entropia::OCT_LIGHTS + 3 + 1));
@@ -748,43 +790,43 @@ struct EntropiaWidget : ModuleWidget {
 		
 		// Top portion
 		static constexpr float rowRulerTop = rowRulerOutput - 150.0f;
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerTop - 30.5f), Port::INPUT, module, Entropia::GPROB_INPUT, &module->panelTheme));
-		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerTop), module, Entropia::GPROB_PARAM, -1.0f, 1.0f, 0.0f, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerTop - 30.5f), true, module, Entropia::GPROB_INPUT, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, rowRulerTop), module, Entropia::GPROB_PARAM, module ? &module->panelTheme : NULL));
 		
 		// Left side top
 		// ext
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 77.5f, rowRulerTop), Port::INPUT, module, Entropia::EXTSIG_INPUTS + 0, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 41.5f, rowRulerTop), module, Entropia::EXTSIG_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 77.5f, rowRulerTop), true, module, Entropia::EXTSIG_INPUTS + 0, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 41.5f, rowRulerTop), module, Entropia::EXTSIG_PARAMS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - 26.5f, rowRulerTop), module, Entropia::EXTSIG_LIGHTS + 0));
 		// random
 		static constexpr float buttonOffsetX = 35.5f;// button
 		static constexpr float buttonOffsetY = 20.5f;// button
 		static constexpr float lightOffsetX = 22.5f;// light
 		static constexpr float lightOffsetY = 12.5f;// light
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - buttonOffsetX, rowRulerTop - buttonOffsetY), module, Entropia::RANDOM_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - buttonOffsetX, rowRulerTop - buttonOffsetY), module, Entropia::RANDOM_PARAMS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - lightOffsetX, rowRulerTop - lightOffsetY), module, Entropia::RANDOM_LIGHTS + 0));
 		// fixed cv
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - buttonOffsetX, rowRulerTop + buttonOffsetY), module, Entropia::FIXEDCV_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - buttonOffsetX, rowRulerTop + buttonOffsetY), module, Entropia::FIXEDCV_PARAMS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoBlueLight>>(Vec(colRulerCenter - lightOffsetX, rowRulerTop + lightOffsetY), module, Entropia::FIXEDCV_LIGHTS + 0));
 		// audio
-		addParam(createDynamicParam<GeoPushButton>(Vec(38.5f, 380.0f - 325.5f), module, Entropia::EXTAUDIO_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(38.5f, 380.0f - 325.5f), module, Entropia::EXTAUDIO_PARAMS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(40.0f, 380.0f - 311.5f), module, Entropia::EXTAUDIO_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(48.5f, 380.0f - 315.5f), module, Entropia::EXTCV_LIGHTS + 0));
 		
 		
 		// Right side top
 		// ext
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 77.5f, rowRulerTop), Port::INPUT, module, Entropia::EXTSIG_INPUTS + 1, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 41.5f, rowRulerTop), module, Entropia::EXTSIG_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 77.5f, rowRulerTop), true, module, Entropia::EXTSIG_INPUTS + 1, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 41.5f, rowRulerTop), module, Entropia::EXTSIG_PARAMS + 1, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + 26.5f, rowRulerTop), module, Entropia::EXTSIG_LIGHTS + 1));
 		// random
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + buttonOffsetX, rowRulerTop - buttonOffsetY), module, Entropia::RANDOM_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + buttonOffsetX, rowRulerTop - buttonOffsetY), module, Entropia::RANDOM_PARAMS + 1, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + lightOffsetX, rowRulerTop - lightOffsetY), module, Entropia::RANDOM_LIGHTS + 1));
 		// fixed cv
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + buttonOffsetX, rowRulerTop + buttonOffsetY), module, Entropia::FIXEDCV_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + buttonOffsetX, rowRulerTop + buttonOffsetY), module, Entropia::FIXEDCV_PARAMS + 1, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoYellowLight>>(Vec(colRulerCenter + lightOffsetX, rowRulerTop + lightOffsetY), module, Entropia::FIXEDCV_LIGHTS + 1));
 		// audio
-		addParam(createDynamicParam<GeoPushButton>(Vec(315.0f - 38.5f, 380.0f - 325.5f), module, Entropia::EXTAUDIO_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(315.0f - 38.5f, 380.0f - 325.5f), module, Entropia::EXTAUDIO_PARAMS + 1, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(315.0f - 40.0f, 380.0f - 311.5f), module, Entropia::EXTAUDIO_LIGHTS + 1));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(315.0f - 48.5f, 380.0f - 315.5f), module, Entropia::EXTCV_LIGHTS + 1));
 		
@@ -795,36 +837,36 @@ struct EntropiaWidget : ModuleWidget {
 		// Run jack, light and button
 		static constexpr float rowRulerRunJack = 380.0f - 32.5f;
 		static constexpr float offsetRunJackX = 119.5f;
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetRunJackX, rowRulerRunJack), Port::INPUT, module, Entropia::RUN_INPUT, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetRunJackX, rowRulerRunJack), true, module, Entropia::RUN_INPUT, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRunJackX + 18.0f, rowRulerRunJack), module, Entropia::RUN_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRunJackX + 33.0f, rowRulerRunJack), module, Entropia::RUN_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRunJackX + 33.0f, rowRulerRunJack), module, Entropia::RUN_PARAM, module ? &module->panelTheme : NULL));	
 		
 		// Reset jack, light and button
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetRunJackX, rowRulerRunJack), Port::INPUT, module, Entropia::RESET_INPUT, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetRunJackX, rowRulerRunJack), true, module, Entropia::RESET_INPUT, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRunJackX - 18.0f, rowRulerRunJack), module, Entropia::RESET_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRunJackX - 33.0f, rowRulerRunJack), module, Entropia::RESET_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRunJackX - 33.0f, rowRulerRunJack), module, Entropia::RESET_PARAM, module ? &module->panelTheme : NULL));	
 	
 		static constexpr float offsetMagneticButton = 42.5f;
 		// Magnetic clock (step clocks)
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetMagneticButton - 15.0f, rowRulerRunJack), module, Entropia::STEPCLOCK_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetMagneticButton, rowRulerRunJack), module, Entropia::STEPCLOCK_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));			
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetMagneticButton, rowRulerRunJack), module, Entropia::STEPCLOCK_PARAM, module ? &module->panelTheme : NULL));			
 		// Reset on Run light and button
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetMagneticButton + 15.0f, rowRulerRunJack), module, Entropia::RESETONRUN_LIGHT));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetMagneticButton, rowRulerRunJack), module, Entropia::RESETONRUN_PARAM, 0.0f, 1.0f, 0.0f, &module->panelTheme));	
-		
-		
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetMagneticButton, rowRulerRunJack), module, Entropia::RESETONRUN_PARAM, module ? &module->panelTheme : NULL));	
+	}
+	
+	void step() override {
+		if (module) {
+			lightPanel->visible = ((((Entropia*)module)->panelTheme) == 0);
+			darkPanel->visible  = ((((Entropia*)module)->panelTheme) == 1);
+		}
+		Widget::step();
 	}
 };
 
-Model *modelEntropia = Model::create<Entropia, EntropiaWidget>("Geodesics", "Entropia", "Entropia", SEQUENCER_TAG);
+Model *modelEntropia = createModel<Entropia, EntropiaWidget>("Entropia");
 
 /*CHANGE LOG
 
-0.6.6:
-add audio/cv switch for ext source, and activate anti-pop when at least one channel has audio input
-make step knobs select a gain rather that attenuverter for ext sources
-
-0.6.5:
-created
 
 */

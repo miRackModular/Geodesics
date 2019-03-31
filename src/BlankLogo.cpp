@@ -60,7 +60,11 @@ struct BlankLogo : Module {
 	Trigger clkTrigger;
 	
 	
-	BlankLogo() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
+	BlankLogo() {
+		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+
+		configParam(CLK_FREQ_PARAM, -2.0f, 4.0f, 1.0f, "CLK freq", " BPM", 2.0f, 60.0f);// 120 BMP when default value  (120 = 60*2^1) diplay params 
+
 		clkTrigger.reset();
 		onReset();
 	}
@@ -73,7 +77,7 @@ struct BlankLogo : Module {
 	void onRandomize() override {
 	}
 
-	json_t *toJson() override {
+	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
 		// panelTheme
@@ -82,7 +86,7 @@ struct BlankLogo : Module {
 		return rootJ;
 	}
 
-	void fromJson(json_t *rootJ) override {
+	void dataFromJson(json_t *rootJ) override {
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -91,11 +95,11 @@ struct BlankLogo : Module {
 
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
-	void step() override {	
+	void process(const ProcessArgs &args) override {
 		if (outputs[OUT_OUTPUT].active) {
 			// CLK
 			oscillatorClk.setPitch(params[CLK_FREQ_PARAM].value);
-			oscillatorClk.step(engineGetSampleTime());
+			oscillatorClk.step(args.sampleTime);
 			float clkValue = oscillatorClk.sqr();	
 			
 			if (clkTrigger.process(clkValue)) {
@@ -110,20 +114,20 @@ struct BlankLogo : Module {
 
 
 struct BlankLogoWidget : ModuleWidget {
+	SvgPanel* lightPanel;
+	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
 		BlankLogo *module;
 		int theme;
-		void onAction(EventAction &e) override {
+		void onAction(const widget::ActionEvent &e) override {
 			module->panelTheme = theme;
 		}
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
 		}
 	};
-	Menu *createContextMenu() override {
-		Menu *menu = ModuleWidget::createContextMenu();
-
+	void appendContextMenu(Menu *menu) override {
 		MenuLabel *spacerLabel = new MenuLabel();
 		menu->addChild(spacerLabel);
 
@@ -145,27 +149,36 @@ struct BlankLogoWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
-
-		return menu;
 	}	
 
 
-	BlankLogoWidget(BlankLogo *module) : ModuleWidget(module) {
-		// Main panel from Inkscape
-        DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/WhiteLight/BlankLogo-WL.svg")));
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/DarkMatter/BlankLogo-DM.svg")));
-        box.size = panel->box.size;
-        panel->mode = &module->panelTheme;
-        addChild(panel);
+	BlankLogoWidget(BlankLogo *module) {
+		setModule(module);
+
+		// Main panels from Inkscape
+        lightPanel = new SvgPanel();
+        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/BlankLogo-WL.svg")));
+        box.size = lightPanel->box.size;
+        addChild(lightPanel);
+        darkPanel = new SvgPanel();
+		darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/BlankLogo-DM.svg")));
+		darkPanel->visible = false;
+		addChild(darkPanel);
 
 		// Screws
 		// part of svg panel, no code required
 		
-		addParam(createDynamicParam<BlankCKnob>(Vec(29.5f,74.2f), module, BlankLogo::CLK_FREQ_PARAM, -2.0f, 4.0f, 1.0f, &module->panelTheme));// 120 BMP when default value
-		addOutput(createOutputCentered<BlankPort>(Vec(29.5f,187.5f), module, BlankLogo::OUT_OUTPUT));
-		
+		addParam(createDynamicParam<BlankCKnob>(Vec(29.5f,74.2f), module, BlankLogo::CLK_FREQ_PARAM, module ? &module->panelTheme : NULL));// 120 BMP when default value
+		addOutput(createOutputCentered<BlankPort>(Vec(29.5f,187.5f), module, BlankLogo::OUT_OUTPUT));	
+	}
+	
+	void step() override {
+		if (module) {
+			lightPanel->visible = ((((BlankLogo*)module)->panelTheme) == 0);
+			darkPanel->visible  = ((((BlankLogo*)module)->panelTheme) == 1);
+		}
+		Widget::step();
 	}
 };
 
-Model *modelBlankLogo = Model::create<BlankLogo, BlankLogoWidget>("Geodesics", "Blank-Panel Logo", "Blank-Panel Logo", BLANK_TAG);
+Model *modelBlankLogo = createModel<BlankLogo, BlankLogoWidget>("Blank-Panel Logo");

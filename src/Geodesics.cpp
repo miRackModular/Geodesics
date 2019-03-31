@@ -12,17 +12,16 @@
 #include "Geodesics.hpp"
 
 
-Plugin *plugin;
+Plugin *pluginInstance;
+
 
 void init(rack::Plugin *p) {
-	plugin = p;
-	p->slug = TOSTRING(SLUG);
-	p->version = TOSTRING(VERSION);
+	pluginInstance = p;
 
-	p->addModel(modelBlackHoles);
-	p->addModel(modelPulsars);
-	p->addModel(modelBranes);
-	p->addModel(modelIons);
+	// p->addModel(modelBlackHoles);
+	// p->addModel(modelPulsars);
+	// p->addModel(modelBranes);
+	// p->addModel(modelIons);
 	p->addModel(modelEntropia);
 	p->addModel(modelBlankLogo);
 	p->addModel(modelBlankInfo);
@@ -33,8 +32,34 @@ void init(rack::Plugin *p) {
 
 // other
 
+
+bool Trigger::process(float in) {
+	switch (state) {
+		case LOW:
+			if (in >= 1.0f) {
+				state = HIGH;
+				return true;
+			}
+			break;
+		case HIGH:
+			if (in <= 0.1f) {
+				state = LOW;
+			}
+			break;
+		default:
+			if (in >= 1.0f) {
+				state = HIGH;
+			}
+			else if (in <= 0.1f) {
+				state = LOW;
+			}
+			break;
+	}
+	return false;
+}	
+
 int getWeighted1to8random() {
-	int	prob = randomu32() % 1000;
+	int	prob = random::u32() % 1000;
 	if (prob < 175)
 		return 1;
 	else if (prob < 330) // 175 + 155

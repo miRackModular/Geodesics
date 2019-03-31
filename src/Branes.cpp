@@ -121,7 +121,9 @@ struct Branes : Module {
 	unsigned int lightRefreshCounter = 0;
 
 	
-	Branes() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS) {
+	Branes() {
+		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+		
 		redFilter[0].setCutoff(441.0f / engineGetSampleRate());
 		redFilter[1].setCutoff(441.0f / engineGetSampleRate());
 		blueFilter[0].setCutoff(44100.0f / engineGetSampleRate());
@@ -151,7 +153,7 @@ struct Branes : Module {
 	}
 
 	
-	json_t *toJson() override {
+	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
 		// trigBypass
@@ -169,7 +171,7 @@ struct Branes : Module {
 	}
 
 	
-	void fromJson(json_t *rootJ) override {
+	void dataFromJson(json_t *rootJ) override {
 		// trigBypass
 		json_t *trigBypass0J = json_object_get(rootJ, "trigBypass0");
 		if (trigBypass0J)
@@ -196,7 +198,7 @@ struct Branes : Module {
 	}
 
 	
-	void step() override {		
+	void process(const ProcessArgs &args) override {
 	
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 			
@@ -352,20 +354,20 @@ struct Branes : Module {
 
 
 struct BranesWidget : ModuleWidget {
+	SvgPanel* lightPanel;
+	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
 		Branes *module;
 		int theme;
-		void onAction(EventAction &e) override {
+		void onAction(const widget::ActionEvent &e) override {
 			module->panelTheme = theme;
 		}
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
 		}
 	};	
-	Menu *createContextMenu() override {
-		Menu *menu = ModuleWidget::createContextMenu();
-
+	void appendContextMenu(Menu *menu) override {
 		MenuLabel *spacerLabel = new MenuLabel();
 		menu->addChild(spacerLabel);
 
@@ -387,11 +389,11 @@ struct BranesWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
-
-		return menu;
 	}	
 	
-	BranesWidget(Branes *module) : ModuleWidget(module) {
+	BranesWidget(Branes *module) {
+		setModule(module);
+
 		// Main panel from Inkscape
         DynamicSVGPanel *panel = new DynamicSVGPanel();
         panel->addPanel(SVG::load(assetPlugin(plugin, "res/WhiteLight/Branes-WL.svg")));
@@ -413,57 +415,57 @@ struct BranesWidget : ModuleWidget {
 		
 		
 		// BraneA trig intput
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA), Port::INPUT, module, Branes::TRIG_INPUTS + 0, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA), true, module, Branes::TRIG_INPUTS + 0, module ? &module->panelTheme : NULL));
 		
 		// BraneA inputs
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldA + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 0, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerHoldA), Port::INPUT, module, Branes::IN_INPUTS + 1, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldA - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 2, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA - radiusIn), Port::INPUT, module, Branes::IN_INPUTS + 3, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldA - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 4, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerHoldA), Port::INPUT, module, Branes::IN_INPUTS + 5, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldA + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 6, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldA + offsetIn), true, module, Branes::IN_INPUTS + 0, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerHoldA), true, module, Branes::IN_INPUTS + 1, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldA - offsetIn), true, module, Branes::IN_INPUTS + 2, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA - radiusIn), true, module, Branes::IN_INPUTS + 3, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldA - offsetIn), true, module, Branes::IN_INPUTS + 4, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerHoldA), true, module, Branes::IN_INPUTS + 5, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldA + offsetIn), true, module, Branes::IN_INPUTS + 6, module ? &module->panelTheme : NULL));
 
 		// BraneA outputs
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldA + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 0, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusOut, rowRulerHoldA), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 1, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldA - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 2, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA - radiusOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 3, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldA - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 4, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusOut, rowRulerHoldA), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 5, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldA + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 6, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldA + offsetOut), false, module, Branes::OUT_OUTPUTS + 0, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusOut, rowRulerHoldA), false, module, Branes::OUT_OUTPUTS + 1, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldA - offsetOut), false, module, Branes::OUT_OUTPUTS + 2, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldA - radiusOut), false, module, Branes::OUT_OUTPUTS + 3, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldA - offsetOut), false, module, Branes::OUT_OUTPUTS + 4, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusOut, rowRulerHoldA), false, module, Branes::OUT_OUTPUTS + 5, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldA + offsetOut), false, module, Branes::OUT_OUTPUTS + 6, module ? &module->panelTheme : NULL));
 		
 		
 		// BraneB trig intput
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB), Port::INPUT, module, Branes::TRIG_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB), true, module, Branes::TRIG_INPUTS + 1, module ? &module->panelTheme : NULL));
 		
 		// BraneB inputs
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldB - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 7, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerHoldB), Port::INPUT, module, Branes::IN_INPUTS + 8, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldB + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 9, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB + radiusIn), Port::INPUT, module, Branes::IN_INPUTS + 10, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldB + offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 11, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerHoldB), Port::INPUT, module, Branes::IN_INPUTS + 12, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldB - offsetIn), Port::INPUT, module, Branes::IN_INPUTS + 13, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldB - offsetIn), true, module, Branes::IN_INPUTS + 7, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusIn, rowRulerHoldB), true, module, Branes::IN_INPUTS + 8, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetIn, rowRulerHoldB + offsetIn), true, module, Branes::IN_INPUTS + 9, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB + radiusIn), true, module, Branes::IN_INPUTS + 10, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldB + offsetIn), true, module, Branes::IN_INPUTS + 11, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusIn, rowRulerHoldB), true, module, Branes::IN_INPUTS + 12, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetIn, rowRulerHoldB - offsetIn), true, module, Branes::IN_INPUTS + 13, module ? &module->panelTheme : NULL));
 
 
 		// BraneB outputs
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldB - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 7, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusOut, rowRulerHoldB), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 8, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldB + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 9, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB + radiusOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 10, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB + offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 11, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusOut, rowRulerHoldB), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 12, &module->panelTheme));
-		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB - offsetOut), Port::OUTPUT, module, Branes::OUT_OUTPUTS + 13, &module->panelTheme));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldB - offsetOut), false, module, Branes::OUT_OUTPUTS + 7, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + radiusOut, rowRulerHoldB), false, module, Branes::OUT_OUTPUTS + 8, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetOut, rowRulerHoldB + offsetOut), false, module, Branes::OUT_OUTPUTS + 9, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, rowRulerHoldB + radiusOut), false, module, Branes::OUT_OUTPUTS + 10, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB + offsetOut), false, module, Branes::OUT_OUTPUTS + 11, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - radiusOut, rowRulerHoldB), false, module, Branes::OUT_OUTPUTS + 12, module ? &module->panelTheme : NULL));
+		addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetOut, rowRulerHoldB - offsetOut), false, module, Branes::OUT_OUTPUTS + 13, module ? &module->panelTheme : NULL));
 		
 		
 		// Trigger bypass (aka Vibrations)
 		// Bypass buttons
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 334.5f), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 31.5f), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 334.5f), module, Branes::TRIG_BYPASS_PARAMS + 0, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 40.0f, 380.0f - 31.5f), module, Branes::TRIG_BYPASS_PARAMS + 1, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
 		// Bypass cv inputs
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 315.5f), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 0, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 50.5f), Port::INPUT, module, Branes::TRIG_BYPASS_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 315.5f), true, module, Branes::TRIG_BYPASS_INPUTS + 0, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 50.5f), true, module, Branes::TRIG_BYPASS_INPUTS + 1, module ? &module->panelTheme : NULL));
 		// Bypass LEDs near buttons
 		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 327.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
 		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 38.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
@@ -474,11 +476,11 @@ struct BranesWidget : ModuleWidget {
 		
 		// Noise range
 		// Range buttons
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 334.5f), module, Branes::NOISE_RANGE_PARAMS + 0, 0.0f, 1.0f, 0.0f, &module->panelTheme));
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 31.5f), module, Branes::NOISE_RANGE_PARAMS + 1, 0.0f, 1.0f, 0.0f, &module->panelTheme));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 334.5f), module, Branes::NOISE_RANGE_PARAMS + 0, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 31.5f), module, Branes::NOISE_RANGE_PARAMS + 1, 0.0f, 1.0f, 0.0f, module ? &module->panelTheme : NULL));
 		// Range cv inputs
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 315.5f), Port::INPUT, module, Branes::NOISE_RANGE_INPUTS + 0, &module->panelTheme));
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 50.5f), Port::INPUT, module, Branes::NOISE_RANGE_INPUTS + 1, &module->panelTheme));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 315.5f), true, module, Branes::NOISE_RANGE_INPUTS + 0, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 68.0f, 380.0f - 50.5f), true, module, Branes::NOISE_RANGE_INPUTS + 1, module ? &module->panelTheme : NULL));
 		// Range LEDs near buttons
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 327.5f), module, Branes::NOISE_RANGE_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 38.5f), module, Branes::NOISE_RANGE_LIGHTS + 1));
@@ -490,21 +492,5 @@ Model *modelBranes = Model::create<Branes, BranesWidget>("Geodesics", "Branes", 
 
 /*CHANGE LOG
 
-0.6.6:
-swap noise range and trigger bypass and add new svg showing noise range settings
-
-0.6.5:
-input refresh optimization
-step optimization of lights refresh
-optimize unused brane (turn of noise of a brane when all outputs of the given brane are unconnected)
-
-0.6.4:
-add noise range buttons
-
-0.6.2: 
-bug fix for stuck outputs, improve random noise non-correlation 
-
-0.6.0:
-created
 
 */

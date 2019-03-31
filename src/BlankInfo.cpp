@@ -11,7 +11,9 @@ struct BlankInfo : Module {
 	int panelTheme = 0;
 
 
-	BlankInfo() : Module(0, 0, 0, 0) {
+	BlankInfo() {
+		config(0, 0, 0, 0);
+		
 		onReset();
 	}
 
@@ -21,7 +23,7 @@ struct BlankInfo : Module {
 	void onRandomize() override {
 	}
 
-	json_t *toJson() override {
+	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
 		// panelTheme
@@ -30,7 +32,7 @@ struct BlankInfo : Module {
 		return rootJ;
 	}
 
-	void fromJson(json_t *rootJ) override {
+	void dataFromJson(json_t *rootJ) override {
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -39,26 +41,26 @@ struct BlankInfo : Module {
 
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
-	void step() override {		
+	void process(const ProcessArgs &args) override {
 	}
 };
 
 
 struct BlankInfoWidget : ModuleWidget {
+	SvgPanel* lightPanel;
+	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
 		BlankInfo *module;
 		int theme;
-		void onAction(EventAction &e) override {
+		void onAction(const widget::ActionEvent &e) override {
 			module->panelTheme = theme;
 		}
 		void step() override {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
 		}
 	};
-	Menu *createContextMenu() override {
-		Menu *menu = ModuleWidget::createContextMenu();
-
+	void appendContextMenu(Menu *menu) override {
 		MenuLabel *spacerLabel = new MenuLabel();
 		menu->addChild(spacerLabel);
 
@@ -80,23 +82,33 @@ struct BlankInfoWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
-
-		return menu;
 	}	
 
 
-	BlankInfoWidget(BlankInfo *module) : ModuleWidget(module) {
-		// Main panel from Inkscape
-        DynamicSVGPanel *panel = new DynamicSVGPanel();
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/WhiteLight/BlankInfo-WL.svg")));
-        panel->addPanel(SVG::load(assetPlugin(plugin, "res/DarkMatter/BlankInfo-DM.svg")));
-        box.size = panel->box.size;
-        panel->mode = &module->panelTheme;
-        addChild(panel);
+	BlankInfoWidget(BlankInfo *module) {
+		setModule(module);
+
+		// Main panels from Inkscape
+        lightPanel = new SvgPanel();
+        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/BlankInfo-WL.svg")));
+        box.size = lightPanel->box.size;
+        addChild(lightPanel);
+        darkPanel = new SvgPanel();
+		darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/BlankInfo-DM.svg")));
+		darkPanel->visible = false;
+		addChild(darkPanel);
 
 		// Screws
 		// part of svg panel, no code required
 	}
+	
+	void step() override {
+		if (module) {
+			lightPanel->visible = ((((BlankInfo*)module)->panelTheme) == 0);
+			darkPanel->visible  = ((((BlankInfo*)module)->panelTheme) == 1);
+		}
+		Widget::step();
+	}
 };
 
-Model *modelBlankInfo = Model::create<BlankInfo, BlankInfoWidget>("Geodesics", "Blank-Panel Info", "Blank-Panel Info", BLANK_TAG);
+Model *modelBlankInfo = createModel<BlankInfo, BlankInfoWidget>("Blank-Panel Info");
