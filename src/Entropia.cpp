@@ -154,8 +154,8 @@ struct Entropia : Module {
 		
 		configParam(SWITCHADD_PARAM, 0.0f, 1.0f, 0.0f, "Add");
 		configParam(STATESWITCH_PARAM, 0.0f, 1.0f, 0.0f, "Invert microstate");
-		configParam(QUANTIZE_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Quantize (plank) blue");
-		configParam(QUANTIZE_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Quantize (plank) yellow");
+		configParam(QUANTIZE_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Quantize (Planck) blue");
+		configParam(QUANTIZE_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Quantize (Planck) yellow");
 		
 		configParam(OCT_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Octaves blue");
 		configParam(OCT_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Octaves yellow");

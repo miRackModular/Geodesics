@@ -11,8 +11,7 @@ CXXFLAGS +=
 LDFLAGS +=
 
 # Add .cpp files to the build
-#SOURCES += $(wildcard src/*.cpp)
-SOURCES += src/GeoWidgets.cpp src/Geodesics.cpp src/BlankInfo.cpp src/BlankLogo.cpp src/Entropia.cpp src/BlackHoles.cpp src/Pulsars.cpp src/Branes.cpp
+SOURCES += $(wildcard src/*.cpp)
 
 # Add files to the ZIP package when running `make dist`
 # The compiled plugin and "plugin.json" are automatically added.
