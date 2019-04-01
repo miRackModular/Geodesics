@@ -1,0 +1,54 @@
+{
+	"slug": "Geodesics",
+	"name": "Geodesics",
+	"version": "1.0.0",
+	"license": "BSD-3-Clause",
+	"author": "Geodesics",
+	"authorEmail": "geodesics.modular@outlook.com",
+	"authorUrl": "https://www.pyer.be/geodesics.html",
+	"sourceUrl": "https://github.com/MarcBoule/Geodesics",
+	"modules": [
+		{
+			"slug": "BlackHoles",
+			"name": "BlackHoles",
+			"description": "Gravitational attenumixset",
+			"tags": ["VCA"]
+		},
+		{
+			"slug": "Pulsars",
+			"name": "Pulsars",
+			"description": "Neutron powered crossfader",
+			"tags": ["Mixer"]
+		},
+		{
+			"slug": "Branes",
+			"name": "Branes",
+			"description": "Coliding sample and hold",
+			"tags": ["Sample & Hold"]
+		},
+		{
+			"slug": "Ions",
+			"name": "Ions",
+			"description": "Atomic dual cv sequencer",
+			"tags": ["Sequencer"]
+		},
+		{
+			"slug": "Entropia",
+			"name": "Entropia",
+			"description": "Thermodynamic microstate sequencer",
+			"tags": ["Sequencer"]
+		},
+		{
+			"slug": "Blank-Panel Info",
+			"name": "Blank-Panel Info",
+			"description": "Blank panel with info",
+			"tags": ["Blank"]
+		},
+		{
+			"slug": "Blank-Panel Logo",
+			"name": "Blank-Panel Logo",
+			"description": "Blank panel with info",
+			"tags": ["Blank"]
+		}
+	]
+}
