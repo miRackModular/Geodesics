@@ -174,8 +174,6 @@ struct Entropia : Module {
 		configParam(STEPCLOCK_PARAM, 0.0f, 1.0f, 0.0f, "Magnetic clock");			
 		configParam(RESETONRUN_PARAM, 0.0f, 1.0f, 0.0f, "Reset on run");				
 						
-		for (int i = 0; i < 8; i++)
-			params[Entropia::PROB_PARAMS + i].value = 1.0f;// HACK since params not initialized properly yet, remove this in Rack 1.0
 		onReset();
 	}
 
