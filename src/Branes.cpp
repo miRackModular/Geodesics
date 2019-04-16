@@ -52,6 +52,8 @@ struct PinkFilter {
 		return y;
 	}
 };
+// The coefficients above seem to be from this source:
+// http://www.firstpr.com.au/dsp/pink-noise/#Filtering
 
 
 //*****************************************************************************
