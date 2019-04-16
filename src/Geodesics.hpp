@@ -44,6 +44,7 @@ static const unsigned int displayRefreshStepSkips = 256;
 static const unsigned int userInputsStepSkipMask = 0xF;// sub interval of displayRefreshStepSkips, since inputs should be more responsive than lights
 // above value should make it such that inputs are sampled > 1kHz so as to not miss 1ms triggers
 
+static const float blurRadiusRatio = 0.06f;
 
 
 // Variations on existing knobs, lights, etc
@@ -55,8 +56,7 @@ struct GeoPort : DynamicSVGPort {
 	GeoPort() {
 		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Jack-WL.svg")));
 		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Jack-DM.svg")));
-		// shadow->blurRadius = 10.0;
-		// shadow->opacity = 0.8;
+		shadow->blurRadius = 1.0f;
 	}
 };
 
@@ -91,8 +91,7 @@ struct GeoKnob : DynamicSVGKnob {
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if knob is small (taken from IMSmallKnob)
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Knob-WL.svg")));
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Knob-DM.svg")));
-		// shadow->blurRadius = 10.0;
-		// shadow->opacity = 0.8;
+		shadow->blurRadius = box.size.y * blurRadiusRatio;
 	}
 };
 
