@@ -53,8 +53,8 @@ static const unsigned int userInputsStepSkipMask = 0xF;// sub interval of displa
 
 struct GeoPort : DynamicSVGPort {
 	GeoPort() {
-		shadow->blurRadius = 10.0;
-		shadow->opacity = 0.8;
+		// shadow->blurRadius = 10.0;
+		// shadow->opacity = 0.8;
 		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Jack-WL.svg")));
 		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Jack-DM.svg")));
 	}
@@ -88,8 +88,8 @@ struct GeoKnob : DynamicSVGKnob {
 	GeoKnob() {
 		minAngle = -0.73*M_PI;
 		maxAngle = 0.73*M_PI;
-		shadow->blurRadius = 10.0;
-		shadow->opacity = 0.8;
+		// shadow->blurRadius = 10.0;
+		// shadow->opacity = 0.8;
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if knob is small (taken from IMSmallKnob)
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Knob-WL.svg")));
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Knob-DM.svg")));
