@@ -50,7 +50,7 @@ void DynamicSVGSwitch::step() {
 			frames[1]=framesAll[3];
 		}
         oldMode = *mode;
-		onChange(*(new ChangeEvent()));// required because of the way SVGSwitch changes images, we only change the frames above.
+		onChange(*(new event::Change()));// required because of the way SVGSwitch changes images, we only change the frames above.
 		fb->dirty = true;// dirty is not sufficient when changing via frames assignments above (i.e. onChange() is required)
     }
 	SvgSwitch::step();

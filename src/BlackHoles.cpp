@@ -237,7 +237,7 @@ struct BlackHolesWidget : ModuleWidget {
 	struct PanelThemeItem : MenuItem {
 		BlackHoles *module;
 		int theme;
-		void onAction(const widget::ActionEvent &e) override {
+		void onAction(const event::Action &e) override {
 			module->panelTheme = theme;
 		}
 		void step() override {
