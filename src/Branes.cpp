@@ -212,14 +212,14 @@ struct Branes : Module {
 			
 			// trigBypass buttons and cv inputs
 			for (int i = 0; i < 2; i++) {
-				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].getVoltage())) {
+				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].getValue() + inputs[TRIG_BYPASS_INPUTS + i].getVoltage())) {
 					trigBypass[i] = !trigBypass[i];
 				}
 			}
 			
 			// noiseRange buttons and cv inputs
 			for (int i = 0; i < 2; i++) {
-				if (noiseRangeTriggers[i].process(params[NOISE_RANGE_PARAMS + i].value + inputs[NOISE_RANGE_INPUTS + i].getVoltage())) {
+				if (noiseRangeTriggers[i].process(params[NOISE_RANGE_PARAMS + i].getValue() + inputs[NOISE_RANGE_INPUTS + i].getVoltage())) {
 					noiseRange[i] = !noiseRange[i];
 				}
 			}

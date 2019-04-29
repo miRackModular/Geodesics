@@ -145,18 +145,18 @@ struct BlackHoles : Module {
 
 			// Exponential buttons
 			for (int i = 0; i < 2; i++)
-				if (expTriggers[i].process(params[EXP_PARAMS + i].value)) {
+				if (expTriggers[i].process(params[EXP_PARAMS + i].getValue())) {
 					isExponential[i] = !isExponential[i];
 			}
 			
 			// Wormhole buttons
-			if (wormholeTrigger.process(params[WORMHOLE_PARAM].value)) {
+			if (wormholeTrigger.process(params[WORMHOLE_PARAM].getValue())) {
 				wormhole = ! wormhole;
 			}
 
 			// CV Level buttons
 			for (int i = 0; i < 2; i++) {
-				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
+				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].getValue()))
 					cvMode ^= (0x1 << i);
 			}
 		
@@ -217,7 +217,7 @@ struct BlackHoles : Module {
 	
 	inline float calcChannel(float in, Param &level, Input &levelCV, bool isExp, int cvMode) {
 		float levCv = levelCV.isConnected() ? (levelCV.getVoltage() * (cvMode != 0 ? 0.1f : 0.2f)) : 0.0f;
-		float lev = clamp(level.value + levCv, -1.0f, 1.0f);
+		float lev = clamp(level.getValue() + levCv, -1.0f, 1.0f);
 		if (isExp) {
 			float newlev = rescale(powf(expBase, fabsf(lev)), 1.0f, expBase, 0.0f, 1.0f);
 			if (lev < 0.0f)

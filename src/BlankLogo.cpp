@@ -98,7 +98,7 @@ struct BlankLogo : Module {
 	void process(const ProcessArgs &args) override {
 		if (outputs[OUT_OUTPUT].isConnected()) {
 			// CLK
-			oscillatorClk.setPitch(params[CLK_FREQ_PARAM].value);
+			oscillatorClk.setPitch(params[CLK_FREQ_PARAM].getValue());
 			oscillatorClk.step(args.sampleTime);
 			float clkValue = oscillatorClk.sqr();	
 			

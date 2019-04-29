@@ -107,7 +107,7 @@ struct Ions : Module {
 
 	
 	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
-	inline bool jumpRandom() {return (random::uniform() < (params[PROB_PARAM].value + inputs[PROB_INPUT].getVoltage() / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
+	inline bool jumpRandom() {return (random::uniform() < (params[PROB_PARAM].getValue() + inputs[PROB_INPUT].getVoltage() / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
 	
 	
 	Ions() {
@@ -272,7 +272,7 @@ struct Ions : Module {
 		//********** Buttons, knobs, switches and inputs **********
 	
 		// Run button
-		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].getVoltage())) {// no input refresh here, don't want to introduce startup skew
+		if (runningTrigger.process(params[RUN_PARAM].getValue() + inputs[RUN_INPUT].getVoltage())) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
 			if (running ) {
 				if (resetOnRun)
@@ -285,29 +285,29 @@ struct Ions : Module {
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 
 			// Leap button
-			if (leapTrigger.process(params[LEAP_PARAM].value + inputs[LEAP_INPUT].getVoltage())) {
+			if (leapTrigger.process(params[LEAP_PARAM].getValue() + inputs[LEAP_INPUT].getVoltage())) {
 				leap = !leap;
 			}
 
 			// Plank buttons (quatize)
-			if (plankTrigger.process(params[PLANK_PARAM].value))
+			if (plankTrigger.process(params[PLANK_PARAM].getValue()))
 				quantize ^= 0x1;
-			if (plank2Trigger.process(params[PLANK2_PARAM].value))
+			if (plank2Trigger.process(params[PLANK2_PARAM].getValue()))
 				quantize ^= 0x2;
 
 			// uncertainty button
-			if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].value + inputs[UNCERTANTY_INPUT].getVoltage())) {
+			if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].getValue() + inputs[UNCERTANTY_INPUT].getVoltage())) {
 				uncertainty = !uncertainty;
 			}
 
 			// Reset on Run button
-			if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].value)) {
+			if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].getValue())) {
 				resetOnRun = !resetOnRun;
 			}
 
 			// State buttons and CV inputs (state: 0 = global, 1 = local, 2 = both)
 			for (int i = 0; i < 2; i++) {
-				int stateTrig = stateTriggers[i].process(params[STATE_PARAMS + i].value);
+				int stateTrig = stateTriggers[i].process(params[STATE_PARAMS + i].getValue());
 				if (inputs[STATECV_INPUTS + i].isConnected()) {
 					if (inputs[STATECV_INPUTS + i].getVoltage() <= -1.0f)
 						states[i] = 1;
@@ -325,7 +325,7 @@ struct Ions : Module {
 			
 			// Range buttons and CV inputs
 			for (int i = 0; i < 2; i++) {
-				bool rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
+				bool rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].getValue());
 				if (inputs[OCTCV_INPUTS + i].isConnected()) {
 					if (inputs[OCTCV_INPUTS + i].getVoltage() <= -1.0f)
 						ranges[i] = 0;
@@ -358,7 +358,7 @@ struct Ions : Module {
 		//********** Clock and reset **********
 		
 		// Clocks
-		bool stepClocksTrig = stepClocksTrigger.process(params[STEPCLOCKS_PARAM].value);
+		bool stepClocksTrig = stepClocksTrigger.process(params[STEPCLOCKS_PARAM].getValue());
 		bool globalClockTrig = false;
 		if (running && clockIgnoreOnReset == 0l)
 			globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].getVoltage());// keep outside of loop, only need to call once per step()
@@ -401,7 +401,7 @@ struct Ions : Module {
 		
 		
 		// Reset
-		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage() + params[RESET_PARAM].value)) {
+		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage() + params[RESET_PARAM].getValue())) {
 			initRun(true);
 			resetLight = 1.0f;
 			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
@@ -415,7 +415,7 @@ struct Ions : Module {
 
 		// Outputs
 		for (int i = 0; i < 2; i++) {
-			float knobVal = params[CV_PARAMS + cvMap[i][stepIndexes[i]]].value;
+			float knobVal = params[CV_PARAMS + cvMap[i][stepIndexes[i]]].getValue();
 			float cv = 0.0f;
 			int range = ranges[i];
 			if ( (i == 0 && (quantize & 0x1) != 0) || (i == 1 && (quantize > 1)) ) {

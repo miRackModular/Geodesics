@@ -188,20 +188,20 @@ struct Pulsars : Module {
 
 			// Void, Reverse and Random buttons
 			for (int i = 0; i < 2; i++) {
-				if (voidTriggers[i].process(params[VOID_PARAMS + i].value + inputs[VOID_INPUTS + i].getVoltage())) {
+				if (voidTriggers[i].process(params[VOID_PARAMS + i].getValue() + inputs[VOID_INPUTS + i].getVoltage())) {
 					isVoid[i] = !isVoid[i];
 				}
-				if (revTriggers[i].process(params[REV_PARAMS + i].value + inputs[REV_INPUTS + i].getVoltage())) {
+				if (revTriggers[i].process(params[REV_PARAMS + i].getValue() + inputs[REV_INPUTS + i].getVoltage())) {
 					isReverse[i] = !isReverse[i];
 				}
-				if (rndTriggers[i].process(params[RND_PARAMS + i].value)) {// + inputs[RND_INPUTS + i].getVoltage())) {
+				if (rndTriggers[i].process(params[RND_PARAMS + i].getValue())) {// + inputs[RND_INPUTS + i].getVoltage())) {
 					isRandom[i] = !isRandom[i];
 				}
 			}
 			
 			// CV Level buttons
 			for (int i = 0; i < 2; i++) {
-				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].value))
+				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].getValue()))
 					cvMode ^= (0x1 << i);
 			}
 			

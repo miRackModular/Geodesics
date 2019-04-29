@@ -122,7 +122,7 @@ struct Entropia : Module {
 	
 	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
 	inline void updatePipeBlue(int step) {
-		float effectiveKnob = params[PROB_PARAMS + step].value + -1.0f * (params[GPROB_PARAM].value + inputs[GPROB_INPUT].getVoltage() / 5.0f);
+		float effectiveKnob = params[PROB_PARAMS + step].getValue() + -1.0f * (params[GPROB_PARAM].getValue() + inputs[GPROB_INPUT].getVoltage() / 5.0f);
 		pipeBlue[step] = effectiveKnob > random::uniform();
 	}
 	inline void updateRandomCVs() {
@@ -348,7 +348,7 @@ struct Entropia : Module {
 		//********** Buttons, knobs, switches and inputs **********
 	
 		// Run button
-		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].getVoltage())) {// no input refresh here, don't want to introduce startup skew
+		if (runningTrigger.process(params[RUN_PARAM].getValue() + inputs[RUN_INPUT].getVoltage())) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
 			if (running) {
 				if (resetOnRun)
@@ -361,7 +361,7 @@ struct Entropia : Module {
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 
 			// Length button and input
-			bool lengthTrig = lengthTrigger.process(params[LENGTH_PARAM].value);
+			bool lengthTrig = lengthTrigger.process(params[LENGTH_PARAM].getValue());
 			if (inputs[LENGTH_INPUT].isConnected()) {
 				length = clamp(8 - (int)(inputs[LENGTH_INPUT].getVoltage() * 7.0f / 10.0f + 0.5f)  , 1, 8);
 			}
@@ -371,14 +371,14 @@ struct Entropia : Module {
 			}
 
 			// Plank buttons (quantize)
-			if (plankTriggers[0].process(params[QUANTIZE_PARAMS + 0].value))
+			if (plankTriggers[0].process(params[QUANTIZE_PARAMS + 0].getValue()))
 				quantize ^= 0x1;
-			if (plankTriggers[1].process(params[QUANTIZE_PARAMS + 1].value))
+			if (plankTriggers[1].process(params[QUANTIZE_PARAMS + 1].getValue()))
 				quantize ^= 0x2;
 
 			// Range buttons and CV inputs
 			for (int i = 0; i < 2; i++) {
-				bool rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
+				bool rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].getValue());
 				if (inputs[OCTCV_INPUTS + i].isConnected()) {
 					if (inputs[OCTCV_INPUTS + i].getVoltage() <= -1.0f)
 						ranges[i] = 0;
@@ -407,33 +407,33 @@ struct Entropia : Module {
 			
 			// Source buttons (fixedCV, random, ext)
 			for (int i = 0; i < 2; i++) {
-				if (rndSrcTriggers[i].process(params[RANDOM_PARAMS + i].value))
+				if (rndSrcTriggers[i].process(params[RANDOM_PARAMS + i].getValue()))
 					sources[i] = SRC_RND;
-				if (extSrcTriggers[i].process(params[EXTSIG_PARAMS + i].value))
+				if (extSrcTriggers[i].process(params[EXTSIG_PARAMS + i].getValue()))
 					sources[i] = SRC_EXT;
-				if (fixedSrcTriggers[i].process(params[FIXEDCV_PARAMS + i].value))
+				if (fixedSrcTriggers[i].process(params[FIXEDCV_PARAMS + i].getValue()))
 					sources[i] = SRC_CV;
-				if (extAudioTriggers[i].process(params[EXTAUDIO_PARAMS + i].value))
+				if (extAudioTriggers[i].process(params[EXTAUDIO_PARAMS + i].getValue()))
 					audio ^= (1 << i);
 			}
 			
 			// addMode
-			if (switchAddTrigger.process(params[SWITCHADD_PARAM].value + inputs[SWITCHADD_INPUT].getVoltage())) {
+			if (switchAddTrigger.process(params[SWITCHADD_PARAM].getValue() + inputs[SWITCHADD_INPUT].getVoltage())) {
 				addMode = !addMode;
 			}		
 		
 			// StateSwitch
-			if (stateSwitchTrigger.process(params[STATESWITCH_PARAM].value + inputs[STATESWITCH_INPUT].getVoltage())) {
+			if (stateSwitchTrigger.process(params[STATESWITCH_PARAM].getValue() + inputs[STATESWITCH_INPUT].getVoltage())) {
 				pipeBlue[stepIndex] = !pipeBlue[stepIndex];
 				stateSwitchLight = 1.0f;
 			}		
 		
 			// Reset on Run button
-			if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].value)) {
+			if (resetOnRunTrigger.process(params[RESETONRUN_PARAM].getValue())) {
 				resetOnRun = !resetOnRun;
 			}	
 
-			if (clkSrcTrigger.process(params[CLKSRC_PARAM].value)) {
+			if (clkSrcTrigger.process(params[CLKSRC_PARAM].getValue())) {
 				if (++clkSource > 2)
 					clkSource = 0;
 			}
@@ -462,7 +462,7 @@ struct Entropia : Module {
 			}
 		}				
 		// Magnetic clock (manual step clock)
-		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].value)) {
+		if (stepClockTrigger.process(params[STEPCLOCK_PARAM].getValue())) {
 			if (++stepIndex >= length) stepIndex = 0;
 			crossFadeStepsToGo = (long)(crossFadeTime * args.sampleRate);
 			updatePipeBlue(stepIndex);
@@ -471,7 +471,7 @@ struct Entropia : Module {
 		}
 		
 		// Reset
-		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage() + params[RESET_PARAM].value)) {
+		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage() + params[RESET_PARAM].getValue())) {
 			initRun();
 			resetLight = 1.0f;
 			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
@@ -577,7 +577,7 @@ struct Entropia : Module {
 	
 	float getStepCV(int step, bool blue) {
 		int colorIndex = blue ? 0 : 1;
-		float knobVal = params[CV_PARAMS + (colorIndex << 3) + step].value;
+		float knobVal = params[CV_PARAMS + (colorIndex << 3) + step].getValue();
 		float cv = 0.0f;
 		
 		if (sources[colorIndex] == SRC_RND) {
