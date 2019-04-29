@@ -96,7 +96,7 @@ struct BlankLogo : Module {
 	
 	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void process(const ProcessArgs &args) override {
-		if (outputs[OUT_OUTPUT].active) {
+		if (outputs[OUT_OUTPUT].isConnected()) {
 			// CLK
 			oscillatorClk.setPitch(params[CLK_FREQ_PARAM].value);
 			oscillatorClk.step(args.sampleTime);
@@ -106,7 +106,7 @@ struct BlankLogo : Module {
 				stepIndex++;
 				if (stepIndex >= 5)
 					stepIndex = 0;
-				outputs[OUT_OUTPUT].value = song[stepIndex];
+				outputs[OUT_OUTPUT].setVoltage(song[stepIndex]);
 			}
 		}
 	}

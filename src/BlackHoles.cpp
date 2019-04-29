@@ -166,31 +166,31 @@ struct BlackHoles : Module {
 		float blackHole0 = 0.0f;
 		float inputs0[4] = {10.0f, 10.0f, 10.0f, 10.0f};// default to generate CV when no input connected
 		for (int i = 0; i < 4; i++) 
-			if (inputs[IN_INPUTS + i].active)
-				inputs0[i] = inputs[IN_INPUTS + i].value;
+			if (inputs[IN_INPUTS + i].isConnected())
+				inputs0[i] = inputs[IN_INPUTS + i].getVoltage();
 		for (int i = 0; i < 4; i++) {
 			float chanVal = calcChannel(inputs0[i], params[LEVEL_PARAMS + i], inputs[LEVELCV_INPUTS + i], isExponential[0], cvMode & 0x1);
-			outputs[OUT_OUTPUTS + i].value = chanVal;
+			outputs[OUT_OUTPUTS + i].setVoltage(chanVal);
 			blackHole0 += chanVal;
 		}
-		outputs[BLACKHOLE_OUTPUTS + 0].value = clamp(blackHole0, -10.0f, 10.0f);
+		outputs[BLACKHOLE_OUTPUTS + 0].setVoltage(clamp(blackHole0, -10.0f, 10.0f));
 			
 			
 		// BlackHole 1 all outputs
 		float blackHole1 = 0.0f;
 		float inputs1[4] = {10.0f, 10.0f, 10.0f, 10.0f};// default to generate CV when no input connected
 		for (int i = 0; i < 4; i++) {
-			if (inputs[IN_INPUTS + i + 4].active)
-				inputs1[i] = inputs[IN_INPUTS + i + 4].value;
+			if (inputs[IN_INPUTS + i + 4].isConnected())
+				inputs1[i] = inputs[IN_INPUTS + i + 4].getVoltage();
 			else if (wormhole)
 				inputs1[i] = blackHole0;
 		}
 		for (int i = 0; i < 4; i++) {
 			float chanVal = calcChannel(inputs1[i], params[LEVEL_PARAMS + i + 4], inputs[LEVELCV_INPUTS + i + 4], isExponential[1], cvMode >> 1);
-			outputs[OUT_OUTPUTS + i + 4].value = chanVal;
+			outputs[OUT_OUTPUTS + i + 4].setVoltage(chanVal);
 			blackHole1 += chanVal;
 		}
-		outputs[BLACKHOLE_OUTPUTS + 1].value = clamp(blackHole1, -10.0f, 10.0f);
+		outputs[BLACKHOLE_OUTPUTS + 1].setVoltage(clamp(blackHole1, -10.0f, 10.0f));
 
 		lightRefreshCounter++;
 		if (lightRefreshCounter >= displayRefreshStepSkips) {
@@ -216,7 +216,7 @@ struct BlackHoles : Module {
 	}// step()
 	
 	inline float calcChannel(float in, Param &level, Input &levelCV, bool isExp, int cvMode) {
-		float levCv = levelCV.active ? (levelCV.value * (cvMode != 0 ? 0.1f : 0.2f)) : 0.0f;
+		float levCv = levelCV.isConnected() ? (levelCV.getVoltage() * (cvMode != 0 ? 0.1f : 0.2f)) : 0.0f;
 		float lev = clamp(level.value + levCv, -1.0f, 1.0f);
 		if (isExp) {
 			float newlev = rescale(powf(expBase, fabsf(lev)), 1.0f, expBase, 0.0f, 1.0f);

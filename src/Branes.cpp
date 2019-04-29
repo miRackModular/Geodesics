@@ -212,14 +212,14 @@ struct Branes : Module {
 			
 			// trigBypass buttons and cv inputs
 			for (int i = 0; i < 2; i++) {
-				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].value)) {
+				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].value + inputs[TRIG_BYPASS_INPUTS + i].getVoltage())) {
 					trigBypass[i] = !trigBypass[i];
 				}
 			}
 			
 			// noiseRange buttons and cv inputs
 			for (int i = 0; i < 2; i++) {
-				if (noiseRangeTriggers[i].process(params[NOISE_RANGE_PARAMS + i].value + inputs[NOISE_RANGE_INPUTS + i].value)) {
+				if (noiseRangeTriggers[i].process(params[NOISE_RANGE_PARAMS + i].value + inputs[NOISE_RANGE_INPUTS + i].getVoltage())) {
 					noiseRange[i] = !noiseRange[i];
 				}
 			}
@@ -230,10 +230,10 @@ struct Branes : Module {
 		bool trigs[2];
 		bool trigInputsActive[2];
 		for (int i = 0; i < 2; i++)	{	
-			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].value);
+			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].getVoltage());
 			if (trigs[i])
 				trigLights[i] = 1.0f;
-			trigInputsActive[i] = trigBypass[i] ? false : inputs[TRIG_INPUTS + i].active;
+			trigInputsActive[i] = trigBypass[i] ? false : inputs[TRIG_INPUTS + i].isConnected();
 		}
 		
 		for (int i = 0; i < 2; i++) {
@@ -246,13 +246,13 @@ struct Branes : Module {
 		int startSh = 7;
 		int endSh = 7;
 		for (int sh = 0; sh < 7; sh++) {
-			if (outputs[OUT_OUTPUTS + sh].active) {
+			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
 				startSh = 0;
 				break;
 			}
 		}
 		for (int sh = 7; sh < 14; sh++) {
-			if (outputs[OUT_OUTPUTS + sh].active) {
+			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
 				endSh = 14;
 				break;
 			}
@@ -263,24 +263,24 @@ struct Branes : Module {
 		float noises[14];
 		for (int sh = startSh; sh < endSh; sh++) {
 			noises[sh] = getNoise(sh);
-			if (outputs[OUT_OUTPUTS + sh].active) {
+			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
 				int braneIndex = sh < 7 ? 0 : 1;
 				if (trigInputsActive[braneIndex] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// if trigs connected (with crosstrigger mechanism)
 					if ((trigInputsActive[braneIndex] && trigs[braneIndex]) || (sh == 13 && trigInputsActive[0] && trigs[0]) || (sh == 6 && trigInputsActive[1] && trigs[1])) {// if trig rising edge
-						if (inputs[IN_INPUTS + sh].active)// if input cable
-							heldOuts[sh] = inputs[IN_INPUTS + sh].value;// sample and hold input
+						if (inputs[IN_INPUTS + sh].isConnected())// if input cable
+							heldOuts[sh] = inputs[IN_INPUTS + sh].getVoltage();// sample and hold input
 						else
 							heldOuts[sh] = noises[sh];// sample and hold noise
 					}
 					// else no rising edge, so simply preserve heldOuts[sh], nothing to do
 				}
 				else { // no trig connected
-					if (inputs[IN_INPUTS + sh].active)
-						heldOuts[sh] = inputs[IN_INPUTS + sh].value;// copy of input if no trig and input
+					if (inputs[IN_INPUTS + sh].isConnected())
+						heldOuts[sh] = inputs[IN_INPUTS + sh].getVoltage();// copy of input if no trig and input
 					else
 						heldOuts[sh] = noises[sh];// continuous noise if no trig and no input
 				}
-				outputs[OUT_OUTPUTS + sh].value = heldOuts[sh];
+				outputs[OUT_OUTPUTS + sh].setVoltage(heldOuts[sh]);
 			}
 		}
 		

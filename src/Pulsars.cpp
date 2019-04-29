@@ -188,13 +188,13 @@ struct Pulsars : Module {
 
 			// Void, Reverse and Random buttons
 			for (int i = 0; i < 2; i++) {
-				if (voidTriggers[i].process(params[VOID_PARAMS + i].value + inputs[VOID_INPUTS + i].value)) {
+				if (voidTriggers[i].process(params[VOID_PARAMS + i].value + inputs[VOID_INPUTS + i].getVoltage())) {
 					isVoid[i] = !isVoid[i];
 				}
-				if (revTriggers[i].process(params[REV_PARAMS + i].value + inputs[REV_INPUTS + i].value)) {
+				if (revTriggers[i].process(params[REV_PARAMS + i].value + inputs[REV_INPUTS + i].getVoltage())) {
 					isReverse[i] = !isReverse[i];
 				}
-				if (rndTriggers[i].process(params[RND_PARAMS + i].value)) {// + inputs[RND_INPUTS + i].value)) {
+				if (rndTriggers[i].process(params[RND_PARAMS + i].value)) {// + inputs[RND_INPUTS + i].getVoltage())) {
 					isRandom[i] = !isRandom[i];
 				}
 			}
@@ -209,8 +209,8 @@ struct Pulsars : Module {
 
 		// LFO values (normalized to 0.0f to 1.0f space, clamped and offset adjusted depending cvMode)
 		float lfoVal[2];
-		lfoVal[0] = inputs[LFO_INPUTS + 0].value;
-		lfoVal[1] = inputs[LFO_INPUTS + 1].active ? inputs[LFO_INPUTS + 1].value : lfoVal[0];
+		lfoVal[0] = inputs[LFO_INPUTS + 0].getVoltage();
+		lfoVal[1] = inputs[LFO_INPUTS + 1].isConnected() ? inputs[LFO_INPUTS + 1].getVoltage() : lfoVal[0];
 		for (int i = 0; i < 2; i++)
 			lfoVal[i] = clamp( (lfoVal[i] + ((cvMode & (0x1 << i)) == 0 ? 5.0f : 0.0f)) / 10.0f , 0.0f , 1.0f);
 		
@@ -219,7 +219,7 @@ struct Pulsars : Module {
 		bool active8[8];
 		bool atLeastOneActive = false;
 		for (int i = 0; i < 8; i++) {
-			active8[i] = inputs[INA_INPUTS + i].active;
+			active8[i] = inputs[INA_INPUTS + i].isConnected();
 			if (active8[i]) 
 				atLeastOneActive = true;
 		}
@@ -233,7 +233,7 @@ struct Pulsars : Module {
 			
 			float posPercent = topCross[0] ? (1.0f - lfoVal[0]) : lfoVal[0];
 			float nextPosPercent = 1.0f - posPercent;
-			outputs[OUTA_OUTPUT].value = posPercent * inputs[INA_INPUTS + posA].value + nextPosPercent * inputs[INA_INPUTS + posAnext].value;
+			outputs[OUTA_OUTPUT].setVoltage(posPercent * inputs[INA_INPUTS + posA].getVoltage() + nextPosPercent * inputs[INA_INPUTS + posAnext].getVoltage());
 			for (int i = 0; i < 8; i++)
 				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f));
 			
@@ -246,7 +246,7 @@ struct Pulsars : Module {
 			}
 		}
 		else {
-			outputs[OUTA_OUTPUT].value = 0.0f;
+			outputs[OUTA_OUTPUT].setVoltage(0.0f);
 			for (int i = 0; i < 8; i++)
 				lights[MIXA_LIGHTS + i].value = 0.0f;
 		}
@@ -255,7 +255,7 @@ struct Pulsars : Module {
 		// Pulsar B
 		atLeastOneActive = false;
 		for (int i = 0; i < 8; i++) {
-			active8[i] = outputs[OUTB_OUTPUTS + i].active;
+			active8[i] = outputs[OUTB_OUTPUTS + i].isConnected();
 			if (active8[i]) 
 				atLeastOneActive = true;
 		}
@@ -270,10 +270,10 @@ struct Pulsars : Module {
 			float posPercent = topCross[1] ? (1.0f - lfoVal[1]) : lfoVal[1];
 			float nextPosPercent = 1.0f - posPercent;
 			for (int i = 0; i < 8; i++) {
-				if (inputs[INB_INPUT].active)
-					outputs[OUTB_OUTPUTS + i].value = 0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].value) : 0.0f);
+				if (inputs[INB_INPUT].isConnected())
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
 				else// mutidimentional trick
-					outputs[OUTB_OUTPUTS + i].value = 0.0f + ((i == posB) ? (posPercent * inputs[INA_INPUTS + i].value) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INA_INPUTS + i].value) : 0.0f);
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
 				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f));
 			}
 			
@@ -287,7 +287,7 @@ struct Pulsars : Module {
 		}
 		else {
 			for (int i = 0; i < 8; i++) {
-				outputs[OUTB_OUTPUTS + i].value = 0.0f;
+				outputs[OUTB_OUTPUTS + i].setVoltage(0.0f);
 				lights[MIXB_LIGHTS + i].value = 0.0f;
 			}
 		}

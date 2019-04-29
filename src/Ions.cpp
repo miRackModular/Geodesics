@@ -107,7 +107,7 @@ struct Ions : Module {
 
 	
 	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
-	inline bool jumpRandom() {return (random::uniform() < (params[PROB_PARAM].value + inputs[PROB_INPUT].value / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
+	inline bool jumpRandom() {return (random::uniform() < (params[PROB_PARAM].value + inputs[PROB_INPUT].getVoltage() / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
 	
 	
 	Ions() {
@@ -272,7 +272,7 @@ struct Ions : Module {
 		//********** Buttons, knobs, switches and inputs **********
 	
 		// Run button
-		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].value)) {// no input refresh here, don't want to introduce startup skew
+		if (runningTrigger.process(params[RUN_PARAM].value + inputs[RUN_INPUT].getVoltage())) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
 			if (running ) {
 				if (resetOnRun)
@@ -285,7 +285,7 @@ struct Ions : Module {
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 
 			// Leap button
-			if (leapTrigger.process(params[LEAP_PARAM].value + inputs[LEAP_INPUT].value)) {
+			if (leapTrigger.process(params[LEAP_PARAM].value + inputs[LEAP_INPUT].getVoltage())) {
 				leap = !leap;
 			}
 
@@ -296,7 +296,7 @@ struct Ions : Module {
 				quantize ^= 0x2;
 
 			// uncertainty button
-			if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].value + inputs[UNCERTANTY_INPUT].value)) {
+			if (uncertaintyTrigger.process(params[UNCERTANTY_PARAM].value + inputs[UNCERTANTY_INPUT].getVoltage())) {
 				uncertainty = !uncertainty;
 			}
 
@@ -308,10 +308,10 @@ struct Ions : Module {
 			// State buttons and CV inputs (state: 0 = global, 1 = local, 2 = both)
 			for (int i = 0; i < 2; i++) {
 				int stateTrig = stateTriggers[i].process(params[STATE_PARAMS + i].value);
-				if (inputs[STATECV_INPUTS + i].active) {
-					if (inputs[STATECV_INPUTS + i].value <= -1.0f)
+				if (inputs[STATECV_INPUTS + i].isConnected()) {
+					if (inputs[STATECV_INPUTS + i].getVoltage() <= -1.0f)
 						states[i] = 1;
-					else if (inputs[STATECV_INPUTS + i].value < 1.0f)
+					else if (inputs[STATECV_INPUTS + i].getVoltage() < 1.0f)
 						states[i] = 2;
 					else 
 						states[i] = 0;
@@ -326,10 +326,10 @@ struct Ions : Module {
 			// Range buttons and CV inputs
 			for (int i = 0; i < 2; i++) {
 				bool rangeTrig = octTriggers[i].process(params[OCT_PARAMS + i].value);
-				if (inputs[OCTCV_INPUTS + i].active) {
-					if (inputs[OCTCV_INPUTS + i].value <= -1.0f)
+				if (inputs[OCTCV_INPUTS + i].isConnected()) {
+					if (inputs[OCTCV_INPUTS + i].getVoltage() <= -1.0f)
 						ranges[i] = 0;
-					else if (inputs[OCTCV_INPUTS + i].value < 1.0f)
+					else if (inputs[OCTCV_INPUTS + i].getVoltage() < 1.0f)
 						ranges[i] = 1;
 					else 
 						ranges[i] = 2;
@@ -361,14 +361,14 @@ struct Ions : Module {
 		bool stepClocksTrig = stepClocksTrigger.process(params[STEPCLOCKS_PARAM].value);
 		bool globalClockTrig = false;
 		if (running && clockIgnoreOnReset == 0l)
-			globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].value);// keep outside of loop, only need to call once per step()
+			globalClockTrig = clockTrigger.process(inputs[CLK_INPUT].getVoltage());// keep outside of loop, only need to call once per step()
 		for (int i = 0; i < 2; i++) {
 			int jumpCount = 0;
 			
 			if (running && clockIgnoreOnReset == 0l) {	
 				
 				// Local clocks and uncertainty
-				bool localClockTrig = clocksTriggers[i].process(inputs[CLK_INPUTS + i].value);
+				bool localClockTrig = clocksTriggers[i].process(inputs[CLK_INPUTS + i].getVoltage());
 				localClockTrig &= (states[i] >= 1);
 				if (localClockTrig) {
 					if (uncertainty) {// local clock modified by uncertainty
@@ -401,7 +401,7 @@ struct Ions : Module {
 		
 		
 		// Reset
-		if (resetTrigger.process(inputs[RESET_INPUT].value + params[RESET_PARAM].value)) {
+		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage() + params[RESET_PARAM].value)) {
 			initRun(true);
 			resetLight = 1.0f;
 			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
@@ -426,8 +426,8 @@ struct Ions : Module {
 				int maxCV = (range == 0 ? 1 : (range * 5));// maxCV is [1, 5, 10]
 				cv = knobVal * (float)(maxCV * 2) - (float)maxCV;
 			}
-			outputs[SEQ_OUTPUTS + i].value = cv;
-			outputs[JUMP_OUTPUTS + i].value = jumpPulses[i].process((float)args.sampleTime) ? 10.0f : 0.0f;
+			outputs[SEQ_OUTPUTS + i].setVoltage(cv);
+			outputs[JUMP_OUTPUTS + i].setVoltage(jumpPulses[i].process((float)args.sampleTime) ? 10.0f : 0.0f);
 		}
 		
 		lightRefreshCounter++;
