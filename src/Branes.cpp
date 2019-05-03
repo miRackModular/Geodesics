@@ -80,7 +80,7 @@ struct Branes : Module {
 	};
 	enum LightIds {
 		ENUMS(UNUSED1, 2 * 2),// no longer used
-		ENUMS(BYPASS_TRIG_LIGHTS, 2 * 2),// room for white-red
+		ENUMS(BYPASS_TRIG_LIGHTS, 4 * 2),// room for blue-yellow-red-white
 		// -- 0.6.3 ^^
 		ENUMS(NOISE_RANGE_LIGHTS, 2),
 		NUM_LIGHTS
@@ -96,7 +96,7 @@ struct Branes : Module {
 	
 	// Need to save, with reset
 	int panelTheme = 0;
-	bool trigBypass[2];
+	int vibrations[2];
 	bool noiseRange[2];
 	
 	
@@ -143,7 +143,7 @@ struct Branes : Module {
 	
 	void onReset() override {
 		for (int i = 0; i < 2; i++) {
-			trigBypass[i] = false;
+			vibrations[i] = 0;
 			noiseRange[i] = false;
 		}
 		for (int i = 0; i < 14; i++)
@@ -153,7 +153,7 @@ struct Branes : Module {
 	
 	void onRandomize() override {
 		for (int i = 0; i < 2; i++) {
-			trigBypass[i] = (random::u32() % 2) > 0;
+			vibrations[i] = (random::u32() % 2);
 			noiseRange[i] = (random::u32() % 2) > 0;
 		}
 		for (int i = 0; i < 14; i++)
@@ -164,9 +164,13 @@ struct Branes : Module {
 	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
-		// trigBypass
-		json_object_set_new(rootJ, "trigBypass0", json_real(trigBypass[0]));
-		json_object_set_new(rootJ, "trigBypass1", json_real(trigBypass[1]));
+		// trigBypass (DEPRECATED, replaced by vibrations below)
+		//json_object_set_new(rootJ, "trigBypass0", json_real(trigBypass[0]));// should have been bool instead of real
+		//json_object_set_new(rootJ, "trigBypass1", json_real(trigBypass[1]));// should have been bool instead of real
+		
+		// vibrations (normal, trig bypass, yellow, blue)
+		json_object_set_new(rootJ, "vibrations0", json_integer(vibrations[0]));
+		json_object_set_new(rootJ, "vibrations1", json_integer(vibrations[1]));
 
 		// noiseRange
 		json_object_set_new(rootJ, "noiseRange0", json_real(noiseRange[0]));
@@ -180,13 +184,24 @@ struct Branes : Module {
 
 	
 	void dataFromJson(json_t *rootJ) override {
-		// trigBypass
-		json_t *trigBypass0J = json_object_get(rootJ, "trigBypass0");
-		if (trigBypass0J)
-			trigBypass[0] = json_number_value(trigBypass0J);
-		json_t *trigBypass1J = json_object_get(rootJ, "trigBypass1");
-		if (trigBypass1J)
-			trigBypass[1] = json_number_value(trigBypass1J);
+		// vibrations (0 - top)
+		json_t *vibrations0J = json_object_get(rootJ, "vibrations0");
+		if (vibrations0J)
+			vibrations[0] = json_integer_value(vibrations0J);
+		else {// legacy
+			json_t *trigBypass0J = json_object_get(rootJ, "trigBypass0");
+			if (trigBypass0J)
+				vibrations[0] = json_number_value(trigBypass0J);// this was a real instead of bool by accident
+		}
+		// vibrations (1 - bottom)
+		json_t *vibrations1J = json_object_get(rootJ, "vibrations1");
+		if (vibrations1J)
+			vibrations[1] = json_integer_value(vibrations1J);
+		else {// legacy
+			json_t *trigBypass1J = json_object_get(rootJ, "trigBypass1");
+			if (trigBypass1J)
+				vibrations[1] = json_number_value(trigBypass1J);// this was a real instead of bool by accident
+		}
 
 		// noiseRange
 		json_t *noiseRange0J = json_object_get(rootJ, "noiseRange0");
@@ -210,10 +225,10 @@ struct Branes : Module {
 	
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 			
-			// trigBypass buttons and cv inputs
+			// vibrations buttons and cv inputs
 			for (int i = 0; i < 2; i++) {
 				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].getValue() + inputs[TRIG_BYPASS_INPUTS + i].getVoltage())) {
-					trigBypass[i] = !trigBypass[i];
+					vibrations[i] ^= 0x1;
 				}
 			}
 			
@@ -233,7 +248,7 @@ struct Branes : Module {
 			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].getVoltage());
 			if (trigs[i])
 				trigLights[i] = 1.0f;
-			trigInputsActive[i] = trigBypass[i] ? false : inputs[TRIG_INPUTS + i].isConnected();
+			trigInputsActive[i] = vibrations[i] == 1 ? false : inputs[TRIG_INPUTS + i].isConnected();
 		}
 		
 		for (int i = 0; i < 2; i++) {
@@ -290,10 +305,14 @@ struct Branes : Module {
 
 			// Lights
 			for (int i = 0; i < 2; i++) {
-				float red = trigBypass[i] ? 1.0f : 0.0f;
-				float white = !trigBypass[i] ? trigLights[i] : 0.0f;
-				lights[BYPASS_TRIG_LIGHTS + i * 2 + 0].value = white;
-				lights[BYPASS_TRIG_LIGHTS + i * 2 + 1].value = red;
+				float blue = (vibrations[i] == 3 ? 1.0f : 0.0f);
+				float yellow = (vibrations[i] == 2 ? 1.0f : 0.0f);
+				float red = (vibrations[i] == 1 ? 1.0f : 0.0f);
+				float white = (vibrations[i] == 0 ? trigLights[i] : 0.0f);
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 3].value = white;
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 2].value = red;
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 1].value = yellow;
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 0].value = blue;
 				lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
 				trigLights[i] -= (trigLights[i] / lightLambda) * (float)args.sampleTime * displayRefreshStepSkips;
 			}
@@ -375,6 +394,16 @@ struct BranesWidget : ModuleWidget {
 			rightText = (module->panelTheme == theme) ? "✔" : "";
 		}
 	};	
+	struct SecretModeItem : MenuItem {
+		Branes *module;
+		int braneIndex = 0;
+		void onAction(const event::Action &e) override {
+			if (module->vibrations[braneIndex] > 1)
+				module->vibrations[braneIndex] = 0;// turn off secret mode
+			else
+				module->vibrations[braneIndex] = 2;// turn on secret mode
+		}
+	};	
 	void appendContextMenu(Menu *menu) override {
 		MenuLabel *spacerLabel = new MenuLabel();
 		menu->addChild(spacerLabel);
@@ -397,6 +426,21 @@ struct BranesWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
+		
+		menu->addChild(new MenuLabel());// empty line
+		
+		MenuLabel *settingsLabel = new MenuLabel();
+		settingsLabel->text = "Settings";
+		menu->addChild(settingsLabel);
+		
+		SecretModeItem *secretItemH = createMenuItem<SecretModeItem>("High brain secret mode", CHECKMARK(module->vibrations[0] > 1));
+		secretItemH->module = module;
+		menu->addChild(secretItemH);
+		
+		SecretModeItem *secretItemL = createMenuItem<SecretModeItem>("Low brain secret mode", CHECKMARK(module->vibrations[1] > 1));
+		secretItemL->module = module;
+		secretItemL->braneIndex = 1;
+		menu->addChild(secretItemL);
 	}	
 	
 	BranesWidget(Branes *module) {
@@ -477,13 +521,9 @@ struct BranesWidget : ModuleWidget {
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 315.5f), true, module, Branes::TRIG_BYPASS_INPUTS + 0, module ? &module->panelTheme : NULL));
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 68.0f, 380.0f - 50.5f), true, module, Branes::TRIG_BYPASS_INPUTS + 1, module ? &module->panelTheme : NULL));
 		// Bypass LEDs near buttons
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 327.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
-		addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 38.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
+		addChild(createLightCentered<SmallLight<GeoBlueYellowRedWhiteLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 327.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 4));
+		addChild(createLightCentered<SmallLight<GeoBlueYellowRedWhiteLight>>(Vec(colRulerCenter + 53.0f, 380.0f - 38.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 4));
 				
-		// Bypass LEDs in branes
-		// addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter + 5.5f, rowRulerHoldA + 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 0 * 2));
-		// addChild(createLightCentered<SmallLight<GeoWhiteRedLight>>(Vec(colRulerCenter - 5.5f, rowRulerHoldB - 19.5f), module, Branes::BYPASS_TRIG_LIGHTS + 1 * 2));
-		
 		// Noise range
 		// Range buttons
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 40.0f, 380.0f - 334.5f), module, Branes::NOISE_RANGE_PARAMS + 0, module ? &module->panelTheme : NULL));
