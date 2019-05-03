@@ -58,6 +58,23 @@ bool Trigger::process(float in) {
 	return false;
 }	
 
+
+bool HoldDetect::process(float paramValue) {
+	bool ret = false;
+	if (modeHoldDetect > 0l) {
+		if (paramValue < 0.5f)
+			modeHoldDetect = 0l;
+		else {// button held long enough
+			if (modeHoldDetect == 1l) {
+				ret = true;
+			}
+			modeHoldDetect--;
+		}
+	}
+	return ret;
+}
+
+
 int getWeighted1to8random() {
 	int	prob = random::u32() % 1000;
 	if (prob < 175)

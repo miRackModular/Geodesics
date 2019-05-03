@@ -121,7 +121,8 @@ struct Branes : Module {
 	bool cacheHitPink[2];// no need to init; index is braneIndex
 	float cacheValPink[2];
 	unsigned int lightRefreshCounter = 0;
-
+	HoldDetect secretHoldDetect[2];
+	
 	
 	Branes() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -222,13 +223,15 @@ struct Branes : Module {
 
 	
 	void process(const ProcessArgs &args) override {
-	
+		static const float holdDetectTime = 2.0f;// seconds
+
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 			
 			// vibrations buttons and cv inputs
 			for (int i = 0; i < 2; i++) {
 				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].getValue() + inputs[TRIG_BYPASS_INPUTS + i].getVoltage())) {
 					vibrations[i] ^= 0x1;
+					secretHoldDetect[i].start((long) (holdDetectTime * args.sampleRate / displayRefreshStepSkips));
 				}
 			}
 			
@@ -248,7 +251,7 @@ struct Branes : Module {
 			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].getVoltage());
 			if (trigs[i])
 				trigLights[i] = 1.0f;
-			trigInputsActive[i] = vibrations[i] == 1 ? false : inputs[TRIG_INPUTS + i].isConnected();
+			trigInputsActive[i] = (vibrations[i] == 1 ? false : inputs[TRIG_INPUTS + i].isConnected());
 		}
 		
 		for (int i = 0; i < 2; i++) {
@@ -315,6 +318,13 @@ struct Branes : Module {
 				lights[BYPASS_TRIG_LIGHTS + i * 4 + 0].value = blue;
 				lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
 				trigLights[i] -= (trigLights[i] / lightLambda) * (float)args.sampleTime * displayRefreshStepSkips;
+				
+				if (secretHoldDetect[i].process(params[TRIG_BYPASS_PARAMS + i].getValue())) {
+					if (vibrations[i] > 1) 
+						vibrations[i] = 0;
+					else
+						vibrations[i] = 2;
+				}
 			}
 			
 		}// lightRefreshCounter

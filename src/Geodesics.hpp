@@ -227,6 +227,20 @@ struct Trigger : dsp::SchmittTrigger {
 	bool process(float in);
 };	
 
+struct HoldDetect {
+	long modeHoldDetect;// 0 when not detecting, downward counter when detecting
+	
+	void reset() {
+		modeHoldDetect = 0l;
+	}
+	
+	void start(long startValue) {
+		modeHoldDetect = startValue;
+	}
+
+	bool process(float paramValue);
+};
+
 int getWeighted1to8random();
 
 #endif
