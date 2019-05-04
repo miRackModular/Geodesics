@@ -246,12 +246,64 @@ struct Branes : Module {
 
 		// trig inputs
 		bool trigs[2];
-		bool trigInputsActive[2];
 		for (int i = 0; i < 2; i++)	{	
 			trigs[i] = sampleTriggers[i].process(inputs[TRIG_INPUTS + i].getVoltage());
 			if (trigs[i])
 				trigLights[i] = 1.0f;
-			trigInputsActive[i] = (vibrations[i] == 1 ? false : inputs[TRIG_INPUTS + i].isConnected());
+		}
+		
+		
+		// prepare triggering info for the sample and hold + noise code below
+		// -----------------------
+		
+		bool trigInConnect[2];// incorporates bypass mechanism (vibrations < 2)
+		trigInConnect[0] = (vibrations[0] == 1 ? false : inputs[TRIG_INPUTS + 0].isConnected());
+		trigInConnect[1] = (vibrations[1] == 1 ? false : inputs[TRIG_INPUTS + 1].isConnected());
+		
+		bool hasTrigSource[14];
+		for (int sh = 0; sh < 14; sh++)
+			hasTrigSource[sh] = trigInConnect[sh < 7 ? 0 : 1];
+		hasTrigSource[6] |= trigInConnect[1];// cross trigger the lower right of BraneA with trigger of BraneB
+		hasTrigSource[13] |= trigInConnect[0];// cross trigger the top left of BraneB with trigger of BraneA
+
+		bool receivedTrig[14] = {false};
+		for (int bi = 0; bi < 2; bi++) {// brane index
+			if (vibrations[bi] < 2) {// normal or bypass mode
+				if (trigs[bi] && trigInConnect[bi]) {
+					for (int i = 7 * bi; i < (7 * bi + 7); i++)
+						receivedTrig[i] = true;
+				}
+				else if (trigs[bi ^ 0x1] && trigInConnect[bi ^ 0x1]) {
+					if (bi == 0)
+						receivedTrig[6] = true;
+					else
+						receivedTrig[13] = true;
+				}
+			}
+			else if (vibrations[bi] == 2) {// yellow mode (only one of the active outs gets the trigger, random choice)
+				if (trigs[bi] && trigInConnect[bi]) {
+					int cnt = 0;
+					int connectedIndexes[7] = {0};
+					for (int i = 7 * bi; i < (7 * bi + 7); i++) {
+						if (outputs[OUT_OUTPUTS + i].isConnected()) {
+							connectedIndexes[cnt++] = i;
+						}
+					}
+					if (cnt > 0) {
+						int selected = random::u32() % cnt;	
+						receivedTrig[connectedIndexes[selected]] = true;
+					}
+				}
+			}
+			else {// vibrations[bi] == 3 // blue mode (each active active out has 50% chance to get the trigger)
+				if (trigs[bi] && trigInConnect[bi]) {
+					for (int i = 7 * bi; i < (7 * bi + 7); i++) {
+						if (outputs[OUT_OUTPUTS + i].isConnected()) {
+							receivedTrig[i] = ((random::u32() % 2) > 0);
+						}
+					}
+				}
+			}
 		}
 		
 		for (int i = 0; i < 2; i++) {
@@ -282,9 +334,8 @@ struct Branes : Module {
 		for (int sh = startSh; sh < endSh; sh++) {
 			noises[sh] = getNoise(sh);
 			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
-				int braneIndex = sh < 7 ? 0 : 1;
-				if (trigInputsActive[braneIndex] || (sh == 13 && trigInputsActive[0]) || (sh == 6 && trigInputsActive[1])) {// if trigs connected (with crosstrigger mechanism)
-					if ((trigInputsActive[braneIndex] && trigs[braneIndex]) || (sh == 13 && trigInputsActive[0] && trigs[0]) || (sh == 6 && trigInputsActive[1] && trigs[1])) {// if trig rising edge
+				if (hasTrigSource[sh]) {
+					if (receivedTrig[sh]) {
 						if (inputs[IN_INPUTS + sh].isConnected())// if input cable
 							heldOuts[sh] = inputs[IN_INPUTS + sh].getVoltage();// sample and hold input
 						else
