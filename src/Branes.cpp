@@ -273,7 +273,7 @@ struct Branes : Module {
 					for (int i = 7 * bi; i < (7 * bi + 7); i++)
 						receivedTrig[i] = true;
 				}
-				else if (trigs[bi ^ 0x1] && trigInConnect[bi ^ 0x1]) {
+				else if (trigs[bi ^ 0x1] && trigInConnect[bi ^ 0x1]) {// cross triggering
 					if (bi == 0)
 						receivedTrig[6] = true;
 					else
@@ -294,6 +294,7 @@ struct Branes : Module {
 						receivedTrig[connectedIndexes[selected]] = true;
 					}
 				}
+				// else no cross triggering in this mode (makes no sense)
 			}
 			else {// vibrations[bi] == 3 // blue mode (each active active out has 50% chance to get the trigger)
 				if (trigs[bi] && trigInConnect[bi]) {
@@ -302,6 +303,12 @@ struct Branes : Module {
 							receivedTrig[i] = ((random::u32() % 2) > 0);
 						}
 					}
+				}
+				else if (trigs[bi ^ 0x1] && trigInConnect[bi ^ 0x1]) {// cross triggering
+					if (bi == 0)
+						receivedTrig[6] = ((random::u32() % 2) > 0);
+					else
+						receivedTrig[13] = ((random::u32() % 2) > 0);
 				}
 			}
 		}
