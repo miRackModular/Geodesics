@@ -139,6 +139,8 @@ struct Branes : Module {
 		blueFilter[1].setCutoff(44100.0f / sampleRate);
 		
 		onReset();
+
+		panelTheme = (loadDarkAsDefault() ? 1 : 0);
 	}
 
 	
@@ -495,6 +497,8 @@ struct BranesWidget : ModuleWidget {
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
 		
+		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
+
 		menu->addChild(new MenuLabel());// empty line
 		
 		MenuLabel *settingsLabel = new MenuLabel();

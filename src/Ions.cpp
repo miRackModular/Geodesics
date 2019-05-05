@@ -138,6 +138,8 @@ struct Ions : Module {
 		configParam(UNCERTANTY_PARAM, 0.0f, 1.0f, 0.0f, "Uncertainty");	
 
 		onReset();
+
+		panelTheme = (loadDarkAsDefault() ? 1 : 0);
 	}
 
 	
@@ -536,6 +538,8 @@ struct IonsWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
+
+		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
 	}	
 	
 	IonsWidget(Ions *module) {

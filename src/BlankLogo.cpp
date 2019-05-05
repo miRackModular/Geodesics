@@ -67,6 +67,8 @@ struct BlankLogo : Module {
 
 		clkTrigger.reset();
 		onReset();
+		
+		panelTheme = (loadDarkAsDefault() ? 1 : 0);
 	}
 
 	void onReset() override {	
@@ -149,6 +151,8 @@ struct BlankLogoWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
+
+		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
 	}	
 
 	BlankLogoWidget(BlankLogo *module) {

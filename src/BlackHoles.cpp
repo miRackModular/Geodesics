@@ -74,7 +74,9 @@ struct BlackHoles : Module {
 		configParam(CVLEVEL_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Top BH gravity");
 		configParam(CVLEVEL_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Bottom BH gravity");		
 		
-		onReset();
+		onReset();		
+		
+		panelTheme = (loadDarkAsDefault() ? 1 : 0);
 	}
 
 	
@@ -266,6 +268,8 @@ struct BlackHolesWidget : ModuleWidget {
 		darkItem->module = module;
 		darkItem->theme = 1;
 		menu->addChild(darkItem);
+		
+		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
 	}	
 	
 	BlackHolesWidget(BlackHoles *module) {

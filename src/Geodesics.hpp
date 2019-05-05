@@ -243,4 +243,14 @@ struct HoldDetect {
 
 int getWeighted1to8random();
 
+
+void saveDarkAsDefault(bool darkAsDefault);
+bool loadDarkAsDefault();
+
+struct DarkDefaultItem : MenuItem {
+	void onAction(const event::Action &e) override {
+		saveDarkAsDefault(rightText.empty());// implicitly toggled
+	}
+};	
+
 #endif
