@@ -17,9 +17,13 @@
 
 struct PinkNoise {
 	// the filter in this code is adapted from http://www.firstpr.com.au/dsp/pink-noise/#Filtering
-	// from the above link
 	
+	// from the above link:	
 	/* 
+	Most of this material is written by other people, especially Allan Herriman, James McCartney, Phil Burk and Paul Kellet – all from the music-dsp mailing list. 
+	
+	...
+	
 	On 17 October 1999, Paul put up a further refinement: "instrumentation grade" and "economy" filters.
 
 	This is an approximation to a -10dB/decade filter using a weighted sum 
@@ -53,6 +57,88 @@ struct PinkNoise {
 //*****************************************************************************
 
 
+struct NoiseEngine {
+	enum NoiseId {NONE, WHITE, PINK, RED, BLUE};//use negative value for inv phase
+	int noiseSources[14] = {PINK, RED, BLUE, WHITE, BLUE, RED, PINK,   PINK, RED, BLUE, WHITE, BLUE, RED, PINK};
+
+
+	PinkNoise pinkNoise[2];
+	PinkNoise pinkForBlueNoise[2];
+	dsp::RCFilter redFilter[2];
+	dsp::RCFilter blueFilter[2];
+	bool cacheHitRed[2];// no need to init; index is braneIndex
+	float cacheValRed[2];
+	bool cacheHitBlue[2];// no need to init; index is braneIndex
+	float cacheValBlue[2];
+	bool cacheHitPink[2];// no need to init; index is braneIndex
+	float cacheValPink[2];
+	
+	
+	inline float whiteNoise() {return random::uniform() * 2.0f - 1.0f;}	
+	
+	
+	void setCutoffs(float sampleRate) {
+		redFilter[0].setCutoff(441.0f / sampleRate);
+		redFilter[1].setCutoff(441.0f / sampleRate);
+		blueFilter[0].setCutoff(44100.0f / sampleRate);
+		blueFilter[1].setCutoff(44100.0f / sampleRate);
+	}		
+	
+	
+	void clearCache() {
+		// optimizations for noise generators
+		for (int i = 0; i < 2; i++) {
+			cacheHitRed[i] = false;
+			cacheHitBlue[i] = false;
+			cacheHitPink[i] = false;
+		}
+	}		
+	
+	
+	float getNoise(int sh) {
+		float ret = 0.0f;
+		int braneIndex = sh < 7 ? 0 : 1;
+		int noiseIndex = noiseSources[sh];
+		if (noiseIndex == WHITE) {
+			ret = 5.0f * whiteNoise();
+		}
+		else if (noiseIndex == RED) {
+			if (cacheHitRed[braneIndex])
+				ret = -1.0 * cacheValRed[braneIndex];
+			else {
+				redFilter[braneIndex].process(whiteNoise());
+				cacheValRed[braneIndex] = 5.0f * clamp(7.5f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
+				cacheHitRed[braneIndex] = true;
+				ret = cacheValRed[braneIndex];
+			}
+		}
+		else if (noiseIndex == PINK) {
+			if (cacheHitPink[braneIndex])
+				ret = -1.0 * cacheValPink[braneIndex];
+			else {
+				cacheValPink[braneIndex] = 5.0f * clamp(0.17f * pinkNoise[braneIndex].process(), -1.0f, 1.0f);
+				cacheHitPink[braneIndex] = true;
+				ret = cacheValPink[braneIndex];
+			}
+		}
+		else {// noiseIndex == BLUE
+			if (cacheHitBlue[braneIndex])
+				ret = -1.0 * cacheValBlue[braneIndex];
+			else {
+				blueFilter[braneIndex].process(pinkForBlueNoise[braneIndex].process());
+				cacheValBlue[braneIndex] = 5.0f * clamp(0.7f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
+				cacheHitBlue[braneIndex] = true;
+				ret = cacheValBlue[braneIndex];
+			}
+		}
+		return ret;
+	}		
+};
+
+
+//*****************************************************************************
+
+
 struct Branes : Module {
 	enum ParamIds {
 		ENUMS(TRIG_BYPASS_PARAMS, 2),
@@ -64,12 +150,13 @@ struct Branes : Module {
 		ENUMS(IN_INPUTS, 14),
 		ENUMS(TRIG_INPUTS, 2),
 		ENUMS(TRIG_BYPASS_INPUTS, 2),
-		// -- 0.6.3 ^^
 		ENUMS(NOISE_RANGE_INPUTS, 2),
 		NUM_INPUTS
 	};
 	enum OutputIds {
 		ENUMS(OUT_OUTPUTS, 14),
+		// S&H are numbered 0 to 6 in BraneA from lower left to lower right
+		// S&H are numbered 7 to 13 in BraneB from top right to top left
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -82,11 +169,7 @@ struct Branes : Module {
 	
 	
 	// Constants
-	// S&H are numbered 0 to 6 in BraneA from lower left to lower right
-	// S&H are numbered 7 to 13 in BraneB from top right to top left
-	enum NoiseId {NONE, WHITE, PINK, RED, BLUE};//use negative value for inv phase
-	int noiseSources[14] = {PINK, RED, BLUE, WHITE, BLUE, RED, PINK,   PINK, RED, BLUE, WHITE, BLUE, RED, PINK};
-
+	// none
 	
 	// Need to save, with reset
 	int panelTheme = 0;
@@ -103,21 +186,9 @@ struct Branes : Module {
 	Trigger trigBypassTriggers[2];
 	Trigger noiseRangeTriggers[2];
 	float trigLights[2] = {0.0f, 0.0f};
-	PinkNoise pinkNoise[2];
-	PinkNoise pinkForBlueNoise[2];
-	dsp::RCFilter redFilter[2];
-	dsp::RCFilter blueFilter[2];
-	bool cacheHitRed[2];// no need to init; index is braneIndex
-	float cacheValRed[2];
-	bool cacheHitBlue[2];// no need to init; index is braneIndex
-	float cacheValBlue[2];
-	bool cacheHitPink[2];// no need to init; index is braneIndex
-	float cacheValPink[2];
 	unsigned int lightRefreshCounter = 0;
 	HoldDetect secretHoldDetect[2];
-	
-	
-	inline float whiteNoise() {return random::uniform() * 2.0f - 1.0f;}
+	NoiseEngine noiseEngine;
 	
 	
 	Branes() {
@@ -129,10 +200,7 @@ struct Branes : Module {
 		configParam(NOISE_RANGE_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Bottom brane noise range");		
 		
 		float sampleRate = APP->engine->getSampleRate();
-		redFilter[0].setCutoff(441.0f / sampleRate);
-		redFilter[1].setCutoff(441.0f / sampleRate);
-		blueFilter[0].setCutoff(44100.0f / sampleRate);
-		blueFilter[1].setCutoff(44100.0f / sampleRate);
+		noiseEngine.setCutoffs(sampleRate);
 		
 		onReset();
 
@@ -303,13 +371,10 @@ struct Branes : Module {
 		if (trigs[1] && trigInConnect[1])
 			receivedTrig[6] = true;
 
-		// optimizations for noise generators
-		for (int i = 0; i < 2; i++) {
-			cacheHitRed[i] = false;
-			cacheHitBlue[i] = false;
-			cacheHitPink[i] = false;
-		}
 		
+		// main branes code
+		// -----------------------
+				
 		// detect unused brane and avoid noise when so (unused = not a single output connected)
 		int startSh = 7;
 		int endSh = 7;
@@ -324,10 +389,10 @@ struct Branes : Module {
 				endSh = 14;
 				break;
 			}
-		}
-			
+		}			
 		
 		// sample and hold outputs (noise continually generated or else stepping non-white on S&H only will not work well because of filters)
+		noiseEngine.clearCache();
 		float noises[14];
 		for (int sh = startSh; sh < endSh; sh++) {
 			noises[sh] = getNoise(sh);
@@ -381,41 +446,7 @@ struct Branes : Module {
 	}// step()
 	
 	float getNoise(int sh) {
-		float ret = 0.0f;
-		int braneIndex = sh < 7 ? 0 : 1;
-		int noiseIndex = noiseSources[sh];
-		if (noiseIndex == WHITE) {
-			ret = 5.0f * whiteNoise();
-		}
-		else if (noiseIndex == RED) {
-			if (cacheHitRed[braneIndex])
-				ret = -1.0 * cacheValRed[braneIndex];
-			else {
-				redFilter[braneIndex].process(whiteNoise());
-				cacheValRed[braneIndex] = 5.0f * clamp(7.5f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
-				cacheHitRed[braneIndex] = true;
-				ret = cacheValRed[braneIndex];
-			}
-		}
-		else if (noiseIndex == PINK) {
-			if (cacheHitPink[braneIndex])
-				ret = -1.0 * cacheValPink[braneIndex];
-			else {
-				cacheValPink[braneIndex] = 5.0f * clamp(0.17f * pinkNoise[braneIndex].process(), -1.0f, 1.0f);
-				cacheHitPink[braneIndex] = true;
-				ret = cacheValPink[braneIndex];
-			}
-		}
-		else {// noiseIndex == BLUE
-			if (cacheHitBlue[braneIndex])
-				ret = -1.0 * cacheValBlue[braneIndex];
-			else {
-				blueFilter[braneIndex].process(pinkForBlueNoise[braneIndex].process());
-				cacheValBlue[braneIndex] = 5.0f * clamp(0.7f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
-				cacheHitBlue[braneIndex] = true;
-				ret = cacheValBlue[braneIndex];
-			}
-		}
+		float ret = noiseEngine.getNoise(sh);
 		
 		// noise ranges
 		if (noiseRange[0]) {

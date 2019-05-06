@@ -1,7 +1,6 @@
 //***********************************************************************************************
 //Geodesics: A modular collection for VCV Rack by Pierre Collard and Marc Boulé
 //
-//Based on code from Valley Rack Free by Dale Johnson
 //See ./LICENSE.txt for all licenses
 //***********************************************************************************************
 
