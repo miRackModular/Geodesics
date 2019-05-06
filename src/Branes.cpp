@@ -14,46 +14,40 @@
 #include "Geodesics.hpp"
 
 
-// By Joel Robichaud - Nohmad Noise module
-struct NoiseGenerator {
-	std::mt19937 rng;
-	std::uniform_real_distribution<float> uniform;
 
-	NoiseGenerator() : uniform(-1.0f, 1.0f) {
-		rng.seed(std::random_device()());
-	}
+struct PinkNoise {
+	// the filter in this code is adapted from http://www.firstpr.com.au/dsp/pink-noise/#Filtering
+	// from the above link
+	
+	/* 
+	On 17 October 1999, Paul put up a further refinement: "instrumentation grade" and "economy" filters.
 
-	float white() {
-		return uniform(rng);
-	}
-};
+	This is an approximation to a -10dB/decade filter using a weighted sum 
+	of first order filters. It is accurate to within +/-0.05dB above 9.2Hz 
+	(44100Hz sampling rate). Unity gain is at Nyquist, but can be adjusted 
+	by scaling the numbers at the end of each line.
+	
+	(This is pk3 = (Black) Paul Kellet's refined method in Allan's analysis.)
+	*/
+	
+	float b0, b1, b2, b3, b4, b5, b6;
 
-
-//*****************************************************************************
-
-
-// By Joel Robichaud - Nohmad Noise module
-struct PinkFilter {
-	float b0, b1, b2, b3, b4, b5, b6; // Coefficients
-	float y; // Out
-
-	void process(float x) {
-		b0 = 0.99886f * b0 + x * 0.0555179f;
-		b1 = 0.99332f * b1 + x * 0.0750759f;
-		b2 = 0.96900f * b2 + x * 0.1538520f;
-		b3 = 0.86650f * b3 + x * 0.3104856f;
-		b4 = 0.55000f * b4 + x * 0.5329522f;
-		b5 = -0.7616f * b5 - x * 0.0168980f;
-		y = b0 + b1 + b2 + b3 + b4 + b5 + b6 + x * 0.5362f;
-		b6 = x * 0.115926f;
-	}
-
-	float pink() {
-		return y;
+	float process() {
+		// noise source
+		const float white = random::uniform() * 2.0f - 1.0f;
+		
+		// filter
+		b0 = 0.99886f * b0 + white * 0.0555179f;
+		b1 = 0.99332f * b1 + white * 0.0750759f;
+		b2 = 0.96900f * b2 + white * 0.1538520f;
+		b3 = 0.86650f * b3 + white * 0.3104856f;
+		b4 = 0.55000f * b4 + white * 0.5329522f;
+		b5 = -0.7616f * b5 - white * 0.0168980f;
+		const float pink = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362f;
+		b6 = white * 0.115926f;
+		return pink;
 	}
 };
-// The coefficients above seem to be from this source:
-// http://www.firstpr.com.au/dsp/pink-noise/#Filtering
 
 
 //*****************************************************************************
@@ -109,11 +103,10 @@ struct Branes : Module {
 	Trigger trigBypassTriggers[2];
 	Trigger noiseRangeTriggers[2];
 	float trigLights[2] = {0.0f, 0.0f};
-	NoiseGenerator whiteNoise;
-	PinkFilter pinkFilter[2];
+	PinkNoise pinkNoise[2];
+	PinkNoise pinkForBlueNoise[2];
 	dsp::RCFilter redFilter[2];
 	dsp::RCFilter blueFilter[2];
-	PinkFilter pinkForBlueFilter[2];
 	bool cacheHitRed[2];// no need to init; index is braneIndex
 	float cacheValRed[2];
 	bool cacheHitBlue[2];// no need to init; index is braneIndex
@@ -122,6 +115,9 @@ struct Branes : Module {
 	float cacheValPink[2];
 	unsigned int lightRefreshCounter = 0;
 	HoldDetect secretHoldDetect[2];
+	
+	
+	inline float whiteNoise() {return random::uniform() * 2.0f - 1.0f;}
 	
 	
 	Branes() {
@@ -385,19 +381,18 @@ struct Branes : Module {
 	}// step()
 	
 	float getNoise(int sh) {
-		// some of the code in here is from Joel Robichaud - Nohmad Noise module
 		float ret = 0.0f;
 		int braneIndex = sh < 7 ? 0 : 1;
 		int noiseIndex = noiseSources[sh];
 		if (noiseIndex == WHITE) {
-			ret = 5.0f * whiteNoise.white();
+			ret = 5.0f * whiteNoise();
 		}
 		else if (noiseIndex == RED) {
 			if (cacheHitRed[braneIndex])
 				ret = -1.0 * cacheValRed[braneIndex];
 			else {
-				redFilter[braneIndex].process(whiteNoise.white());
-				cacheValRed[braneIndex] = 5.0f * clamp(7.8f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
+				redFilter[braneIndex].process(whiteNoise());
+				cacheValRed[braneIndex] = 5.0f * clamp(7.5f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
 				cacheHitRed[braneIndex] = true;
 				ret = cacheValRed[braneIndex];
 			}
@@ -406,8 +401,7 @@ struct Branes : Module {
 			if (cacheHitPink[braneIndex])
 				ret = -1.0 * cacheValPink[braneIndex];
 			else {
-				pinkFilter[braneIndex].process(whiteNoise.white());
-				cacheValPink[braneIndex] = 5.0f * clamp(0.18f * pinkFilter[braneIndex].pink(), -1.0f, 1.0f);
+				cacheValPink[braneIndex] = 5.0f * clamp(0.17f * pinkNoise[braneIndex].process(), -1.0f, 1.0f);
 				cacheHitPink[braneIndex] = true;
 				ret = cacheValPink[braneIndex];
 			}
@@ -416,9 +410,8 @@ struct Branes : Module {
 			if (cacheHitBlue[braneIndex])
 				ret = -1.0 * cacheValBlue[braneIndex];
 			else {
-				pinkForBlueFilter[braneIndex].process(whiteNoise.white());
-				blueFilter[braneIndex].process(pinkForBlueFilter[braneIndex].pink());
-				cacheValBlue[braneIndex] = 5.0f * clamp(0.64f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
+				blueFilter[braneIndex].process(pinkForBlueNoise[braneIndex].process());
+				cacheValBlue[braneIndex] = 5.0f * clamp(0.7f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
 				cacheHitBlue[braneIndex] = true;
 				ret = cacheValBlue[braneIndex];
 			}
