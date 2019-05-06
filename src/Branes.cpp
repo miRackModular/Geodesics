@@ -275,12 +275,6 @@ struct Branes : Module {
 					for (int i = 7 * bi; i < (7 * bi + 7); i++)
 						receivedTrig[i] = true;
 				}
-				else if (trigs[bi ^ 0x1] && trigInConnect[bi ^ 0x1]) {// cross triggering
-					if (bi == 0)
-						receivedTrig[6] = true;
-					else
-						receivedTrig[13] = true;
-				}
 			}
 			else if (vibrations[bi] == 2) {// yellow mode (only one of the active outs gets the trigger, random choice)
 				if (trigs[bi] && trigInConnect[bi]) {
@@ -296,12 +290,6 @@ struct Branes : Module {
 						receivedTrig[connectedIndexes[selected]] = true;
 					}
 				}
-				else if (trigs[bi ^ 0x1] && trigInConnect[bi ^ 0x1]) {// cross triggering
-					if (bi == 0)
-						receivedTrig[6] = true;
-					else
-						receivedTrig[13] = true;
-				}
 			}
 			else {// vibrations[bi] == 3 // blue mode (each active active out has 50% chance to get the trigger)
 				if (trigs[bi] && trigInConnect[bi]) {
@@ -311,15 +299,15 @@ struct Branes : Module {
 						}
 					}
 				}
-				else if (trigs[bi ^ 0x1] && trigInConnect[bi ^ 0x1]) {// cross triggering
-					if (bi == 0)
-						receivedTrig[6] = true;//((random::u32() % 2) > 0);
-					else
-						receivedTrig[13] = true;//((random::u32() % 2) > 0);
-				}
-			}
+			}			
 		}
-		
+		// cross triggering
+		if (trigs[0] && trigInConnect[0])
+			receivedTrig[13] = true;
+		if (trigs[1] && trigInConnect[1])
+			receivedTrig[6] = true;
+
+		// optimizations for noise generators
 		for (int i = 0; i < 2; i++) {
 			cacheHitRed[i] = false;
 			cacheHitBlue[i] = false;
