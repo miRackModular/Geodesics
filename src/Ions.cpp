@@ -85,7 +85,7 @@ struct Ions : Module {
 	
 	// No need to save
 	long clockIgnoreOnReset;
-	float resetLight;
+	float resetLight = 0.0f;
 	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	Trigger runningTrigger;
 	Trigger clockTrigger;
@@ -438,45 +438,45 @@ struct Ions : Module {
 
 			// Blue and Yellow lights
 			for (int i = 0; i < 16; i++) {
-				lights[BLUE_LIGHTS + i].value = (stepIndexes[0] == i ? 1.0f : 0.0f);
-				lights[YELLOW_LIGHTS + i].value = (stepIndexes[1] == i ? 1.0f : 0.0f);
+				lights[BLUE_LIGHTS + i].setBrightness(stepIndexes[0] == i ? 1.0f : 0.0f);
+				lights[YELLOW_LIGHTS + i].setBrightness(stepIndexes[1] == i ? 1.0f : 0.0f);
 			}
 			
 			// Reset light
-			lights[RESET_LIGHT].value =	resetLight;	
-			resetLight -= (resetLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;	
+			lights[RESET_LIGHT].setSmoothBrightness(resetLight, args.sampleTime * displayRefreshStepSkips);	
+			resetLight = 0.0f;	
 			
 			// Run light
-			lights[RUN_LIGHT].value = running ? 1.0f : 0.0f;
+			lights[RUN_LIGHT].setBrightness(running ? 1.0f : 0.0f);
 
 			// State lights
 			for (int i = 0; i < 2; i++) {
-				lights[GLOBAL_LIGHTS + i].value = (states[i] & 0x1) == 0 ? 0.5f : 0.0f;
-				lights[LOCAL_LIGHTS + i].value = states[i] >= 1 ? 0.5f : 0.0f;
+				lights[GLOBAL_LIGHTS + i].setBrightness((states[i] & 0x1) == 0 ? 1.0f : 0.0f);
+				lights[LOCAL_LIGHTS + i].setBrightness(states[i] >= 1 ? 1.0f : 0.0f);
 			}
 			
 			// Leap, Plank, uncertainty and ResetOnRun lights
-			lights[LEAP_LIGHT].value = leap ? 1.0f : 0.0f;
-			lights[PLANK_LIGHTS + 0].value = (quantize & 0x1) ? 1.0f : 0.0f;// Blue
-			lights[PLANK_LIGHTS + 1].value = (quantize & 0x2) ? 1.0f : 0.0f;// Yellow
-			lights[UNCERTANTY_LIGHT].value = uncertainty ? 1.0f : 0.0f;
-			lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
+			lights[LEAP_LIGHT].setBrightness(leap ? 1.0f : 0.0f);
+			lights[PLANK_LIGHTS + 0].setBrightness((quantize & 0x1) ? 1.0f : 0.0f);// Blue
+			lights[PLANK_LIGHTS + 1].setBrightness((quantize & 0x2) ? 1.0f : 0.0f);// Yellow
+			lights[UNCERTANTY_LIGHT].setBrightness(uncertainty ? 1.0f : 0.0f);
+			lights[RESETONRUN_LIGHT].setBrightness(resetOnRun ? 1.0f : 0.0f);
 			
 			// Range lights
 			for (int i = 0; i < 3; i++) {
-				lights[OCTA_LIGHTS + i].value = (i <= ranges[0] ? 1.0f : 0.0f);
-				lights[OCTB_LIGHTS + i].value = (i <= ranges[1] ? 1.0f : 0.0f);
+				lights[OCTA_LIGHTS + i].setBrightness(i <= ranges[0] ? 1.0f : 0.0f);
+				lights[OCTB_LIGHTS + i].setBrightness(i <= ranges[1] ? 1.0f : 0.0f);
 			}
 
 			// Jump lights
 			for (int i = 0; i < 2; i++) {
-				lights[JUMP_LIGHTS + i].value = jumpLights[i];
-				jumpLights[i] -= (jumpLights[i] / lightLambda) * args.sampleTime * displayRefreshStepSkips;
+				lights[JUMP_LIGHTS + i].setSmoothBrightness(jumpLights[i], args.sampleTime * displayRefreshStepSkips);
+				jumpLights[i] = 0.0f;
 			}
 
 			// Step clocks light
-			lights[STEPCLOCKS_LIGHT].value = stepClocksLight;
-			stepClocksLight -= (stepClocksLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;
+			lights[STEPCLOCKS_LIGHT].setSmoothBrightness(stepClocksLight, args.sampleTime * displayRefreshStepSkips);
+			stepClocksLight = 0.0f;
 		
 		}// lightRefreshCounter
 		

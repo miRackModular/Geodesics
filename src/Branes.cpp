@@ -426,12 +426,12 @@ struct Branes : Module {
 				float yellow = (vibrations[i] == 2 ? 1.0f : 0.0f);
 				float red = (vibrations[i] == 1 ? 1.0f : 0.0f);
 				float white = (vibrations[i] == 0 ? trigLights[i] : 0.0f);
-				lights[BYPASS_TRIG_LIGHTS + i * 4 + 3].value = white;
-				lights[BYPASS_TRIG_LIGHTS + i * 4 + 2].value = red;
-				lights[BYPASS_TRIG_LIGHTS + i * 4 + 1].value = yellow;
-				lights[BYPASS_TRIG_LIGHTS + i * 4 + 0].value = blue;
-				lights[NOISE_RANGE_LIGHTS + i].value = noiseRange[i] ? 1.0f : 0.0f;
-				trigLights[i] -= (trigLights[i] / lightLambda) * (float)args.sampleTime * displayRefreshStepSkips;
+				trigLights[i] = 0.0f;
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 3].setSmoothBrightness(white, (float)args.sampleTime * displayRefreshStepSkips);
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 2].setBrightness(red);
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 1].setBrightness(yellow);
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 0].setBrightness(blue);
+				lights[NOISE_RANGE_LIGHTS + i].setBrightness(noiseRange[i] ? 1.0f : 0.0f);
 				
 				if (secretHoldDetect[i].process(params[TRIG_BYPASS_PARAMS + i].getValue())) {
 					if (vibrations[i] > 1) 

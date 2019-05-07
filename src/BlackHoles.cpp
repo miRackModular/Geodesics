@@ -199,19 +199,19 @@ struct BlackHoles : Module {
 			lightRefreshCounter = 0;
 
 			// Wormhole light
-			lights[WORMHOLE_LIGHT].value = (wormhole ? 1.0f : 0.0f);
+			lights[WORMHOLE_LIGHT].setBrightness(wormhole ? 1.0f : 0.0f);
 					
 			// isExponential lights
 			for (int i = 0; i < 2; i++)
-				lights[EXP_LIGHTS + i].value = isExponential[i] ? 1.0f : 0.0f;
+				lights[EXP_LIGHTS + i].setBrightness(isExponential[i] ? 1.0f : 0.0f);
 			
 			// CV Level lights
 			bool is5V = (cvMode & 0x1) == 0;
-			lights[CVALEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
-			lights[CVALEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
+			lights[CVALEVEL_LIGHTS + 0].setBrightness(is5V ? 1.0f : 0.0f);
+			lights[CVALEVEL_LIGHTS + 1].setBrightness(is5V ? 0.0f : 1.0f);
 			is5V = (cvMode & 0x2) == 0;
-			lights[CVBLEVEL_LIGHTS + 0].value = is5V ? 1.0f : 0.0f;
-			lights[CVBLEVEL_LIGHTS + 1].value = is5V ? 0.0f : 1.0f;
+			lights[CVBLEVEL_LIGHTS + 0].setBrightness(is5V ? 1.0f : 0.0f);
+			lights[CVBLEVEL_LIGHTS + 1].setBrightness(is5V ? 0.0f : 1.0f);
 
 		}// lightRefreshCounter
 		

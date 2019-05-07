@@ -97,8 +97,8 @@ struct Entropia : Module {
 	int stepIndexOld;// when equal to stepIndex, crossfade (antipop) is finished, when not equal, crossfade until counter 0, then set to stepIndex
 	long crossFadeStepsToGo;
 	long clockIgnoreOnReset;
-	float resetLight;
-	float cvLight;
+	float resetLight = 0.0f;
+	float cvLight = 0.0f;
 	unsigned int lightRefreshCounter = 0;
 	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	Trigger runningTrigger;
@@ -503,67 +503,68 @@ struct Entropia : Module {
 		lightRefreshCounter++;
 		if (lightRefreshCounter >= displayRefreshStepSkips) {
 			lightRefreshCounter = 0;
+			float deltaTime = args.sampleTime * displayRefreshStepSkips;
 
 			// Reset light
-			lights[RESET_LIGHT].value =	resetLight;	
-			resetLight -= (resetLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;	
+			lights[RESET_LIGHT].setSmoothBrightness(resetLight, deltaTime);	
+			resetLight = 0.0f;	
 			
 			// Run light
-			lights[RUN_LIGHT].value = running ? 1.0f : 0.0f;
-			lights[RESETONRUN_LIGHT].value = resetOnRun ? 1.0f : 0.0f;
+			lights[RUN_LIGHT].setBrightness(running ? 1.0f : 0.0f);
+			lights[RESETONRUN_LIGHT].setBrightness(resetOnRun ? 1.0f : 0.0f);
 			
 			// Length lights
 			for (int i = 0; i < 8; i++)
-				lights[LENGTH_LIGHTS + i].value = (i < length ? 0.0f : 1.0f);
+				lights[LENGTH_LIGHTS + i].setBrightness(i < length ? 0.0f : 1.0f);
 			
 			// Plank
-			lights[QUANTIZE_LIGHTS + 0].value = (quantize & 0x1) ? 1.0f : 0.0f;// Blue
-			lights[QUANTIZE_LIGHTS + 1].value = (quantize & 0x2) ? 1.0f : 0.0f;// Yellow
+			lights[QUANTIZE_LIGHTS + 0].setBrightness((quantize & 0x1) ? 1.0f : 0.0f);// Blue
+			lights[QUANTIZE_LIGHTS + 1].setBrightness((quantize & 0x2) ? 1.0f : 0.0f);// Yellow
 
 			// step and main output lights (GeoBlueYellowWhiteLight)
-			lights[CV_LIGHT + 0].value = (pipeBlue[stepIndex]) ? 1.0f * cvLight : 0.0f;
-			lights[CV_LIGHT + 1].value = (!pipeBlue[stepIndex] && !addMode) ? 1.0f * cvLight : 0.0f;
-			lights[CV_LIGHT + 2].value = (!pipeBlue[stepIndex] && addMode) ? 1.0f * cvLight : 0.0f;
-			cvLight -= (cvLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;	
+			lights[CV_LIGHT + 0].setSmoothBrightness((pipeBlue[stepIndex])              ? cvLight : 0.0f, deltaTime);
+			lights[CV_LIGHT + 1].setSmoothBrightness((!pipeBlue[stepIndex] && !addMode) ? cvLight : 0.0f, deltaTime);
+			lights[CV_LIGHT + 2].setSmoothBrightness((!pipeBlue[stepIndex] && addMode)  ? cvLight : 0.0f, deltaTime);
+			cvLight = 0.0f;	
 			for (int i = 0; i < 8; i++) {
-				lights[STEP_LIGHTS + i].value = ((pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f;
-				lights[STEP_LIGHTS + 8 + i].value = ((!pipeBlue[i]) && stepIndex == i) ? 1.0f : 0.0f;
+				lights[STEP_LIGHTS + i].setBrightness( ((pipeBlue[i] || addMode) && stepIndex == i) ? 1.0f : 0.0f );
+				lights[STEP_LIGHTS + 8 + i].setBrightness( ((!pipeBlue[i]) && stepIndex == i) ? 1.0f : 0.0f );
 			}
 			
 			// Range (energy) lights
 			for (int i = 0; i < 3; i++) {
-				lights[OCT_LIGHTS + i].value = (i <= ranges[0] ? 1.0f : 0.0f);
-				lights[OCT_LIGHTS + 3 + i].value = (i <= ranges[1] ? 1.0f : 0.0f);
+				lights[OCT_LIGHTS + i].setBrightness(i <= ranges[0] ? 1.0f : 0.0f);
+				lights[OCT_LIGHTS + 3 + i].setBrightness(i <= ranges[1] ? 1.0f : 0.0f);
 			}
 				
 			// Step clocks light
-			lights[STEPCLOCK_LIGHT].value = stepClockLight;
-			stepClockLight -= (stepClockLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;
+			lights[STEPCLOCK_LIGHT].setSmoothBrightness(stepClockLight, deltaTime);
+			stepClockLight = 0.0f;
 
 			// Swtich add light
-			lights[SWITCHADD_LIGHT].value = (addMode ? 0.0f : 1.0f);
-			lights[ADD_LIGHT].value = (addMode ? 1.0f : 0.0f);
+			lights[SWITCHADD_LIGHT].setBrightness(addMode ? 0.0f : 1.0f);
+			lights[ADD_LIGHT].setBrightness(addMode ? 1.0f : 0.0f);
 			
 			// State switch light
-			lights[STATESWITCH_LIGHT].value = stateSwitchLight;
-			stateSwitchLight -= (stateSwitchLight / lightLambda) * args.sampleTime * displayRefreshStepSkips;
+			lights[STATESWITCH_LIGHT].setSmoothBrightness(stateSwitchLight, deltaTime);
+			stateSwitchLight = 0.0f;
 			
 			for (int i = 0; i < 2; i++) {
 				// Sources lights
-				lights[RANDOM_LIGHTS + i].value = (sources[i] == SRC_RND) ? 1.0f : 0.0f;
-				lights[EXTSIG_LIGHTS + i].value = (sources[i] == SRC_EXT) ? 1.0f : 0.0f;
-				lights[FIXEDCV_LIGHTS + i].value = (sources[i] == SRC_CV) ? 1.0f : 0.0f;
+				lights[RANDOM_LIGHTS + i].setBrightness((sources[i] == SRC_RND) ? 1.0f : 0.0f);
+				lights[EXTSIG_LIGHTS + i].setBrightness((sources[i] == SRC_EXT) ? 1.0f : 0.0f);
+				lights[FIXEDCV_LIGHTS + i].setBrightness((sources[i] == SRC_CV) ? 1.0f : 0.0f);
 				
 				// Audio lights
-				lights[EXTAUDIO_LIGHTS + i].value = ((audio & (1 << i)) != 0) ? 1.0f : 0.0f;
-				lights[EXTCV_LIGHTS + i].value = ((audio & (1 << i)) == 0) ? 1.0f : 0.0f;
+				lights[EXTAUDIO_LIGHTS + i].setBrightness(((audio & (1 << i)) != 0) ? 1.0f : 0.0f);
+				lights[EXTCV_LIGHTS + i].setBrightness(((audio & (1 << i)) == 0) ? 1.0f : 0.0f);
 			}
 			
 			
 			
 			// Clock source lights
-			lights[CLKSRC_LIGHTS + 0].value = (clkSource < 2) ? 1.0f : 0.0f;
-			lights[CLKSRC_LIGHTS + 1].value = ((clkSource & 0x1) == 0) ? 1.0f : 0.0f;
+			lights[CLKSRC_LIGHTS + 0].setBrightness((clkSource < 2) ? 1.0f : 0.0f);
+			lights[CLKSRC_LIGHTS + 1].setBrightness(((clkSource & 0x1) == 0) ? 1.0f : 0.0f);
 			
 		}// lightRefreshCounter
 		
