@@ -16,11 +16,11 @@ struct LowFrequencyOscillator {
 
 	LowFrequencyOscillator() {}
 	void setPitch(float pitch) {
-		pitch = fminf(pitch, 8.0f);
-		freq = powf(2.0f, pitch);
+		pitch = std::fmin(pitch, 8.0f);
+		freq = std::pow(2.0f, pitch);
 	}
 	void step(float dt) {
-		float deltaPhase = fminf(freq * dt, 0.5f);
+		float deltaPhase = std::fmin(freq * dt, 0.5f);
 		phase += deltaPhase;
 		if (phase >= 1.0f)
 			phase -= 1.0f;

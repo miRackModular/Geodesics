@@ -120,7 +120,7 @@ struct Entropia : Module {
 	float stepClockLight = 0.0f;
 	float stateSwitchLight = 0.0f;
 	
-	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
+	inline float quantizeCV(float cv) {return std::round(cv * 12.0f) / 12.0f;}
 	inline void updatePipeBlue(int step) {
 		float effectiveKnob = params[PROB_PARAMS + step].getValue() + -1.0f * (params[GPROB_PARAM].getValue() + inputs[GPROB_INPUT].getVoltage() / 5.0f);
 		pipeBlue[step] = effectiveKnob > random::uniform();

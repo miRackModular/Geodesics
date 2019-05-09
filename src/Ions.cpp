@@ -106,7 +106,7 @@ struct Ions : Module {
 	unsigned int lightRefreshCounter = 0;
 
 	
-	inline float quantizeCV(float cv) {return roundf(cv * 12.0f) / 12.0f;}
+	inline float quantizeCV(float cv) {return std::round(cv * 12.0f) / 12.0f;}
 	inline bool jumpRandom() {return (random::uniform() < (params[PROB_PARAM].getValue() + inputs[PROB_INPUT].getVoltage() / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
 	
 	

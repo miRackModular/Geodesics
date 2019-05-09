@@ -221,7 +221,7 @@ struct BlackHoles : Module {
 		float levCv = levelCV.isConnected() ? (levelCV.getVoltage() * (cvMode != 0 ? 0.1f : 0.2f)) : 0.0f;
 		float lev = clamp(level.getValue() + levCv, -1.0f, 1.0f);
 		if (isExp) {
-			float newlev = rescale(powf(expBase, fabsf(lev)), 1.0f, expBase, 0.0f, 1.0f);
+			float newlev = rescale(std::pow(expBase, std::fabs(lev)), 1.0f, expBase, 0.0f, 1.0f);
 			if (lev < 0.0f)
 				newlev *= -1.0f;
 			lev = newlev;
