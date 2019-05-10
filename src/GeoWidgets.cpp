@@ -17,9 +17,14 @@ void DynamicSVGPort::addFrame(std::shared_ptr<Svg> svg) {
 	}
 }
 
+
 void DynamicSVGPort::step() {
     if(mode != NULL && *mode != oldMode) {
-        sw->setSvg(frames[*mode]);
+        if (*mode > 0 && !frameAltName.empty()) {// JIT loading of alternate skin
+			frames.push_back(APP->window->loadSvg(frameAltName));
+			frameAltName.clear();// don't reload!
+		}
+		sw->setSvg(frames[*mode]);
         oldMode = *mode;
         fb->dirty = true;
     }
@@ -40,6 +45,12 @@ void DynamicSVGSwitch::addFrameAll(std::shared_ptr<Svg> svg) {
 
 void DynamicSVGSwitch::step() {
     if(mode != NULL && *mode != oldMode) {
+        if (*mode > 0 && !frameAltName0.empty() && !frameAltName1.empty()) {// JIT loading of alternate skin
+			framesAll.push_back(APP->window->loadSvg(frameAltName0));
+			framesAll.push_back(APP->window->loadSvg(frameAltName1));
+			frameAltName0.clear();// don't reload!
+			frameAltName1.clear();// don't reload!
+		}
         if ((*mode) == 0|| framesAll.size() < 4) {
 			frames[0]=framesAll[0];
 			frames[1]=framesAll[1];
@@ -80,6 +91,10 @@ void DynamicSVGKnob::setOrientation(float angle) {
 
 void DynamicSVGKnob::step() {
     if(mode != NULL && *mode != oldMode) {
+        if (*mode > 0 && !frameAltName.empty()) {// JIT loading of alternate skin
+			framesAll.push_back(APP->window->loadSvg(frameAltName));
+			frameAltName.clear();// don't reload!
+		}
         if ((*mode) == 0) {
 			setSvg(framesAll[0]);
 		}

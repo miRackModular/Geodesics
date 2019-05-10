@@ -54,7 +54,7 @@ static const float blurRadiusRatio = 0.06f;
 struct GeoPort : DynamicSVGPort {
 	GeoPort() {
 		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Jack-WL.svg")));
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Jack-DM.svg")));
+		addFrameAlt(asset::plugin(pluginInstance, "res/DarkMatter/Jack-DM.svg"));
 		shadow->blurRadius = 1.0f;
 	}
 };
@@ -74,8 +74,8 @@ struct GeoPushButton : DynamicSVGSwitch {
 		momentary = true;
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/PushButton1_0.svg")));
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/PushButton1_1.svg")));
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_0.svg")));
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_1.svg")));
+		addFrameAlt0(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_0.svg"));
+		addFrameAlt1(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_1.svg"));
 	}
 };
 
@@ -89,7 +89,7 @@ struct GeoKnob : DynamicSVGKnob {
 		maxAngle = 0.73*M_PI;
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if knob is small (taken from IMSmallKnob)
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Knob-WL.svg")));
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Knob-DM.svg")));
+		addFrameAlt(asset::plugin(pluginInstance, "res/DarkMatter/Knob-DM.svg"));
 		shadow->blurRadius = box.size.y * blurRadiusRatio;
 	}
 };
@@ -122,7 +122,7 @@ struct BlankCKnob : DynamicSVGKnob {
 		minAngle = -0.73*M_PI;
 		maxAngle = 0.73*M_PI;
 		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/C-WL.svg")));
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/C-DM.svg")));
+		addFrameAlt(asset::plugin(pluginInstance, "res/DarkMatter/C-DM.svg"));
 		shadow->opacity = 0.0;
 	}
 };
