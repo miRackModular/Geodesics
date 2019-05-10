@@ -280,11 +280,13 @@ struct BlackHolesWidget : ModuleWidget {
         lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/BlackHoles-WL.svg")));
         box.size = lightPanel->box.size;
         addChild(lightPanel);
-        darkPanel = new SvgPanel();
-		darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/BlackHoles-DM.svg")));
-		darkPanel->visible = false;
-		addChild(darkPanel);
-
+        if (module) {
+			darkPanel = new SvgPanel();
+			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/BlackHoles-DM.svg")));
+			darkPanel->visible = false;
+			addChild(darkPanel);
+		}
+		
 		// Screws 
 		// part of svg panel, no code required
 		
