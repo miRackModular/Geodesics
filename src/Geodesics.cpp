@@ -34,7 +34,7 @@ void init(rack::Plugin *p) {
 
 
 bool Trigger::process(float in) {
-	switch (state) {
+	/*switch (state) {
 		case LOW:
 			if (in >= 1.0f) {
 				state = HIGH;
@@ -54,6 +54,20 @@ bool Trigger::process(float in) {
 				state = LOW;
 			}
 			break;
+	}
+	return false;*/
+	if (state) {
+		// HIGH to LOW
+		if (in <= 0.1f) {
+			state = false;
+		}
+	}
+	else {
+		// LOW to HIGH
+		if (in >= 1.0f) {
+			state = true;
+			return true;
+		}
 	}
 	return false;
 }	

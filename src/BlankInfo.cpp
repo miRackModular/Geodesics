@@ -49,7 +49,6 @@ struct BlankInfo : Module {
 
 
 struct BlankInfoWidget : ModuleWidget {
-	SvgPanel* lightPanel;
 	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
@@ -93,10 +92,7 @@ struct BlankInfoWidget : ModuleWidget {
 		setModule(module);
 
 		// Main panels from Inkscape
-        lightPanel = new SvgPanel();
-        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/BlankInfo-WL.svg")));
-        box.size = lightPanel->box.size;
-        addChild(lightPanel);
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/BlankInfo-WL.svg")));
         if (module) {
 			darkPanel = new SvgPanel();
 			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/BlankInfo-DM.svg")));
@@ -110,7 +106,7 @@ struct BlankInfoWidget : ModuleWidget {
 	
 	void step() override {
 		if (module) {
-			lightPanel->visible = ((((BlankInfo*)module)->panelTheme) == 0);
+			panel->visible = ((((BlankInfo*)module)->panelTheme) == 0);
 			darkPanel->visible  = ((((BlankInfo*)module)->panelTheme) == 1);
 		}
 		Widget::step();

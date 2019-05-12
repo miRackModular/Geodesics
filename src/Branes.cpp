@@ -468,7 +468,6 @@ struct Branes : Module {
 
 
 struct BranesWidget : ModuleWidget {
-	SvgPanel* lightPanel;
 	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
@@ -536,10 +535,7 @@ struct BranesWidget : ModuleWidget {
 		setModule(module);
 
 		// Main panels from Inkscape
-        lightPanel = new SvgPanel();
-        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Branes-WL.svg")));
-        box.size = lightPanel->box.size;
-        addChild(lightPanel);
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Branes-WL.svg")));
         if (module) {
 			darkPanel = new SvgPanel();
 			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Branes-DM.svg")));
@@ -630,7 +626,7 @@ struct BranesWidget : ModuleWidget {
 	
 	void step() override {
 		if (module) {
-			lightPanel->visible = ((((Branes*)module)->panelTheme) == 0);
+			panel->visible = ((((Branes*)module)->panelTheme) == 0);
 			darkPanel->visible  = ((((Branes*)module)->panelTheme) == 1);
 		}
 		Widget::step();

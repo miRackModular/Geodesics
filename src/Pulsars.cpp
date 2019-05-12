@@ -374,7 +374,6 @@ struct Pulsars : Module {
 
 
 struct PulsarsWidget : ModuleWidget {
-	SvgPanel* lightPanel;
 	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
@@ -417,10 +416,7 @@ struct PulsarsWidget : ModuleWidget {
 		setModule(module);
 
 		// Main panels from Inkscape
-        lightPanel = new SvgPanel();
-        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Pulsars-WL.svg")));
-        box.size = lightPanel->box.size;
-        addChild(lightPanel);
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Pulsars-WL.svg")));
         if (module) {
 			darkPanel = new SvgPanel();
 			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Pulsars-DM.svg")));
@@ -551,7 +547,7 @@ struct PulsarsWidget : ModuleWidget {
 	
 	void step() override {
 		if (module) {
-			lightPanel->visible = ((((Pulsars*)module)->panelTheme) == 0);
+			panel->visible = ((((Pulsars*)module)->panelTheme) == 0);
 			darkPanel->visible  = ((((Pulsars*)module)->panelTheme) == 1);
 		}
 		Widget::step();

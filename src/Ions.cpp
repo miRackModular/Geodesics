@@ -503,7 +503,6 @@ struct Ions : Module {
 
 
 struct IonsWidget : ModuleWidget {
-	SvgPanel* lightPanel;
 	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
@@ -546,10 +545,7 @@ struct IonsWidget : ModuleWidget {
 		setModule(module);
 
 		// Main panels from Inkscape
-        lightPanel = new SvgPanel();
-        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Ions-WL.svg")));
-        box.size = lightPanel->box.size;
-        addChild(lightPanel);
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Ions-WL.svg")));
         if (module) {
 			darkPanel = new SvgPanel();
 			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Ions-DM.svg")));
@@ -729,7 +725,7 @@ struct IonsWidget : ModuleWidget {
 	
 	void step() override {
 		if (module) {
-			lightPanel->visible = ((((Ions*)module)->panelTheme) == 0);
+			panel->visible = ((((Ions*)module)->panelTheme) == 0);
 			darkPanel->visible  = ((((Ions*)module)->panelTheme) == 1);
 		}
 		Widget::step();

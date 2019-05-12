@@ -609,7 +609,6 @@ struct Entropia : Module {
 
 
 struct EntropiaWidget : ModuleWidget {
-	SvgPanel* lightPanel;
 	SvgPanel* darkPanel;
 
 	struct PanelThemeItem : MenuItem {
@@ -652,10 +651,7 @@ struct EntropiaWidget : ModuleWidget {
 		setModule(module);
 
 		// Main panels from Inkscape
-        lightPanel = new SvgPanel();
-        lightPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Entropia-WL.svg")));
-        box.size = lightPanel->box.size;
-        addChild(lightPanel);
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Entropia-WL.svg")));
         if (module) {
 			darkPanel = new SvgPanel();
 			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Entropia-DM.svg")));
@@ -862,7 +858,7 @@ struct EntropiaWidget : ModuleWidget {
 	
 	void step() override {
 		if (module) {
-			lightPanel->visible = ((((Entropia*)module)->panelTheme) == 0);
+			panel->visible = ((((Entropia*)module)->panelTheme) == 0);
 			darkPanel->visible  = ((((Entropia*)module)->panelTheme) == 1);
 		}
 		Widget::step();
