@@ -8,7 +8,7 @@
 
 struct BlankInfo : Module {
 
-	int panelTheme = 0;
+	int panelTheme;
 
 
 	BlankInfo() {

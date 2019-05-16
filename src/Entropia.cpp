@@ -78,7 +78,7 @@ struct Entropia : Module {
 	enum SourceIds {SRC_CV, SRC_EXT, SRC_RND};
 	
 	// Need to save, with reset
-	int panelTheme = 0;
+	int panelTheme;
 	bool running;
 	bool resetOnRun;
 	int length;

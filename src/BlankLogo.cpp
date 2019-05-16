@@ -51,7 +51,7 @@ struct BlankLogo : Module {
 	};
 	
 	
-	int panelTheme = 0;
+	int panelTheme;
 	float clkValue;
 	int stepIndex;
 	float song[5] = {7.0f/12.0f, 9.0f/12.0f, 5.0f/12.0f, 5.0f/12.0f - 1.0f, 0.0f/12.0f};

@@ -172,7 +172,7 @@ struct Branes : Module {
 	// none
 	
 	// Need to save, with reset
-	int panelTheme = 0;
+	int panelTheme;
 	int vibrations[2];
 	bool noiseRange[2];
 	

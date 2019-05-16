@@ -72,7 +72,7 @@ struct Ions : Module {
 
 							  
 	// Need to save, with reset
-	int panelTheme = 0;
+	int panelTheme;
 	bool running;
 	bool resetOnRun;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow

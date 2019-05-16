@@ -44,7 +44,7 @@ struct BlackHoles : Module {
 
 	
 	// Need to save
-	int panelTheme = 0;
+	int panelTheme;
 	bool isExponential[2];
 	bool wormhole;
 	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper BH, bit 1 is lower BH

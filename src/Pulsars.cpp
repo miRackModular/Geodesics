@@ -51,7 +51,7 @@ struct Pulsars : Module {
 
 	
 	// Need to save
-	int panelTheme = 0;
+	int panelTheme;
 	int cvMode;// 0 is -5v to 5v, 1 is 0v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
 	bool isVoid[2];
 	bool isReverse[2];
