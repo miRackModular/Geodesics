@@ -12,20 +12,93 @@
 #include "Geodesics.hpp"
 
 
+// http://www.earlevel.com/main/2012/12/15/a-one-pole-filter/
+struct OnePoleFilter {
+    float b1 = 0.0;
+	float lowout = 0.0;
+	float lastin = 0.0f;
+	
+    void setCutoff(float Fc) {
+		b1 = exp(-2.0 * M_PI * Fc);
+	}
+    void process(float in) {
+		lastin = in;
+		lowout = in * (1.0f - b1) + lowout * b1;
+	}
+	float lowpass() {
+		return lowout;
+	}
+	float highpass() {
+		return lastin - lowout;
+	}
+};
+
+
+// This struct is an SIMD adaptation by Marc Boulé of the filter from
+// http://www.earlevel.com/main/2012/12/15/a-one-pole-filter/
+struct QuadOnePoleFilter {
+	simd::f32_4 b1 = simd::f32_4(0.0f);
+	simd::f32_4 lowout = simd::f32_4(0.0f);
+	float lowpassOuts[4] = {0.0f};
+	float highpassOuts[4] = {0.0f};	
+	
+    void setCutoff(int index, float Fc) {
+		float tb1[4] = {0.0f};
+		b1.store(tb1);
+		tb1[index] = std::exp(-2.0 * M_PI * Fc);
+		b1 = simd::f32_4::load(tb1);
+	}
+	
+    void process(float *inflt) {
+		simd::f32_4 lastin = simd::f32_4::load(inflt);
+		lowout = lastin * (1.0f - b1) + lowout * b1;
+		lowout.store(lowpassOuts);
+		lastin -= lowout;
+		lastin.store(highpassOuts);
+	}
+	
+	float lowpass(int index) {
+		return lowpassOuts[index];
+	}
+	float highpass(int index) {
+		return highpassOuts[index];
+	}
+};
+
+
+/*
+struct RCFilter {
+	float c = 0.f;
+	float xstate[1] = {};
+	float ystate[1] = {};
+
+	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
+	void setCutoff(float r) {
+		c = 2.f / r;
+	}
+	void process(float x) {
+		float y = (x + xstate[0] - ystate[0] * (1 - c)) / (1 + c);
+		xstate[0] = x;
+		ystate[0] = y;
+	}
+	float lowpass() {
+		return ystate[0];
+	}
+	float highpass() {
+		return xstate[0] - ystate[0];
+	}
+};
+*/
+
+
 // This struct is an SIMD adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
 struct QuadRCFilter {
 	float cutoffs[4] = {0.0f};// do not change here, constructor will use to init x,y states
-	simd::f32_4 xstate;
-	simd::f32_4 ystate;
+	simd::f32_4 xstate = simd::f32_4(0.0f);
+	simd::f32_4 ystate = simd::f32_4(0.0f);
 	float lowpassOuts[4] = {0.0f};
 	float highpassOuts[4] = {0.0f};
 
-	QuadRCFilter() {
-		xstate = simd::f32_4::load(cutoffs);// cutoffs not relevant here, just using as an array of 0s	
-		ystate = simd::f32_4::load(cutoffs);// cutoffs not relevant here, just using as an array of 0s	
-	}
-	
-	
 	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
 	void setCutoff(int index, float r) {// TODO add sample rate to calculation so that a cutoff f_c is not changed when sample rate changes
 		cutoffs[index] = 2.f / r;
@@ -33,7 +106,7 @@ struct QuadRCFilter {
 	void process(float *x_f) {// argument: 4 inputs to quad filter
 		simd::f32_4 c = simd::f32_4::load(cutoffs);
 		simd::f32_4 x = simd::f32_4::load(x_f);
-		simd::f32_4 y = (x + xstate - ystate * (1 - c)) / (1 + c);
+		simd::f32_4 y = (x + xstate - ystate * (1.0f - c)) / (1.0f + c);
 		xstate = x;
 		ystate = y;
 		y.store(lowpassOuts);
@@ -47,6 +120,8 @@ struct QuadRCFilter {
 		return highpassOuts[index];
 	}
 };
+
+
 
 // This struct is an adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
 struct QuadRCFilter2 {
@@ -73,31 +148,6 @@ struct QuadRCFilter2 {
 		return xstate[index] - ystate[index];
 	}
 };
-
-/*
-struct RCFilter {
-	float c = 0.f;
-	float xstate[1] = {};
-	float ystate[1] = {};
-
-	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
-	void setCutoff(float r) {
-		c = 2.f / r;
-	}
-	void process(float x) {
-		float y = (x + xstate[0] - ystate[0] * (1 - c)) / (1 + c);
-		xstate[0] = x;
-		ystate[0] = y;
-	}
-	float lowpass() {
-		return ystate[0];
-	}
-	float highpass() {
-		return xstate[0] - ystate[0];
-	}
-};
-*/
-
 	
 
 //*****************************************************************************
@@ -112,7 +162,8 @@ struct chanVol {// a mixMap for an output has four of these, for each quadrant t
 
 struct mixMapOutput {
 	chanVol cvs[4];// an output can have a mix of at most 4 inputs
-	QuadRCFilter2 filt;// TODO return to simd version (test performace though, for comparison)
+	QuadOnePoleFilter filt;
+	// QuadRCFilter filt;
 
 	float calcFilteredOutput() {
 		float filterOut = 0.0f;
@@ -137,11 +188,8 @@ struct mixMapOutput {
 				cvs[i].vol = _vol;
 				cvs[i].chan = _chan;
 				cvs[i].inputIsAboveOutput = _inAboveOut;
-				//float f_c = (float)calcCutoffFreq(numerator, denominator, _inAboveOut);
-				//if (_inAboveOut)
-					//filt.setCutoff(i, 441.0f / 44100.0f);// low pass (red)
-				//else
-					filt.setCutoff(i, 44100.0f / 44100.0f);// high pass (part of blue)
+				float f_c = (float)calcCutoffFreq(numerator, denominator, _inAboveOut);
+				filt.setCutoff(i, f_c / 44100.0f);
 				return;
 			}
 		}
