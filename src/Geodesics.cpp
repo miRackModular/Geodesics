@@ -23,6 +23,8 @@ void init(rack::Plugin *p) {
 	p->addModel(modelBranes);
 	p->addModel(modelIons);
 	p->addModel(modelEntropia);
+	p->addModel(modelEnergy);
+	p->addModel(modelTorus);
 	p->addModel(modelBlankLogo);
 	p->addModel(modelBlankInfo);
 }

@@ -42,7 +42,6 @@ struct BlankInfo : Module {
 	}
 
 	
-	// Advances the module by 1 audio frame with duration 1.0 / engineGetSampleRate()
 	void process(const ProcessArgs &args) override {
 	}
 };

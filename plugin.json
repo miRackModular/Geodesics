@@ -39,6 +39,18 @@
 			"tags": ["Sequencer"]
 		},
 		{
+			"slug": "Energy",
+			"name": "Energy",
+			"description": "Relativistic oscillator",
+			"tags": ["Oscillator"]
+		},
+		{
+			"slug": "Torus",
+			"name": "Torus",
+			"description": "Bi-dimensional multimixer",
+			"tags": ["Mixer"]
+		},
+		{
 			"slug": "Blank-Panel Info",
 			"name": "Blank-Panel Info",
 			"description": "Blank panel with info",

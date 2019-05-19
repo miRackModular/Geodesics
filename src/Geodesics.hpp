@@ -28,6 +28,8 @@ extern Model *modelPulsars;
 extern Model *modelBranes;
 extern Model *modelIons;
 extern Model *modelEntropia;
+extern Model *modelEnergy;
+extern Model *modelTorus;
 extern Model *modelBlankLogo;
 extern Model *modelBlankInfo;
 
