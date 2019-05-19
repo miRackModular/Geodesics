@@ -64,8 +64,8 @@ struct NoiseEngine {
 
 	PinkNoise pinkNoise[2];
 	PinkNoise pinkForBlueNoise[2];
-	dsp::RCFilter redFilter[2];
-	dsp::RCFilter blueFilter[2];
+	dsp::RCFilter redFilter[2];// for lowpass
+	dsp::RCFilter blueFilter[2];// for highpass
 	bool cacheHitRed[2];// no need to init; index is braneIndex
 	float cacheValRed[2];
 	bool cacheHitBlue[2];// no need to init; index is braneIndex
@@ -78,9 +78,9 @@ struct NoiseEngine {
 	
 	
 	void setCutoffs(float sampleRate) {
-		redFilter[0].setCutoff(441.0f / sampleRate);
+		redFilter[0].setCutoff(441.0f / sampleRate);// low pass
 		redFilter[1].setCutoff(441.0f / sampleRate);
-		blueFilter[0].setCutoff(44100.0f / sampleRate);
+		blueFilter[0].setCutoff(44100.0f / sampleRate);// high pass
 		blueFilter[1].setCutoff(44100.0f / sampleRate);
 	}		
 	
@@ -199,8 +199,7 @@ struct Branes : Module {
 		configParam(NOISE_RANGE_PARAMS + 0, 0.0f, 1.0f, 0.0f, "Top brane noise range");
 		configParam(NOISE_RANGE_PARAMS + 1, 0.0f, 1.0f, 0.0f, "Bottom brane noise range");		
 		
-		float sampleRate = APP->engine->getSampleRate();
-		noiseEngine.setCutoffs(sampleRate);
+		noiseEngine.setCutoffs(APP->engine->getSampleRate());
 		
 		onReset();
 
@@ -286,6 +285,11 @@ struct Branes : Module {
 		for (int i = 0; i < 14; i++)
 			heldOuts[i] = 0.0f;
 	}
+
+
+	void onSampleRateChange() override {
+		noiseEngine.setCutoffs(APP->engine->getSampleRate());
+	}		
 
 	
 	void process(const ProcessArgs &args) override {

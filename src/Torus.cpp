@@ -12,31 +12,191 @@
 #include "Geodesics.hpp"
 
 
+// This struct is an SIMD adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
+struct QuadRCFilter {
+	float cutoffs[4] = {0.0f};// do not change here, constructor will use to init x,y states
+	simd::f32_4 xstate;
+	simd::f32_4 ystate;
+	float lowpassOuts[4] = {0.0f};
+	float highpassOuts[4] = {0.0f};
+
+	QuadRCFilter() {
+		xstate = simd::f32_4::load(cutoffs);// cutoffs not relevant here, just using as an array of 0s	
+		ystate = simd::f32_4::load(cutoffs);// cutoffs not relevant here, just using as an array of 0s	
+	}
+	
+	
+	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
+	void setCutoff(int index, float r) {// TODO add sample rate to calculation so that a cutoff f_c is not changed when sample rate changes
+		cutoffs[index] = 2.f / r;
+	}
+	void process(float *x_f) {// argument: 4 inputs to quad filter
+		simd::f32_4 c = simd::f32_4::load(cutoffs);
+		simd::f32_4 x = simd::f32_4::load(x_f);
+		simd::f32_4 y = (x + xstate - ystate * (1 - c)) / (1 + c);
+		xstate = x;
+		ystate = y;
+		y.store(lowpassOuts);
+		x -= y;
+		x.store(highpassOuts);
+	}
+	float lowpass(int index) {
+		return lowpassOuts[index];
+	}
+	float highpass(int index) {
+		return highpassOuts[index];
+	}
+};
+
+// This struct is an adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
+struct QuadRCFilter2 {
+	float c[4] = {0.f};
+	float xstate[4] = {};
+	float ystate[4] = {};
+
+	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
+	void setCutoff(int index, float r) {
+		c[index] = 2.f / r;
+	}
+	void process(float *x) {
+		float y[4];
+		for (int i = 0; i < 4; i++) {
+			y[i] = (x[i] + xstate[i] - ystate[i] * (1 - c[i])) / (1 + c[i]);
+			xstate[i] = x[i];
+			ystate[i] = y[i];
+		}
+	}
+	float lowpass(int index) {
+		return ystate[index];
+	}
+	float highpass(int index) {
+		return xstate[index] - ystate[index];
+	}
+};
+
+/*
+struct RCFilter {
+	float c = 0.f;
+	float xstate[1] = {};
+	float ystate[1] = {};
+
+	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
+	void setCutoff(float r) {
+		c = 2.f / r;
+	}
+	void process(float x) {
+		float y = (x + xstate[0] - ystate[0] * (1 - c)) / (1 + c);
+		xstate[0] = x;
+		ystate[0] = y;
+	}
+	float lowpass() {
+		return ystate[0];
+	}
+	float highpass() {
+		return xstate[0] - ystate[0];
+	}
+};
+*/
+
+	
+
+//*****************************************************************************
+
+
 struct chanVol {// a mixMap for an output has four of these, for each quadrant that can map to its output
 	float vol;// 0.0 to 1.0
 	float chan;// channel input number (0 to 15), garbage when vol is 0.0
+	bool inputIsAboveOutput;// true when an input is located above the output, false otherwise
 };
 
 
 struct mixMapOutput {
 	chanVol cvs[4];// an output can have a mix of at most 4 inputs
+	QuadRCFilter2 filt;// TODO return to simd version (test performace though, for comparison)
+
+	float calcFilteredOutput() {
+		float filterOut = 0.0f;
+		for (int i = 0; i < 4; i++) {
+			if (cvs[i].vol > 0.0f) {
+				filterOut += (cvs[i].inputIsAboveOutput ? filt.highpass(i) : filt.lowpass(i));
+			}				
+		}
+		return filterOut;
+	}
 
 	void init() {
 		for (int i = 0; i < 4; i++) {
-			cvs[i].vol = 0.0f;// when this is non-zero, chan is assuredly valid
+			cvs[i].vol = 0.0f;// when this is non-zero, .chan and .inputIsAboveOutput are assuredly valid
 		}	
 	}
 	
-	void insert(float _vol, float _chan) {// _vol is never 0.0f
-		assert(_vol != 0.0f);
+	void insert(int numerator, int denominator, int mixmode, float _chan, bool _inAboveOut) {
+		float _vol = (mixmode == 1 ? 1.0f : ((float)numerator / (float)denominator)); 
 		for (int i = 0; i < 4; i++) {
 			if (cvs[i].vol == 0.0f) {
 				cvs[i].vol = _vol;
 				cvs[i].chan = _chan;
+				cvs[i].inputIsAboveOutput = _inAboveOut;
+				//float f_c = (float)calcCutoffFreq(numerator, denominator, _inAboveOut);
+				//if (_inAboveOut)
+					//filt.setCutoff(i, 441.0f / 44100.0f);// low pass (red)
+				//else
+					filt.setCutoff(i, 44100.0f / 44100.0f);// high pass (part of blue)
 				return;
 			}
 		}
 		assert(false);
+	}
+	
+	void processFilters(float *invals) {
+		filt.process(invals);
+	}
+	
+	inline int calcCutoffFreq(int num, int denum, bool isHighPass) {
+		switch (denum) {
+			case (3) :
+				if (num == 1) return isHighPass ? 8000 : 60;
+				return isHighPass ? 3000 : 200;
+			break;
+			
+			case (4) :
+				if (num == 1) return isHighPass ? 10000 : 50;
+				if (num == 3) return isHighPass ? 3900 : 250;
+			break;
+			
+			case (5) :
+				if (num == 1) return isHighPass ? 12000 : 40;
+				if (num == 2) return isHighPass ? 7000 : 70;
+				if (num == 3) return isHighPass ? 4000 : 150;
+				return isHighPass ? 3000 : 250;
+			break;
+			
+			case (6) :
+				if (num == 1) return isHighPass ? 12500 : 30;
+				if (num == 2) return isHighPass ? 8000 : 60;
+				if (num == 4) return isHighPass ? 3000 : 200;
+				if (num == 5) return isHighPass ? 2500 : 300;
+			break;
+			
+			case (7) :
+				if (num == 1) return isHighPass ? 15000 : 27;
+				if (num == 2) return isHighPass ? 8100 : 50;
+				if (num == 3) return isHighPass ? 6000 : 80;
+				if (num == 4) return isHighPass ? 4000 : 125;
+				if (num == 5) return isHighPass ? 2500 : 200;
+				return isHighPass ? 2000 : 350;
+			break;
+			
+			case (8) :
+				if (num == 1) return isHighPass ? 18000 : 22;
+				if (num == 2) return isHighPass ? 10000 : 40;
+				if (num == 3) return isHighPass ? 7000 : 68;
+				if (num == 5) return isHighPass ? 3900 : 160;
+				if (num == 6) return isHighPass ? 2500 : 250;
+				if (num == 7) return isHighPass ? 1500 : 400;
+			break;
+		}
+		return isHighPass ? 5000 : 100;
 	}
 };
 	
@@ -61,6 +221,7 @@ struct Torus : Module {
 	enum LightIds {
 		DECAY_LIGHT,
 		CONSTANT_LIGHT,
+		FILTER_LIGHT,
 		NUM_LIGHTS
 	};
 	
@@ -70,7 +231,7 @@ struct Torus : Module {
 	
 	// Need to save
 	int panelTheme;
-	int mixmode;// 0 is decay, 1 is constant
+	int mixmode;// 0 is decay, 1 is constant, 2 is filter
 	
 	// No need to save
 	unsigned int lightRefreshCounter = 0;
@@ -95,6 +256,11 @@ struct Torus : Module {
 		updateMixMap();
 	}
 
+
+	void onSampleRateChange() override {
+		updateMixMap();// this will make sure cutoff freqs get adjusted if necessary
+	}		
+	
 	
 	void onRandomize() override {
 	}
@@ -131,7 +297,7 @@ struct Torus : Module {
 		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
 			// mixmode
 			if (modeTrigger.process(params[MODE_PARAM].getValue())) {
-				if (++mixmode > 1)
+				if (++mixmode > 2)
 					mixmode = 0;
 			}
 			
@@ -141,7 +307,8 @@ struct Torus : Module {
 		
 		// mixer code
 		for (int outi = 0; outi < 7; outi++) {
-			outputs[MIX_OUTPUTS + outi].setVoltage(clamp(calcOutput(outi) * params[GAIN_PARAM].getValue(), -10.0f, 10.0f));
+			float outValue = outputs[MIX_OUTPUTS + outi].isConnected() ? clamp(calcOutput(outi) * params[GAIN_PARAM].getValue(), -10.0f, 10.0f) : 0.0f;
+			outputs[MIX_OUTPUTS + outi].setVoltage(outValue);
 		}
 		
 
@@ -152,15 +319,17 @@ struct Torus : Module {
 
 			lights[DECAY_LIGHT].setBrightness(mixmode == 0 ? 1.0f : 0.0f);
 			lights[CONSTANT_LIGHT].setBrightness(mixmode == 1 ? 1.0f : 0.0f);
+			lights[FILTER_LIGHT].setBrightness(mixmode == 2 ? 1.0f : 0.0f);
 		}// lightRefreshCounter
 	}// step()
+	
 	
 	void updateMixMap() {
 		for (int outi = 0; outi < 7; outi++) {
 			mixMap[outi].init();
 		}
 		
-		// scan inputs for upwards flow
+		// scan inputs for upwards flow (input is below output)
 		int distanceUL = 1;
 		int distanceUR = 1;
 		for (int ini = 1; ini < 8; ini++) {
@@ -173,8 +342,7 @@ struct Torus : Module {
 					int numerator = (distanceUL - ini + outi);
 					if (numerator == 0) 
 						break;
-					float vol = (mixmode == 0 ? ((float)numerator) / ((float)(distanceUL)) : 1.0f);
-					mixMap[outi].insert(vol, ini);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, ini, false);
 				}
 				distanceUL = 1;
 			}
@@ -185,14 +353,13 @@ struct Torus : Module {
 					int numerator = (distanceUR - ini + outi);
 					if (numerator == 0) 
 						break;
-					float vol = (mixmode == 0 ? ((float)numerator) / ((float)(distanceUR)) : 1.0f);
-					mixMap[outi].insert(vol, 8 + ini);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, 8 + ini, false);
 				}
 				distanceUR = 1;
 			}			
 		}	
 
-		// scan inputs for downward flow
+		// scan inputs for downward flow (input is above output)
 		int distanceDL = 1;
 		int distanceDR = 1;
 		for (int ini = 6; ini >= 0; ini--) {
@@ -205,8 +372,7 @@ struct Torus : Module {
 					int numerator = (distanceDL - 1 + ini - outi);
 					if (numerator == 0) 
 						break;
-					float vol = (mixmode == 0 ? ((float)numerator) / ((float)(distanceDL)) : 1.0f);
-					mixMap[outi].insert(vol, ini);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, ini, true);
 				}
 				distanceDL = 1;
 			}
@@ -217,21 +383,34 @@ struct Torus : Module {
 					int numerator = (distanceDR - 1 + ini - outi);
 					if (numerator == 0) 
 						break;
-					float vol = (mixmode == 0 ? ((float)numerator) / ((float)(distanceDR)) : 1.0f);
-					mixMap[outi].insert(vol, 8 + ini);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, 8 + ini, true);
 				}
 				distanceDR = 1;
 			}		
 		}	
 	}
 	
+	
 	inline float calcOutput(int outi) {
 		float outputValue = 0.0f;
-		for (int i = 0; i < 4; i++) {
-			 float vol = mixMap[outi].cvs[i].vol;
-			 if (vol > 0.0f) {
-				outputValue += inputs[MIX_INPUTS + mixMap[outi].cvs[i].chan].getVoltage() * vol;
-			 }
+		if (mixmode < 2) {// constant or decay modes	
+			for (int i = 0; i < 4; i++) {
+				 float vol = mixMap[outi].cvs[i].vol;
+				 if (vol > 0.0f) {
+					outputValue += inputs[MIX_INPUTS + mixMap[outi].cvs[i].chan].getVoltage() * vol;
+				 }
+			}
+		}
+		else {// filter mode
+			float invals[4] = {0.0f};
+			for (int i = 0; i < 4; i++) {
+				float vol = mixMap[outi].cvs[i].vol;
+				if (vol > 0.0f) {
+					invals[i] = inputs[MIX_INPUTS + mixMap[outi].cvs[i].chan].getVoltage();
+				}
+			}
+			mixMap[outi].processFilters(invals);
+			outputValue += mixMap[outi].calcFilteredOutput();
 		}
 		return outputValue;
 	}
@@ -298,6 +477,7 @@ struct TorusWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter, 380.0f - 329.5f), module, Torus::MODE_PARAM, module ? &module->panelTheme : NULL));
 		
 		// decay and constant lights
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter, 380.0f - 343.5f), module, Torus::FILTER_LIGHT));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 12.5f, 380.0f - 322.5f), module, Torus::DECAY_LIGHT));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 12.5f, 380.0f - 322.5f), module, Torus::CONSTANT_LIGHT));
 
