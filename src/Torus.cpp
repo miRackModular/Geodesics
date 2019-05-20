@@ -37,20 +37,19 @@ struct OnePoleFilter {
 // This struct is an SIMD adaptation by Marc Boulé of the filter from
 // http://www.earlevel.com/main/2012/12/15/a-one-pole-filter/
 struct QuadOnePoleFilter {
-	simd::f32_4 b1 = simd::f32_4(0.0f);
-	simd::f32_4 lowout = simd::f32_4(0.0f);
+	float cutoffs[4] = {0.0f};
+	simd::float_4 b1 = simd::float_4(0.0f);
+	simd::float_4 lowout = simd::float_4(0.0f);
 	float lowpassOuts[4] = {0.0f};
 	float highpassOuts[4] = {0.0f};	
 	
     void setCutoff(int index, float Fc) {
-		float tb1[4] = {0.0f};
-		b1.store(tb1);
-		tb1[index] = std::exp(-2.0 * M_PI * Fc);
-		b1 = simd::f32_4::load(tb1);
+		cutoffs[index] = std::exp(-2.0 * M_PI * Fc);
 	}
 	
     void process(float *inflt) {
-		simd::f32_4 lastin = simd::f32_4::load(inflt);
+		b1 = simd::float_4::load(cutoffs);
+		simd::float_4 lastin = simd::float_4::load(inflt);
 		lowout = lastin * (1.0f - b1) + lowout * b1;
 		lowout.store(lowpassOuts);
 		lastin -= lowout;
@@ -67,6 +66,7 @@ struct QuadOnePoleFilter {
 
 
 /*
+// this is Andrew Belt's dsp::RCFilter code in VCV Rack
 struct RCFilter {
 	float c = 0.f;
 	float xstate[1] = {};
@@ -93,9 +93,9 @@ struct RCFilter {
 
 // This struct is an SIMD adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
 struct QuadRCFilter {
-	float cutoffs[4] = {0.0f};// do not change here, constructor will use to init x,y states
-	simd::f32_4 xstate = simd::f32_4(0.0f);
-	simd::f32_4 ystate = simd::f32_4(0.0f);
+	float cutoffs[4] = {0.0f};
+	simd::float_4 xstate = simd::float_4(0.0f);
+	simd::float_4 ystate = simd::float_4(0.0f);
 	float lowpassOuts[4] = {0.0f};
 	float highpassOuts[4] = {0.0f};
 
@@ -104,9 +104,9 @@ struct QuadRCFilter {
 		cutoffs[index] = 2.f / r;
 	}
 	void process(float *x_f) {// argument: 4 inputs to quad filter
-		simd::f32_4 c = simd::f32_4::load(cutoffs);
-		simd::f32_4 x = simd::f32_4::load(x_f);
-		simd::f32_4 y = (x + xstate - ystate * (1.0f - c)) / (1.0f + c);
+		simd::float_4 c = simd::float_4::load(cutoffs);
+		simd::float_4 x = simd::float_4::load(x_f);
+		simd::float_4 y = (x + xstate - ystate * (1.0f - c)) / (1.0f + c);
 		xstate = x;
 		ystate = y;
 		y.store(lowpassOuts);
@@ -120,7 +120,6 @@ struct QuadRCFilter {
 		return highpassOuts[index];
 	}
 };
-
 
 
 // This struct is an adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
@@ -162,18 +161,8 @@ struct chanVol {// a mixMap for an output has four of these, for each quadrant t
 
 struct mixMapOutput {
 	chanVol cvs[4];// an output can have a mix of at most 4 inputs
-	QuadOnePoleFilter filt;
-	// QuadRCFilter filt;
-
-	float calcFilteredOutput() {
-		float filterOut = 0.0f;
-		for (int i = 0; i < 4; i++) {
-			if (cvs[i].vol > 0.0f) {
-				filterOut += (cvs[i].inputIsAboveOutput ? filt.highpass(i) : filt.lowpass(i));
-			}				
-		}
-		return filterOut;
-	}
+	// QuadOnePoleFilter filt;
+	QuadRCFilter2 filt;
 
 	void init() {
 		for (int i = 0; i < 4; i++) {
@@ -181,6 +170,16 @@ struct mixMapOutput {
 		}	
 	}
 	
+	float calcFilteredOutput() {
+		float filterOut = 0.0f;
+		for (int i = 0; i < 4; i++) {
+			if (cvs[i].vol > 0.0f) {
+				filterOut += (cvs[i].inputIsAboveOutput ? filt.lowpass(i) : filt.highpass(i));
+			}				
+		}
+		return filterOut;
+	}
+
 	void insert(int numerator, int denominator, int mixmode, float _chan, bool _inAboveOut) {
 		float _vol = (mixmode == 1 ? 1.0f : ((float)numerator / (float)denominator)); 
 		for (int i = 0; i < 4; i++) {
@@ -189,7 +188,7 @@ struct mixMapOutput {
 				cvs[i].chan = _chan;
 				cvs[i].inputIsAboveOutput = _inAboveOut;
 				float f_c = (float)calcCutoffFreq(numerator, denominator, _inAboveOut);
-				filt.setCutoff(i, f_c / 44100.0f);
+				filt.setCutoff(i, f_c / 44100.0f);// TODO use Rack's sampleRate
 				return;
 			}
 		}
@@ -200,51 +199,52 @@ struct mixMapOutput {
 		filt.process(invals);
 	}
 	
-	inline int calcCutoffFreq(int num, int denum, bool isHighPass) {
+	inline int calcCutoffFreq(int num, int denum, bool isLowPass) {
+		num = denum - num;// complement since distance is complement of volume's fraction in decay mode
 		switch (denum) {
 			case (3) :
-				if (num == 1) return isHighPass ? 8000 : 60;
-				return isHighPass ? 3000 : 200;
+				if (num == 1) return isLowPass ? 8000 : 60;
+				return isLowPass ? 3000 : 200;
 			break;
 			
 			case (4) :
-				if (num == 1) return isHighPass ? 10000 : 50;
-				if (num == 3) return isHighPass ? 3900 : 250;
+				if (num == 1) return isLowPass ? 10000 : 50;
+				if (num == 3) return isLowPass ? 3900 : 250;
 			break;
 			
 			case (5) :
-				if (num == 1) return isHighPass ? 12000 : 40;
-				if (num == 2) return isHighPass ? 7000 : 70;
-				if (num == 3) return isHighPass ? 4000 : 150;
-				return isHighPass ? 3000 : 250;
+				if (num == 1) return isLowPass ? 12000 : 40;
+				if (num == 2) return isLowPass ? 7000 : 70;
+				if (num == 3) return isLowPass ? 4000 : 150;
+				return isLowPass ? 3000 : 250;
 			break;
 			
 			case (6) :
-				if (num == 1) return isHighPass ? 12500 : 30;
-				if (num == 2) return isHighPass ? 8000 : 60;
-				if (num == 4) return isHighPass ? 3000 : 200;
-				if (num == 5) return isHighPass ? 2500 : 300;
+				if (num == 1) return isLowPass ? 12500 : 30;
+				if (num == 2) return isLowPass ? 8000 : 60;
+				if (num == 4) return isLowPass ? 3000 : 200;
+				if (num == 5) return isLowPass ? 2500 : 300;
 			break;
 			
 			case (7) :
-				if (num == 1) return isHighPass ? 15000 : 27;
-				if (num == 2) return isHighPass ? 8100 : 50;
-				if (num == 3) return isHighPass ? 6000 : 80;
-				if (num == 4) return isHighPass ? 4000 : 125;
-				if (num == 5) return isHighPass ? 2500 : 200;
-				return isHighPass ? 2000 : 350;
+				if (num == 1) return isLowPass ? 15000 : 27;
+				if (num == 2) return isLowPass ? 8100 : 50;
+				if (num == 3) return isLowPass ? 6000 : 80;
+				if (num == 4) return isLowPass ? 4000 : 125;
+				if (num == 5) return isLowPass ? 2500 : 200;
+				return isLowPass ? 2000 : 350;
 			break;
 			
 			case (8) :
-				if (num == 1) return isHighPass ? 18000 : 22;
-				if (num == 2) return isHighPass ? 10000 : 40;
-				if (num == 3) return isHighPass ? 7000 : 68;
-				if (num == 5) return isHighPass ? 3900 : 160;
-				if (num == 6) return isHighPass ? 2500 : 250;
-				if (num == 7) return isHighPass ? 1500 : 400;
+				if (num == 1) return isLowPass ? 18000 : 22;
+				if (num == 2) return isLowPass ? 10000 : 40;
+				if (num == 3) return isLowPass ? 7000 : 68;
+				if (num == 5) return isLowPass ? 3900 : 160;
+				if (num == 6) return isLowPass ? 2500 : 250;
+				if (num == 7) return isLowPass ? 1500 : 400;
 			break;
 		}
-		return isHighPass ? 5000 : 100;
+		return isLowPass ? 5000 : 100;
 	}
 };
 	
@@ -390,7 +390,7 @@ struct Torus : Module {
 					int numerator = (distanceUL - ini + outi);
 					if (numerator == 0) 
 						break;
-					mixMap[outi].insert(numerator, distanceUL, mixmode, ini, false);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, ini, false);// last param is _inAboveOut
 				}
 				distanceUL = 1;
 			}
@@ -401,7 +401,7 @@ struct Torus : Module {
 					int numerator = (distanceUR - ini + outi);
 					if (numerator == 0) 
 						break;
-					mixMap[outi].insert(numerator, distanceUL, mixmode, 8 + ini, false);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, 8 + ini, false);// last param is _inAboveOut
 				}
 				distanceUR = 1;
 			}			
@@ -420,7 +420,7 @@ struct Torus : Module {
 					int numerator = (distanceDL - 1 + ini - outi);
 					if (numerator == 0) 
 						break;
-					mixMap[outi].insert(numerator, distanceUL, mixmode, ini, true);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, ini, true);// last param is _inAboveOut
 				}
 				distanceDL = 1;
 			}
@@ -431,7 +431,7 @@ struct Torus : Module {
 					int numerator = (distanceDR - 1 + ini - outi);
 					if (numerator == 0) 
 						break;
-					mixMap[outi].insert(numerator, distanceUL, mixmode, 8 + ini, true);
+					mixMap[outi].insert(numerator, distanceUL, mixmode, 8 + ini, true);// last param is _inAboveOut
 				}
 				distanceDR = 1;
 			}		
