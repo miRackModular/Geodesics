@@ -228,6 +228,32 @@ struct Trigger : dsp::SchmittTrigger {
 	bool process(float in);
 };	
 
+
+// http://www.earlevel.com/main/2012/12/15/a-one-pole-filter/
+// A one-pole filter
+// Posted on December 15, 2012 by Nigel Redmon
+// Adapted by Marc Boulé
+struct OnePoleFilter {
+    float b1 = 0.0;
+	float lowout = 0.0;
+	// float lastin = 0.0f;
+	
+    void setCutoff(float Fc) {
+		b1 = exp(-2.0 * M_PI * Fc);
+	}
+    float process(float in) {
+		// lastin = in;
+		return lowout = in * (1.0f - b1) + lowout * b1;
+	}
+	// float lowpass() {
+		// return lowout;
+	// }
+	// float highpass() {
+		// return lastin - lowout;
+	// }
+};
+
+
 struct HoldDetect {
 	long modeHoldDetect;// 0 when not detecting, downward counter when detecting
 	

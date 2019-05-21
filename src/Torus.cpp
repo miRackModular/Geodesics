@@ -12,96 +12,29 @@
 #include "Geodesics.hpp"
 
 
-// http://www.earlevel.com/main/2012/12/15/a-one-pole-filter/
-struct OnePoleFilter {
-    float b1 = 0.0;
-	float lowout = 0.0;
-	float lastin = 0.0f;
-	
-    void setCutoff(float Fc) {
-		b1 = exp(-2.0 * M_PI * Fc);
-	}
-    void process(float in) {
-		lastin = in;
-		lowout = in * (1.0f - b1) + lowout * b1;
-	}
-	float lowpass() {
-		return lowout;
-	}
-	float highpass() {
-		return lastin - lowout;
-	}
-};
-
-
-// This struct is an SIMD adaptation by Marc Boulé of the filter from
-// http://www.earlevel.com/main/2012/12/15/a-one-pole-filter/
-// this is slower than 
-struct QuadOnePoleFilter {
-	float cutoffs[4] = {0.0f};
-	simd::float_4 b1 = simd::float_4(0.0f);
-	simd::float_4 lowout = simd::float_4(0.0f);
-	float lowpassOuts[4] = {0.0f};
-	float highpassOuts[4] = {0.0f};	
-	
-    void setCutoff(int index, float Fc) {
-		cutoffs[index] = std::exp(-2.0 * M_PI * Fc);
-	}
-	
-    void process(float *inflt) {
-		b1 = simd::float_4::load(cutoffs);
-		simd::float_4 lastin = simd::float_4::load(inflt);
-		lowout = lastin * (1.0f - b1) + lowout * b1;
-		lowout.store(lowpassOuts);
-		lastin -= lowout;
-		lastin.store(highpassOuts);
-	}
-	
-	float lowpass(int index) {
-		return lowpassOuts[index];
-	}
-	float highpass(int index) {
-		return highpassOuts[index];
-	}
-};
-
-struct QuadOnePoleFilter2 {
-    float b1[4] = {0.0f};
-	float lowout[4] = {0.0f};
-	float lastin[4] = {0.0f};
-	
-    void setCutoff(int index, float Fc) {
-		b1[index] = exp(-2.0 * M_PI * Fc);
-	}
-    void process(float *in) {
-		for (int i = 0; i < 4; i++) {
-			lastin[i] = in[i];
-			lowout[i] = in[i] * (1.0f - b1[i]) + lowout[i] * b1[i];
-		}
-	}
-	float lowpass(int index) {
-		return lowout[index];
-	}
-	float highpass(int index) {
-		return lastin[index] - lowout[index];
-	}
-};
-
-
-//*****************************************************************************
-
-
 struct chanVol {// a mixMap for an output has four of these, for each quadrant that can map to its output
 	float vol;// 0.0 to 1.0
 	float chan;// channel input number (0 to 15)
 	bool inputIsAboveOutput;// true when an input is located above the output, false otherwise
+	OnePoleFilter filt;
+	
+	inline void writeChan(float _vol, int _chan, bool _inAboveOut, float norm_f_c) {
+		vol = _vol;
+		chan = _chan;
+		inputIsAboveOutput = _inAboveOut;
+		filt.setCutoff(norm_f_c);		
+	}
+	
+	inline float processFilter(float inval) {
+		float outval = filt.process(inval);
+		return (inputIsAboveOutput ? outval : (inval - outval));// inputIsAboveOutput ? lowpass : highpass		
+	}
 };
 
 
 struct mixMapOutput {
 	chanVol cvs[4];// an output can have a mix of at most 4 inputs
 	int numInputs;// number of inputs that need to be read for this given output
-	QuadOnePoleFilter2 filt;
 	float sampleRate;
 
 	void init(float _sampleRate) {
@@ -109,22 +42,18 @@ struct mixMapOutput {
 		numInputs = 0;
 	}
 	
-	float calcFilteredOutput(float *invals) {
-		filt.process(invals);// TODO process only those indexes that are < numInputs
-		
-		float filterOut = 0.0f;
-		for (int i = 0; i < numInputs; i++) {
-			filterOut += (cvs[i].inputIsAboveOutput ? filt.lowpass(i) : filt.highpass(i));			
-		}
-		return filterOut;
+	inline float getScaledInput(int index, float inval) {
+		return inval * cvs[index].vol;
+	}		
+
+	inline float getFilteredInput(int index, float inval) {
+		return cvs[index].processFilter(inval);
 	}
 
 	void insert(int numerator, int denominator, int mixmode, float _chan, bool _inAboveOut) {
-		cvs[numInputs].vol = (mixmode == 1 ? 1.0f : ((float)numerator / (float)denominator));;
-		cvs[numInputs].chan = _chan;
-		cvs[numInputs].inputIsAboveOutput = _inAboveOut;
+		float _vol = (mixmode == 1 ? 1.0f : ((float)numerator / (float)denominator));
 		float f_c = (float)calcCutoffFreq(numerator, denominator, _inAboveOut);
-		filt.setCutoff(numInputs, f_c / sampleRate);
+		cvs[numInputs].writeChan(_vol, _chan, _inAboveOut, f_c / sampleRate);
 		numInputs++;
 	}
 		
@@ -279,7 +208,10 @@ struct Torus : Module {
 		
 		// mixer code
 		for (int outi = 0; outi < 7; outi++) {
-			float outValue = outputs[MIX_OUTPUTS + outi].isConnected() ? clamp(calcOutput(outi) * params[GAIN_PARAM].getValue(), -10.0f, 10.0f) : 0.0f;
+			float outValue = 0.0f;
+			if (outputs[MIX_OUTPUTS + outi].isConnected()) {
+				outValue = clamp(calcOutput(outi) * params[GAIN_PARAM].getValue(), -10.0f, 10.0f);
+			}
 			outputs[MIX_OUTPUTS + outi].setVoltage(outValue);
 		}
 		
@@ -366,22 +298,16 @@ struct Torus : Module {
 	inline float calcOutput(int outi) {
 		float outputValue = 0.0f;
 		if (mixmode < 2) {// constant or decay modes	
-			for (int i = 0; i < 4; i++) {
-				 float vol = mixMap[outi].cvs[i].vol;
-				 if (vol > 0.0f) {
-					outputValue += inputs[MIX_INPUTS + mixMap[outi].cvs[i].chan].getVoltage() * vol;
-				 }
+			for (int i = 0; i < mixMap[outi].numInputs; i++) {
+				int chan = mixMap[outi].cvs[i].chan;
+				outputValue += mixMap[outi].getScaledInput(i, inputs[MIX_INPUTS + chan].getVoltage());
 			}
 		}
 		else {// filter mode
-			float invals[4] = {0.0f};
-			for (int i = 0; i < 4; i++) {
-				float vol = mixMap[outi].cvs[i].vol;
-				if (vol > 0.0f) {
-					invals[i] = inputs[MIX_INPUTS + mixMap[outi].cvs[i].chan].getVoltage();
-				}
+			for (int i = 0; i < mixMap[outi].numInputs; i++) {
+				int chan = mixMap[outi].cvs[i].chan;
+				outputValue += mixMap[outi].getFilteredInput(i, inputs[MIX_INPUTS + chan].getVoltage());
 			}
-			outputValue += mixMap[outi].calcFilteredOutput(invals);
 		}
 		return outputValue;
 	}
