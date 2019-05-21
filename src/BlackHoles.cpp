@@ -54,7 +54,7 @@ struct BlackHoles : Module {
 	Trigger expTriggers[2];
 	Trigger cvLevelTriggers[2];
 	Trigger wormholeTrigger;
-	unsigned int lightRefreshCounter = 0;
+	RefreshCounter refresh;
 
 	
 	BlackHoles() {
@@ -143,8 +143,7 @@ struct BlackHoles : Module {
 
 	
 	void process(const ProcessArgs &args) override {
-		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
-
+		if (refresh.processInputs()) {
 			// Exponential buttons
 			for (int i = 0; i < 2; i++)
 				if (expTriggers[i].process(params[EXP_PARAMS + i].getValue())) {
@@ -161,7 +160,6 @@ struct BlackHoles : Module {
 				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].getValue()))
 					cvMode ^= (0x1 << i);
 			}
-		
 		}// userInputs refresh
 		
 		// BlackHole 0 all outputs
@@ -194,10 +192,8 @@ struct BlackHoles : Module {
 		}
 		outputs[BLACKHOLE_OUTPUTS + 1].setVoltage(clamp(blackHole1, -10.0f, 10.0f));
 
-		lightRefreshCounter++;
-		if (lightRefreshCounter >= displayRefreshStepSkips) {
-			lightRefreshCounter = 0;
-
+		// lights
+		if (refresh.processLights()) {
 			// Wormhole light
 			lights[WORMHOLE_LIGHT].setBrightness(wormhole ? 1.0f : 0.0f);
 					

@@ -99,7 +99,7 @@ struct Entropia : Module {
 	long clockIgnoreOnReset;
 	float resetLight = 0.0f;
 	float cvLight = 0.0f;
-	unsigned int lightRefreshCounter = 0;
+	RefreshCounter refresh;
 	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	Trigger runningTrigger;
 	Trigger plankTriggers[2];
@@ -360,8 +360,7 @@ struct Entropia : Module {
 			}
 		}
 		
-		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
-
+		if (refresh.processInputs()) {
 			// Length button and input
 			bool lengthTrig = lengthTrigger.process(params[LENGTH_PARAM].getValue());
 			if (inputs[LENGTH_INPUT].isConnected()) {
@@ -500,10 +499,9 @@ struct Entropia : Module {
 		else
 			outputs[CV_OUTPUT].setVoltage(calcOutput(stepIndex));
 		
-		lightRefreshCounter++;
-		if (lightRefreshCounter >= displayRefreshStepSkips) {
-			lightRefreshCounter = 0;
-			float deltaTime = args.sampleTime * displayRefreshStepSkips;
+		// lights
+		if (refresh.processLights()) {
+			float deltaTime = args.sampleTime * RefreshCounter::displayRefreshStepSkips;
 
 			// Reset light
 			lights[RESET_LIGHT].setSmoothBrightness(resetLight, deltaTime);	

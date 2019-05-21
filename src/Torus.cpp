@@ -16,16 +16,16 @@ struct chanVol {// a mixMap for an output has four of these, for each quadrant t
 	float vol;// 0.0 to 1.0
 	float chan;// channel input number (0 to 15)
 	bool inputIsAboveOutput;// true when an input is located above the output, false otherwise
-	OnePoleFilter filt;
+	OnePoleFilter filt;// a lowpass filter (highpass is done using "inval - outval" trick
 	
-	inline void writeChan(float _vol, int _chan, bool _inAboveOut, float norm_f_c) {
+	void writeChan(float _vol, int _chan, bool _inAboveOut, float norm_f_c) {
 		vol = _vol;
 		chan = _chan;
 		inputIsAboveOutput = _inAboveOut;
 		filt.setCutoff(norm_f_c);		
 	}
 	
-	inline float processFilter(float inval) {
+	float processFilter(float inval) {
 		float outval = filt.process(inval);
 		return (inputIsAboveOutput ? outval : (inval - outval));// inputIsAboveOutput ? lowpass : highpass		
 	}
@@ -42,11 +42,11 @@ struct mixMapOutput {
 		numInputs = 0;
 	}
 	
-	inline float getScaledInput(int index, float inval) {
+	float getScaledInput(int index, float inval) {
 		return inval * cvs[index].vol;
 	}		
 
-	inline float getFilteredInput(int index, float inval) {
+	float getFilteredInput(int index, float inval) {
 		return cvs[index].processFilter(inval);
 	}
 
@@ -140,7 +140,7 @@ struct Torus : Module {
 	int mixmode;// 0 is decay, 1 is constant, 2 is filter
 	
 	// No need to save
-	unsigned int lightRefreshCounter = 0;
+	RefreshCounter refresh;
 	Trigger modeTrigger;
 	mixMapOutput mixMap[7];// 7 outputs
 	
@@ -164,6 +164,7 @@ struct Torus : Module {
 
 
 	void onRandomize() override {
+		mixmode = random::u32() % 3;
 	}
 	
 
@@ -195,7 +196,7 @@ struct Torus : Module {
 
 	void process(const ProcessArgs &args) override {		
 		// user inputs
-		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
+		if (refresh.processInputs()) {
 			// mixmode
 			if (modeTrigger.process(params[MODE_PARAM].getValue())) {
 				if (++mixmode > 2)
@@ -217,10 +218,7 @@ struct Torus : Module {
 		
 
 		// lights
-		lightRefreshCounter++;
-		if (lightRefreshCounter >= displayRefreshStepSkips) {
-			lightRefreshCounter = 0;
-
+		if (refresh.processLights()) {
 			lights[DECAY_LIGHT].setBrightness(mixmode == 0 ? 1.0f : 0.0f);
 			lights[CONSTANT_LIGHT].setBrightness(mixmode == 1 ? 1.0f : 0.0f);
 			lights[FILTER_LIGHT].setBrightness(mixmode == 2 ? 1.0f : 0.0f);
@@ -295,7 +293,7 @@ struct Torus : Module {
 	}
 	
 	
-	inline float calcOutput(int outi) {
+	float calcOutput(int outi) {
 		float outputValue = 0.0f;
 		if (mixmode < 2) {// constant or decay modes	
 			for (int i = 0; i < mixMap[outi].numInputs; i++) {

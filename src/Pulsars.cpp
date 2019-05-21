@@ -69,7 +69,7 @@ struct Pulsars : Module {
 	Trigger rndTriggers[2];
 	Trigger cvLevelTriggers[2];
 	float lfoLights[2] = {0.0f, 0.0f};
-	unsigned int lightRefreshCounter = 0;
+	RefreshCounter refresh;
 
 	
 	Pulsars() {
@@ -186,8 +186,7 @@ struct Pulsars : Module {
 
 	
 	void process(const ProcessArgs &args) override {
-		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
-
+		if (refresh.processInputs()) {
 			// Void, Reverse and Random buttons
 			for (int i = 0; i < 2; i++) {
 				if (voidTriggers[i].process(params[VOID_PARAMS + i].getValue() + inputs[VOID_INPUTS + i].getVoltage())) {
@@ -206,7 +205,6 @@ struct Pulsars : Module {
 				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].getValue()))
 					cvMode ^= (0x1 << i);
 			}
-			
 		}// userInputs refresh
 
 		// LFO values (normalized to 0.0f to 1.0f space, clamped and offset adjusted depending cvMode)
@@ -295,10 +293,8 @@ struct Pulsars : Module {
 		}
 
 		
-		lightRefreshCounter++;
-		if (lightRefreshCounter >= displayRefreshStepSkips) {
-			lightRefreshCounter = 0;
-
+		// lights
+		if (refresh.processLights()) {
 			// Void, Reverse and Random lights
 			for (int i = 0; i < 2; i++) {
 				lights[VOID_LIGHTS + i].setBrightness(isVoid[i] ? 1.0f : 0.0f);
@@ -316,7 +312,7 @@ struct Pulsars : Module {
 
 			// LFO lights
 			for (int i = 0; i < 2; i++) {
-				lights[LFO_LIGHTS + i].setSmoothBrightness(lfoLights[i], (float)args.sampleTime * displayRefreshStepSkips);
+				lights[LFO_LIGHTS + i].setSmoothBrightness(lfoLights[i], (float)args.sampleTime * RefreshCounter::displayRefreshStepSkips);
 				lfoLights[i] = 0.0f;
 			}
 			

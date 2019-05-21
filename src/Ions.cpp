@@ -103,7 +103,7 @@ struct Ions : Module {
 	dsp::PulseGenerator jumpPulses[2];
 	float jumpLights[2] = {0.0f, 0.0f};
 	float stepClocksLight = 0.0f;
-	unsigned int lightRefreshCounter = 0;
+	RefreshCounter refresh;
 
 	
 	inline float quantizeCV(float cv) {return std::round(cv * 12.0f) / 12.0f;}
@@ -284,8 +284,7 @@ struct Ions : Module {
 			}
 		}
 		
-		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
-
+		if (refresh.processInputs()) {
 			// Leap button
 			if (leapTrigger.process(params[LEAP_PARAM].getValue() + inputs[LEAP_INPUT].getVoltage())) {
 				leap = !leap;
@@ -353,7 +352,6 @@ struct Ions : Module {
 					}
 				}
 			}
-
 		}// userInputs refresh
 		
 
@@ -432,10 +430,9 @@ struct Ions : Module {
 			outputs[JUMP_OUTPUTS + i].setVoltage(jumpPulses[i].process((float)args.sampleTime) ? 10.0f : 0.0f);
 		}
 		
-		lightRefreshCounter++;
-		if (lightRefreshCounter >= displayRefreshStepSkips) {
-			lightRefreshCounter = 0;
-
+		// lights
+		if (refresh.processLights()) {
+			float deltaTime = args.sampleTime * RefreshCounter::displayRefreshStepSkips;
 			// Blue and Yellow lights
 			for (int i = 0; i < 16; i++) {
 				lights[BLUE_LIGHTS + i].setBrightness(stepIndexes[0] == i ? 1.0f : 0.0f);
@@ -443,7 +440,7 @@ struct Ions : Module {
 			}
 			
 			// Reset light
-			lights[RESET_LIGHT].setSmoothBrightness(resetLight, args.sampleTime * displayRefreshStepSkips);	
+			lights[RESET_LIGHT].setSmoothBrightness(resetLight, deltaTime);	
 			resetLight = 0.0f;	
 			
 			// Run light
@@ -470,12 +467,12 @@ struct Ions : Module {
 
 			// Jump lights
 			for (int i = 0; i < 2; i++) {
-				lights[JUMP_LIGHTS + i].setSmoothBrightness(jumpLights[i], args.sampleTime * displayRefreshStepSkips);
+				lights[JUMP_LIGHTS + i].setSmoothBrightness(jumpLights[i], deltaTime);
 				jumpLights[i] = 0.0f;
 			}
 
 			// Step clocks light
-			lights[STEPCLOCKS_LIGHT].setSmoothBrightness(stepClocksLight, args.sampleTime * displayRefreshStepSkips);
+			lights[STEPCLOCKS_LIGHT].setSmoothBrightness(stepClocksLight, deltaTime);
 			stepClocksLight = 0.0f;
 		
 		}// lightRefreshCounter

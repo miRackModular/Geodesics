@@ -57,7 +57,7 @@ struct Energy : Module {
 	int cross;// cross momentum active or not
 	
 	// No need to save
-	unsigned int lightRefreshCounter = 0;
+	RefreshCounter refresh;
 	float feedbacks[2] = {0.0f, 0.0f};
 	Trigger routingTrigger;
 	Trigger planckTriggers[2];
@@ -188,7 +188,7 @@ struct Energy : Module {
 
 	void process(const ProcessArgs &args) override {	
 		// user inputs
-		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
+		if (refresh.processInputs()) {
 			// routing
 			if (routingTrigger.process(params[ROUTING_PARAM].getValue())) {
 				if (++routing > 2)
@@ -248,10 +248,7 @@ struct Energy : Module {
 		outputs[ENERGY_OUTPUT].setVoltage(attv2);
 
 		// lights
-		lightRefreshCounter++;
-		if (lightRefreshCounter >= displayRefreshStepSkips) {
-			lightRefreshCounter = 0;
-
+		if (refresh.processLights()) {
 			// routing
 			for (int i = 0; i < 3; i++)
 				lights[ROUTING_LIGHTS + i].setBrightness(routing == i ? 1.0f : 0.0f);

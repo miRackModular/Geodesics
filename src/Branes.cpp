@@ -186,7 +186,7 @@ struct Branes : Module {
 	Trigger trigBypassTriggers[2];
 	Trigger noiseRangeTriggers[2];
 	float trigLights[2] = {0.0f, 0.0f};
-	unsigned int lightRefreshCounter = 0;
+	RefreshCounter refresh;
 	HoldDetect secretHoldDetect[2];
 	NoiseEngine noiseEngine;
 	
@@ -295,13 +295,12 @@ struct Branes : Module {
 	void process(const ProcessArgs &args) override {
 		static const float holdDetectTime = 2.0f;// seconds
 
-		if ((lightRefreshCounter & userInputsStepSkipMask) == 0) {
-			
+		if (refresh.processInputs()) {
 			// vibrations buttons and cv inputs
 			for (int i = 0; i < 2; i++) {
 				if (trigBypassTriggers[i].process(params[TRIG_BYPASS_PARAMS + i].getValue() + inputs[TRIG_BYPASS_INPUTS + i].getVoltage())) {
 					vibrations[i] ^= 0x1;
-					secretHoldDetect[i].start((long) (holdDetectTime * args.sampleRate / displayRefreshStepSkips));
+					secretHoldDetect[i].start((long) (holdDetectTime * args.sampleRate / RefreshCounter::displayRefreshStepSkips));
 				}
 			}
 			
@@ -311,7 +310,6 @@ struct Branes : Module {
 					noiseRange[i] = !noiseRange[i];
 				}
 			}
-		
 		}// userInputs refresh
 
 		// trig inputs
@@ -420,10 +418,7 @@ struct Branes : Module {
 			}
 		}
 		
-		lightRefreshCounter++;
-		if (lightRefreshCounter >= displayRefreshStepSkips) {
-			lightRefreshCounter = 0;
-
+		if (refresh.processLights()) {
 			// Lights
 			for (int i = 0; i < 2; i++) {
 				float blue = (vibrations[i] == 3 ? 1.0f : 0.0f);
@@ -431,7 +426,7 @@ struct Branes : Module {
 				float red = (vibrations[i] == 1 ? 1.0f : 0.0f);
 				float white = (vibrations[i] == 0 ? trigLights[i] : 0.0f);
 				trigLights[i] = 0.0f;
-				lights[BYPASS_TRIG_LIGHTS + i * 4 + 3].setSmoothBrightness(white, (float)args.sampleTime * displayRefreshStepSkips);
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 3].setSmoothBrightness(white, (float)args.sampleTime * RefreshCounter::displayRefreshStepSkips);
 				lights[BYPASS_TRIG_LIGHTS + i * 4 + 2].setBrightness(red);
 				lights[BYPASS_TRIG_LIGHTS + i * 4 + 1].setBrightness(yellow);
 				lights[BYPASS_TRIG_LIGHTS + i * 4 + 0].setBrightness(blue);
