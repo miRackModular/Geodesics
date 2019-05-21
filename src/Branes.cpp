@@ -38,7 +38,7 @@ struct PinkNoise {
 
 	float process() {
 		// noise source
-		const float white = random::uniform() * 2.0f - 1.0f;
+		const float white = random::uniform() * 1.2f - 0.6f;// values adjusted so that returned pink noise is in -5V to +5V range
 		
 		// filter
 		b0 = 0.99886f * b0 + white * 0.0555179f;
@@ -74,7 +74,9 @@ struct NoiseEngine {
 	float cacheValPink[2];
 	
 	
-	inline float whiteNoise() {return random::uniform() * 2.0f - 1.0f;}	
+	float whiteNoise() {
+		return random::uniform() * 10.0f - 5.0f;
+	}	
 	
 	
 	void setCutoffs(float sampleRate) {
@@ -100,37 +102,39 @@ struct NoiseEngine {
 		int braneIndex = sh < 7 ? 0 : 1;
 		int noiseIndex = noiseSources[sh];
 		if (noiseIndex == WHITE) {
-			ret = 5.0f * whiteNoise();
+			ret = whiteNoise();
 		}
 		else if (noiseIndex == RED) {
 			if (cacheHitRed[braneIndex])
-				ret = -1.0 * cacheValRed[braneIndex];
+				ret = -1.0f * cacheValRed[braneIndex];
 			else {
-				cacheValRed[braneIndex] = 25.0f * redFilter[braneIndex].process(whiteNoise());
+				cacheValRed[braneIndex] = 5.0f * redFilter[braneIndex].process(whiteNoise());
 				cacheHitRed[braneIndex] = true;
 				ret = cacheValRed[braneIndex];
 			}
 		}
 		else if (noiseIndex == PINK) {
 			if (cacheHitPink[braneIndex])
-				ret = -1.0 * cacheValPink[braneIndex];
+				ret = -1.0f * cacheValPink[braneIndex];
 			else {
-				cacheValPink[braneIndex] = 5.0f * clamp(0.17f * pinkNoise[braneIndex].process(), -1.0f, 1.0f);
+				cacheValPink[braneIndex] = pinkNoise[braneIndex].process();
 				cacheHitPink[braneIndex] = true;
 				ret = cacheValPink[braneIndex];
 			}
 		}
 		else {// noiseIndex == BLUE
 			if (cacheHitBlue[braneIndex])
-				ret = -1.0 * cacheValBlue[braneIndex];
+				ret = -1.0f * cacheValBlue[braneIndex];
 			else {
 				float pinkForBlue = pinkForBlueNoise[braneIndex].process();
 				pinkForBlue -= blueFilter[braneIndex].process(pinkForBlue);// (input - lowpass) technique is used to make the highpass
-				cacheValBlue[braneIndex] = 5.0f * clamp(0.7f * pinkForBlue, -1.0f, 1.0f);
+				cacheValBlue[braneIndex] = 5.8f * pinkForBlue;
 				cacheHitBlue[braneIndex] = true;
 				ret = cacheValBlue[braneIndex];
 			}
 		}
+		// if (noiseIndex == BLUE)// use for calibrating multipliers in the above code
+			// if (ret > 5.0f || ret < -5.0f) INFO("OUT OF BOUNDS %f",ret);
 		return ret;
 	}		
 };

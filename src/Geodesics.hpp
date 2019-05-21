@@ -252,12 +252,12 @@ struct Trigger : dsp::SchmittTrigger {
 // Posted on December 15, 2012 by Nigel Redmon
 // Adapted by Marc Boulé
 struct OnePoleFilter {
-    float b1 = 0.0;
-	float lowout = 0.0;
+    float b1 = 0.0f;
+	float lowout = 0.0f;
 	// float lastin = 0.0f;
 	
     void setCutoff(float Fc) {
-		b1 = exp(-2.0 * M_PI * Fc);
+		b1 = std::exp(-2.0f * M_PI * Fc);
 	}
     float process(float in) {
 		// lastin = in;
