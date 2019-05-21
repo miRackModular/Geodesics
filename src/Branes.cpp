@@ -64,8 +64,8 @@ struct NoiseEngine {
 
 	PinkNoise pinkNoise[2];
 	PinkNoise pinkForBlueNoise[2];
-	dsp::RCFilter redFilter[2];// for lowpass
-	dsp::RCFilter blueFilter[2];// for highpass
+	OnePoleFilter redFilter[2];// for lowpass
+	OnePoleFilter blueFilter[2];// for highpass
 	bool cacheHitRed[2];// no need to init; index is braneIndex
 	float cacheValRed[2];
 	bool cacheHitBlue[2];// no need to init; index is braneIndex
@@ -78,10 +78,10 @@ struct NoiseEngine {
 	
 	
 	void setCutoffs(float sampleRate) {
-		redFilter[0].setCutoff(441.0f / sampleRate);// low pass
-		redFilter[1].setCutoff(441.0f / sampleRate);
-		blueFilter[0].setCutoff(44100.0f / sampleRate);// high pass
-		blueFilter[1].setCutoff(44100.0f / sampleRate);
+		redFilter[0].setCutoff(70.0f / sampleRate);// low pass
+		redFilter[1].setCutoff(70.0f / sampleRate);
+		blueFilter[0].setCutoff(4410.0f / sampleRate);// high pass
+		blueFilter[1].setCutoff(4410.0f / sampleRate);
 	}		
 	
 	
@@ -106,8 +106,7 @@ struct NoiseEngine {
 			if (cacheHitRed[braneIndex])
 				ret = -1.0 * cacheValRed[braneIndex];
 			else {
-				redFilter[braneIndex].process(whiteNoise());
-				cacheValRed[braneIndex] = 5.0f * clamp(7.5f * redFilter[braneIndex].lowpass(), -1.0f, 1.0f);
+				cacheValRed[braneIndex] = 25.0f * redFilter[braneIndex].process(whiteNoise());
 				cacheHitRed[braneIndex] = true;
 				ret = cacheValRed[braneIndex];
 			}
@@ -125,8 +124,9 @@ struct NoiseEngine {
 			if (cacheHitBlue[braneIndex])
 				ret = -1.0 * cacheValBlue[braneIndex];
 			else {
-				blueFilter[braneIndex].process(pinkForBlueNoise[braneIndex].process());
-				cacheValBlue[braneIndex] = 5.0f * clamp(0.7f * blueFilter[braneIndex].highpass(), -1.0f, 1.0f);
+				float pinkForBlue = pinkForBlueNoise[braneIndex].process();
+				pinkForBlue -= blueFilter[braneIndex].process(pinkForBlue);// (input - lowpass) technique is used to make the highpass
+				cacheValBlue[braneIndex] = 5.0f * clamp(0.7f * pinkForBlue, -1.0f, 1.0f);
 				cacheHitBlue[braneIndex] = true;
 				ret = cacheValBlue[braneIndex];
 			}
