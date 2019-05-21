@@ -36,6 +36,7 @@ struct OnePoleFilter {
 
 // This struct is an SIMD adaptation by Marc Boulé of the filter from
 // http://www.earlevel.com/main/2012/12/15/a-one-pole-filter/
+// this is slower than 
 struct QuadOnePoleFilter {
 	float cutoffs[4] = {0.0f};
 	simd::float_4 b1 = simd::float_4(0.0f);
@@ -64,142 +65,70 @@ struct QuadOnePoleFilter {
 	}
 };
 
-
-/*
-// this is Andrew Belt's dsp::RCFilter code in VCV Rack
-struct RCFilter {
-	float c = 0.f;
-	float xstate[1] = {};
-	float ystate[1] = {};
-
-	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
-	void setCutoff(float r) {
-		c = 2.f / r;
+struct QuadOnePoleFilter2 {
+    float b1[4] = {0.0f};
+	float lowout[4] = {0.0f};
+	float lastin[4] = {0.0f};
+	
+    void setCutoff(int index, float Fc) {
+		b1[index] = exp(-2.0 * M_PI * Fc);
 	}
-	void process(float x) {
-		float y = (x + xstate[0] - ystate[0] * (1 - c)) / (1 + c);
-		xstate[0] = x;
-		ystate[0] = y;
-	}
-	float lowpass() {
-		return ystate[0];
-	}
-	float highpass() {
-		return xstate[0] - ystate[0];
-	}
-};
-*/
-
-
-// This struct is an SIMD adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
-struct QuadRCFilter {
-	float cutoffs[4] = {0.0f};
-	simd::float_4 xstate = simd::float_4(0.0f);
-	simd::float_4 ystate = simd::float_4(0.0f);
-	float lowpassOuts[4] = {0.0f};
-	float highpassOuts[4] = {0.0f};
-
-	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
-	void setCutoff(int index, float r) {// TODO add sample rate to calculation so that a cutoff f_c is not changed when sample rate changes
-		cutoffs[index] = 2.f / r;
-	}
-	void process(float *x_f) {// argument: 4 inputs to quad filter
-		simd::float_4 c = simd::float_4::load(cutoffs);
-		simd::float_4 x = simd::float_4::load(x_f);
-		simd::float_4 y = (x + xstate - ystate * (1.0f - c)) / (1.0f + c);
-		xstate = x;
-		ystate = y;
-		y.store(lowpassOuts);
-		x -= y;
-		x.store(highpassOuts);
-	}
-	float lowpass(int index) {
-		return lowpassOuts[index];
-	}
-	float highpass(int index) {
-		return highpassOuts[index];
-	}
-};
-
-
-// This struct is an adaptation by Marc Boulé of Andrew Belt's dsp::RCFilter code in VCV Rack
-struct QuadRCFilter2 {
-	float c[4] = {0.f};
-	float xstate[4] = {};
-	float ystate[4] = {};
-
-	// `r` is the ratio between the cutoff frequency and sample rate, i.e. r = f_c / f_s
-	void setCutoff(int index, float r) {
-		c[index] = 2.f / r;
-	}
-	void process(float *x) {
-		float y[4];
+    void process(float *in) {
 		for (int i = 0; i < 4; i++) {
-			y[i] = (x[i] + xstate[i] - ystate[i] * (1 - c[i])) / (1 + c[i]);
-			xstate[i] = x[i];
-			ystate[i] = y[i];
+			lastin[i] = in[i];
+			lowout[i] = in[i] * (1.0f - b1[i]) + lowout[i] * b1[i];
 		}
 	}
 	float lowpass(int index) {
-		return ystate[index];
+		return lowout[index];
 	}
 	float highpass(int index) {
-		return xstate[index] - ystate[index];
+		return lastin[index] - lowout[index];
 	}
 };
-	
+
 
 //*****************************************************************************
 
 
 struct chanVol {// a mixMap for an output has four of these, for each quadrant that can map to its output
 	float vol;// 0.0 to 1.0
-	float chan;// channel input number (0 to 15), garbage when vol is 0.0
+	float chan;// channel input number (0 to 15)
 	bool inputIsAboveOutput;// true when an input is located above the output, false otherwise
 };
 
 
 struct mixMapOutput {
 	chanVol cvs[4];// an output can have a mix of at most 4 inputs
-	// QuadOnePoleFilter filt;
-	QuadRCFilter2 filt;
+	int numInputs;// number of inputs that need to be read for this given output
+	QuadOnePoleFilter2 filt;
+	float sampleRate;
 
-	void init() {
-		for (int i = 0; i < 4; i++) {
-			cvs[i].vol = 0.0f;// when this is non-zero, .chan and .inputIsAboveOutput are assuredly valid
-		}	
+	void init(float _sampleRate) {
+		sampleRate = _sampleRate;
+		numInputs = 0;
 	}
 	
-	float calcFilteredOutput() {
+	float calcFilteredOutput(float *invals) {
+		filt.process(invals);// TODO process only those indexes that are < numInputs
+		
 		float filterOut = 0.0f;
-		for (int i = 0; i < 4; i++) {
-			if (cvs[i].vol > 0.0f) {
-				filterOut += (cvs[i].inputIsAboveOutput ? filt.lowpass(i) : filt.highpass(i));
-			}				
+		for (int i = 0; i < numInputs; i++) {
+			filterOut += (cvs[i].inputIsAboveOutput ? filt.lowpass(i) : filt.highpass(i));			
 		}
 		return filterOut;
 	}
 
 	void insert(int numerator, int denominator, int mixmode, float _chan, bool _inAboveOut) {
-		float _vol = (mixmode == 1 ? 1.0f : ((float)numerator / (float)denominator)); 
-		for (int i = 0; i < 4; i++) {
-			if (cvs[i].vol == 0.0f) {
-				cvs[i].vol = _vol;
-				cvs[i].chan = _chan;
-				cvs[i].inputIsAboveOutput = _inAboveOut;
-				float f_c = (float)calcCutoffFreq(numerator, denominator, _inAboveOut);
-				filt.setCutoff(i, f_c / 44100.0f);// TODO use Rack's sampleRate
-				return;
-			}
-		}
-		assert(false);
+		cvs[numInputs].vol = (mixmode == 1 ? 1.0f : ((float)numerator / (float)denominator));;
+		cvs[numInputs].chan = _chan;
+		cvs[numInputs].inputIsAboveOutput = _inAboveOut;
+		float f_c = (float)calcCutoffFreq(numerator, denominator, _inAboveOut);
+		filt.setCutoff(numInputs, f_c / sampleRate);
+		numInputs++;
 	}
-	
-	void processFilters(float *invals) {
-		filt.process(invals);
-	}
-	
-	inline int calcCutoffFreq(int num, int denum, bool isLowPass) {
+		
+	int calcCutoffFreq(int num, int denum, bool isLowPass) {
 		num = denum - num;// complement since distance is complement of volume's fraction in decay mode
 		switch (denum) {
 			case (3) :
@@ -301,15 +230,10 @@ struct Torus : Module {
 	
 	void onReset() override {
 		mixmode = 0;
-		updateMixMap();
+		updateMixMap(APP->engine->getSampleRate());
 	}
 
 
-	void onSampleRateChange() override {
-		updateMixMap();// this will make sure cutoff freqs get adjusted if necessary
-	}		
-	
-	
 	void onRandomize() override {
 	}
 	
@@ -349,7 +273,7 @@ struct Torus : Module {
 					mixmode = 0;
 			}
 			
-			updateMixMap();
+			updateMixMap(args.sampleRate);
 		}// userInputs refresh
 		
 		
@@ -372,9 +296,9 @@ struct Torus : Module {
 	}// step()
 	
 	
-	void updateMixMap() {
+	void updateMixMap(float sampleRate) {
 		for (int outi = 0; outi < 7; outi++) {
-			mixMap[outi].init();
+			mixMap[outi].init(sampleRate);
 		}
 		
 		// scan inputs for upwards flow (input is below output)
@@ -457,8 +381,7 @@ struct Torus : Module {
 					invals[i] = inputs[MIX_INPUTS + mixMap[outi].cvs[i].chan].getVoltage();
 				}
 			}
-			mixMap[outi].processFilters(invals);
-			outputValue += mixMap[outi].calcFilteredOutput();
+			outputValue += mixMap[outi].calcFilteredOutput(invals);
 		}
 		return outputValue;
 	}
