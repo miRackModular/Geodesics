@@ -3,6 +3,7 @@ RACK_DIR ?= ../..
 
 # FLAGS will be passed to both the C and C++ compiler
 FLAGS +=
+# FLAGS += -include force_link_glibc_2.23.h
 CFLAGS +=
 CXXFLAGS +=
 
