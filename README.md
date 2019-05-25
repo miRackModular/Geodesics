@@ -26,7 +26,7 @@ Each module comes with two panel options, namely White Light and Dark Matter.
 
 * [Black Holes](#blackholes): Gravitational Voltage Controled Amplifiers.
 
-* [Pulsars](#pulsars): Neutron Powered Rotating Crossfader.
+* [Pulsars](#pulsars): Neutron Powered Morphing.
 
 * [Branes](#branes): Colliding Sample and Hold.
 

@@ -12,12 +12,12 @@
 			"slug": "BlackHoles",
 			"name": "BlackHoles",
 			"description": "Gravitational attenumixset",
-			"tags": ["VCA"]
+			"tags": ["Ring modulator", "VCA"]			
 		},
 		{
 			"slug": "Pulsars",
 			"name": "Pulsars",
-			"description": "Neutron powered crossfader",
+			"description": "Neutron powered morphing",
 			"tags": ["Mixer"]
 		},
 		{

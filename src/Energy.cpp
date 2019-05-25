@@ -40,7 +40,7 @@ struct Energy : Module {
 		ENUMS(ADD_LIGHTS, 2),
 		ENUMS(AMP_LIGHTS, 2),
 		ENUMS(ROUTING_LIGHTS, 3),
-		ENUMS(MOMENTUM_LIGHTS, 2 * 2), // room for two white/blue leds
+		ENUMS(MOMENTUM_LIGHTS, 2),
 		CROSS_LIGHT,
 		NUM_LIGHTS
 	};
@@ -51,7 +51,10 @@ struct Energy : Module {
 	
 	// Need to save
 	int panelTheme;
-	int routing;// 0 is independant (bottom, light index 0), 1 is control (top, light index 1), 2 is spread (middle, light index 2)
+	int routing;// routing of knob 1. 
+		// 0 is independant (i.e. blue only) (bottom light, light index 0),
+		// 1 is control (i.e. blue and yellow) (top light, light index 1),
+		// 2 is spread (i.e. blue and inv yellow) (middle, light index 2)
 	int plancks[2];// index is left/right, value is: 0 = not quantized, 1 = semitones, 2 = 5th+octs
 	int modtypes[2];// index is left/right, value is: {0 to 3} = {bypass, add, amp}
 	int cross;// cross momentum active or not
@@ -100,10 +103,10 @@ struct Energy : Module {
 	void onReset() override {
 		oscM->onReset();
 		oscC->onReset();
-		routing = 0;
+		routing = 1;// default is control (i.e. blue and yellow) (top light, light index 1),
 		for (int i = 0; i < 2; i++) {
 			plancks[i] = 0;
-			modtypes[i] = 0;
+			modtypes[i] = 1;// default is add mode
 		}
 		cross = 0;
 	}
@@ -263,8 +266,7 @@ struct Energy : Module {
 				lights[AMP_LIGHTS + i].setBrightness(modtypes[i] == 2 ? 1.0f : 0.0f);
 				
 				// momentum (cross)
-				lights[MOMENTUM_LIGHTS + i * 2 + 0].setBrightness(cross == 0 ? feedbacks[i] : 0.0f);
-				lights[MOMENTUM_LIGHTS + i * 2 + 1].setBrightness(cross == 0 ? 0.0f			: feedbacks[i]);	
+				lights[MOMENTUM_LIGHTS + i].setBrightness(feedbacks[i]);
 			}
 			
 			// cross
@@ -402,8 +404,8 @@ struct EnergyWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offsetX, 380 - 209), module, Energy::MOMENTUM_PARAMS + 1, module ? &module->panelTheme : NULL));
 		
 		// momentum lights
-		addChild(createLightCentered<SmallLight<GeoWhiteBlueLight>>(Vec(colRulerCenter - offsetX, 380.0f - 181.5f), module, Energy::MOMENTUM_LIGHTS + 0 * 2));
-		addChild(createLightCentered<SmallLight<GeoWhiteBlueLight>>(Vec(colRulerCenter + offsetX, 380.0f - 181.5f), module, Energy::MOMENTUM_LIGHTS + 1 * 2));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetX, 380.0f - 181.5f), module, Energy::MOMENTUM_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetX, 380.0f - 181.5f), module, Energy::MOMENTUM_LIGHTS + 1));
 
 		// freq knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offsetX, 380 - 126), module, Energy::FREQ_PARAMS + 0, module ? &module->panelTheme : NULL));

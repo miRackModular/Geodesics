@@ -61,48 +61,48 @@ struct mixMapOutput {
 		num = denum - num;// complement since distance is complement of volume's fraction in decay mode
 		switch (denum) {
 			case (3) :
-				if (num == 1) return isLowPass ? 8000 : 60;
-				return isLowPass ? 3000 : 200;
+				if (num == 1) return isLowPass ? 3000 : 500;
+				return isLowPass ? 1500 : 1000;
 			break;
 			
 			case (4) :
-				if (num == 1) return isLowPass ? 10000 : 50;
-				if (num == 3) return isLowPass ? 3900 : 250;
+				if (num == 1) return isLowPass ? 4000 : 300;
+				if (num == 3) return isLowPass ? 1000 : 1500;
 			break;
 			
 			case (5) :
-				if (num == 1) return isLowPass ? 12000 : 40;
-				if (num == 2) return isLowPass ? 7000 : 70;
-				if (num == 3) return isLowPass ? 4000 : 150;
-				return isLowPass ? 3000 : 250;
+				if (num == 1) return isLowPass ? 5000 : 250;
+				if (num == 2) return isLowPass ? 3000 : 500;
+				if (num == 3) return isLowPass ? 1500 : 1000;
+				return isLowPass ? 700 : 2000;
 			break;
 			
 			case (6) :
-				if (num == 1) return isLowPass ? 12500 : 30;
-				if (num == 2) return isLowPass ? 8000 : 60;
-				if (num == 4) return isLowPass ? 3000 : 200;
-				if (num == 5) return isLowPass ? 2500 : 300;
+				if (num == 1) return isLowPass ? 8000 : 200;
+				if (num == 2) return isLowPass ? 5000 : 500;
+				if (num == 4) return isLowPass ? 1000 : 1500;
+				if (num == 5) return isLowPass ? 500 : 3000;
 			break;
 			
 			case (7) :
-				if (num == 1) return isLowPass ? 15000 : 27;
-				if (num == 2) return isLowPass ? 8100 : 50;
-				if (num == 3) return isLowPass ? 6000 : 80;
-				if (num == 4) return isLowPass ? 4000 : 125;
-				if (num == 5) return isLowPass ? 2500 : 200;
-				return isLowPass ? 2000 : 350;
+				if (num == 1) return isLowPass ? 12000 : 110;
+				if (num == 2) return isLowPass ? 8000 : 350;
+				if (num == 3) return isLowPass ? 3000 : 750;
+				if (num == 4) return isLowPass ? 1500 : 1500;
+				if (num == 5) return isLowPass ? 500 : 2500;
+				return isLowPass ? 200 : 4000;
 			break;
 			
 			case (8) :
-				if (num == 1) return isLowPass ? 18000 : 22;
-				if (num == 2) return isLowPass ? 10000 : 40;
-				if (num == 3) return isLowPass ? 7000 : 68;
-				if (num == 5) return isLowPass ? 3900 : 160;
-				if (num == 6) return isLowPass ? 2500 : 250;
-				if (num == 7) return isLowPass ? 1500 : 400;
+				if (num == 1) return isLowPass ? 16000 : 60;
+				if (num == 2) return isLowPass ? 8000 : 150;
+				if (num == 3) return isLowPass ? 4000 : 350;
+				if (num == 5) return isLowPass ? 1000 : 1500;
+				if (num == 6) return isLowPass ? 400 : 5000;
+				if (num == 7) return isLowPass ? 100 : 8000;
 			break;
 		}
-		return isLowPass ? 5000 : 100;
+		return isLowPass ? 2000 : 750;
 	}
 };
 	
@@ -358,7 +358,7 @@ struct TorusWidget : ModuleWidget {
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Torus-WL.svg")));
         if (module) {
 			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Torus-WL.svg")));
+			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Torus-DM.svg")));
 			darkPanel->visible = false;
 			addChild(darkPanel);
 		}

@@ -524,11 +524,11 @@ struct BranesWidget : ModuleWidget {
 		settingsLabel->text = "Settings";
 		menu->addChild(settingsLabel);
 		
-		SecretModeItem *secretItemH = createMenuItem<SecretModeItem>("High brain secret mode", CHECKMARK(module->vibrations[0] > 1));
+		SecretModeItem *secretItemH = createMenuItem<SecretModeItem>("High brane young mode (long push)", CHECKMARK(module->vibrations[0] > 1));
 		secretItemH->module = module;
 		menu->addChild(secretItemH);
 		
-		SecretModeItem *secretItemL = createMenuItem<SecretModeItem>("Low brain secret mode", CHECKMARK(module->vibrations[1] > 1));
+		SecretModeItem *secretItemL = createMenuItem<SecretModeItem>("Low brane young mode (long push)", CHECKMARK(module->vibrations[1] > 1));
 		secretItemL->module = module;
 		secretItemL->braneIndex = 1;
 		menu->addChild(secretItemL);
