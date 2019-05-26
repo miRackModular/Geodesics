@@ -41,7 +41,7 @@ struct Energy : Module {
 		ENUMS(AMP_LIGHTS, 2),
 		ENUMS(ROUTING_LIGHTS, 3),
 		ENUMS(MOMENTUM_LIGHTS, 2),
-		ENUMS(FREQ_ROUTING_LIGHTS, 2 * 2),// room for green/red
+		ENUMS(FREQ_ROUTING_LIGHTS, 2 * 2),// room for blue/yellow
 		CROSS_LIGHT,
 		NUM_LIGHTS
 	};
@@ -121,7 +121,7 @@ struct Energy : Module {
 		float sampleRate = APP->engine->getSampleRate();
 		oscM->onSampleRateChange(sampleRate);
 		oscC->onSampleRateChange(sampleRate);
-		multiplySlew.setParams2(sampleRate, 2.5f, 10.0f, 1.0f);
+		multiplySlew.setParams2(sampleRate, 2.5f, 20.0f, 1.0f);
 	}
 	
 	
@@ -271,8 +271,8 @@ struct Energy : Module {
 
 				// momentum (cross)
 				float modSignalLight = modSignals[i] / 3.0f;
-				lights[FREQ_ROUTING_LIGHTS + 2 * i + 0].setBrightness(modSignalLight);// green diode
-				lights[FREQ_ROUTING_LIGHTS + 2 * i + 1].setBrightness(-modSignalLight);// red diode
+				lights[FREQ_ROUTING_LIGHTS + 2 * i + 0].setBrightness(modSignalLight);// blue diode
+				lights[FREQ_ROUTING_LIGHTS + 2 * i + 1].setBrightness(-modSignalLight);// yellow diode
 			}
 			
 			// cross
@@ -414,8 +414,8 @@ struct EnergyWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetX, 380.0f - 186.0f), module, Energy::MOMENTUM_LIGHTS + 1));
 
 		// freq routing lights (below momentum lights)
-		addChild(createLightCentered<SmallLight<GeoGreenRedLight>>(Vec(colRulerCenter - offsetX, 380.0f - 177.0f), module, Energy::FREQ_ROUTING_LIGHTS + 2 * 0));
-		addChild(createLightCentered<SmallLight<GeoGreenRedLight>>(Vec(colRulerCenter + offsetX, 380.0f - 177.0f), module, Energy::FREQ_ROUTING_LIGHTS + 2 * 1));
+		addChild(createLightCentered<SmallLight<GeoBlueYellowLight>>(Vec(colRulerCenter - offsetX, 380.0f - 177.0f), module, Energy::FREQ_ROUTING_LIGHTS + 2 * 0));
+		addChild(createLightCentered<SmallLight<GeoBlueYellowLight>>(Vec(colRulerCenter + offsetX, 380.0f - 177.0f), module, Energy::FREQ_ROUTING_LIGHTS + 2 * 1));
 
 		// freq knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offsetX, 380 - 126), module, Energy::FREQ_PARAMS + 0, module ? &module->panelTheme : NULL));
