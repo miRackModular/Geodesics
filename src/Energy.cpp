@@ -41,6 +41,7 @@ struct Energy : Module {
 		ENUMS(AMP_LIGHTS, 2),
 		ENUMS(ROUTING_LIGHTS, 3),
 		ENUMS(MOMENTUM_LIGHTS, 2),
+		ENUMS(FREQ_ROUTING_LIGHTS, 2 * 2),// room for green/red
 		CROSS_LIGHT,
 		NUM_LIGHTS
 	};
@@ -227,14 +228,14 @@ struct Energy : Module {
 		
 		float freqKnobs[2] = {calcFreqKnob(0), calcFreqKnob(1)};
 		float modSignals[2] = {calcModSignal(0, freqKnobs[0]), calcModSignal(1, freqKnobs[1])};
+		if (routing == 1)
+			modSignals[1] += modSignals[0];
+		else if (routing == 2)
+			modSignals[1] -= modSignals[0];
 		
 		// two values to send to oscs: voct and feedback (aka momentum)
 		// voct
 		float vocts[2] = {modSignals[0] + inputs[FREQCV_INPUT].getVoltage(), modSignals[1] + inputs[FREQCV_INPUT].getVoltage()};
-		if (routing == 1)
-			vocts[1] += modSignals[0];
-		if (routing == 2)
-			vocts[1] += modSignals[0] * -1.0f;
 		// feedback (momentum)
 		calcFeedbacks();
 		
@@ -267,6 +268,11 @@ struct Energy : Module {
 				
 				// momentum (cross)
 				lights[MOMENTUM_LIGHTS + i].setBrightness(feedbacks[i]);
+
+				// momentum (cross)
+				float modSignalLight = modSignals[i] / 3.0f;
+				lights[FREQ_ROUTING_LIGHTS + 2 * i + 0].setBrightness(modSignalLight);// green diode
+				lights[FREQ_ROUTING_LIGHTS + 2 * i + 1].setBrightness(-modSignalLight);// red diode
 			}
 			
 			// cross
@@ -369,7 +375,7 @@ struct EnergyWidget : ModuleWidget {
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Energy-WL.svg")));
         if (module) {
 			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Energy-WL.svg")));
+			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Energy-DM.svg")));
 			darkPanel->visible = false;
 			addChild(darkPanel);
 		}
@@ -404,8 +410,12 @@ struct EnergyWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter + offsetX, 380 - 209), module, Energy::MOMENTUM_PARAMS + 1, module ? &module->panelTheme : NULL));
 		
 		// momentum lights
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetX, 380.0f - 181.5f), module, Energy::MOMENTUM_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetX, 380.0f - 181.5f), module, Energy::MOMENTUM_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetX, 380.0f - 186.0f), module, Energy::MOMENTUM_LIGHTS + 0));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetX, 380.0f - 186.0f), module, Energy::MOMENTUM_LIGHTS + 1));
+
+		// freq routing lights (below momentum lights)
+		addChild(createLightCentered<SmallLight<GeoGreenRedLight>>(Vec(colRulerCenter - offsetX, 380.0f - 177.0f), module, Energy::FREQ_ROUTING_LIGHTS + 2 * 0));
+		addChild(createLightCentered<SmallLight<GeoGreenRedLight>>(Vec(colRulerCenter + offsetX, 380.0f - 177.0f), module, Energy::FREQ_ROUTING_LIGHTS + 2 * 1));
 
 		// freq knobs
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter - offsetX, 380 - 126), module, Energy::FREQ_PARAMS + 0, module ? &module->panelTheme : NULL));

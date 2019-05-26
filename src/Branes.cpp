@@ -430,7 +430,7 @@ struct Branes : Module {
 				float red = (vibrations[i] == 1 ? 1.0f : 0.0f);
 				float white = (vibrations[i] == 0 ? trigLights[i] : 0.0f);
 				trigLights[i] = 0.0f;
-				lights[BYPASS_TRIG_LIGHTS + i * 4 + 3].setSmoothBrightness(white, (float)args.sampleTime * RefreshCounter::displayRefreshStepSkips);
+				lights[BYPASS_TRIG_LIGHTS + i * 4 + 3].setSmoothBrightness(white, (float)args.sampleTime * (RefreshCounter::displayRefreshStepSkips >> 2));
 				lights[BYPASS_TRIG_LIGHTS + i * 4 + 2].setBrightness(red);
 				lights[BYPASS_TRIG_LIGHTS + i * 4 + 1].setBrightness(yellow);
 				lights[BYPASS_TRIG_LIGHTS + i * 4 + 0].setBrightness(blue);

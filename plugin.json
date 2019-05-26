@@ -12,7 +12,7 @@
 			"slug": "BlackHoles",
 			"name": "BlackHoles",
 			"description": "Gravitational attenumixset",
-			"tags": ["Ring modulator", "VCA"]			
+			"tags": ["Ring modulator", "VCA"]
 		},
 		{
 			"slug": "Pulsars",
@@ -24,7 +24,7 @@
 			"slug": "Branes",
 			"name": "Branes",
 			"description": "Coliding sample and hold",
-			"tags": ["Sample & Hold"]
+			"tags": ["Sample & Hold", "Random"]
 		},
 		{
 			"slug": "Ions",
@@ -48,7 +48,13 @@
 			"slug": "Torus",
 			"name": "Torus",
 			"description": "Bi-dimensional multimixer",
-			"tags": ["Mixer"]
+			"tags": ["Mixer", "Filter"]
+		},
+		{
+			"slug": "Fate",
+			"name": "Fate",
+			"description": "Event modifier",
+			"tags": ["Utility"]
 		},
 		{
 			"slug": "Blank-Panel Info",

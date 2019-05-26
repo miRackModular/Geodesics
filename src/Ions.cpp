@@ -107,7 +107,7 @@ struct Ions : Module {
 
 	
 	inline float quantizeCV(float cv) {return std::round(cv * 12.0f) / 12.0f;}
-	inline bool jumpRandom() {return (random::uniform() < (params[PROB_PARAM].getValue() + inputs[PROB_INPUT].getVoltage() / 10.0f));}// randomUniform is [0.0, 1.0), see include/util/common.hpp
+	inline bool jumpRandom() {return (random::uniform() < (params[PROB_PARAM].getValue() + inputs[PROB_INPUT].getVoltage() / 10.0f));}// randomUniform is [0.0, 1.0)
 	
 	
 	Ions() {
@@ -432,7 +432,7 @@ struct Ions : Module {
 		
 		// lights
 		if (refresh.processLights()) {
-			float deltaTime = args.sampleTime * RefreshCounter::displayRefreshStepSkips;
+			float deltaTime = args.sampleTime * (RefreshCounter::displayRefreshStepSkips >> 2);
 			// Blue and Yellow lights
 			for (int i = 0; i < 16; i++) {
 				lights[BLUE_LIGHTS + i].setBrightness(stepIndexes[0] == i ? 1.0f : 0.0f);

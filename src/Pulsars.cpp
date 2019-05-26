@@ -312,7 +312,7 @@ struct Pulsars : Module {
 
 			// LFO lights
 			for (int i = 0; i < 2; i++) {
-				lights[LFO_LIGHTS + i].setSmoothBrightness(lfoLights[i], (float)args.sampleTime * RefreshCounter::displayRefreshStepSkips);
+				lights[LFO_LIGHTS + i].setSmoothBrightness(lfoLights[i], (float)args.sampleTime * (RefreshCounter::displayRefreshStepSkips >> 2));
 				lfoLights[i] = 0.0f;
 			}
 			

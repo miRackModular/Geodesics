@@ -30,6 +30,7 @@ extern Model *modelIons;
 extern Model *modelEntropia;
 extern Model *modelEnergy;
 extern Model *modelTorus;
+extern Model *modelFate;
 extern Model *modelBlankLogo;
 extern Model *modelBlankInfo;
 
@@ -183,6 +184,12 @@ struct GeoYellowLight : GeoGrayModuleLight {
 		addBaseColor(SCHEME_YELLOW);
 	}
 };
+struct GeoGreenRedLight : GeoGrayModuleLight {
+	GeoGreenRedLight() {
+		addBaseColor(SCHEME_GREEN);
+		addBaseColor(SCHEME_RED);
+	}
+};
 struct GeoWhiteRedLight : GeoGrayModuleLight {
 	GeoWhiteRedLight() {
 		addBaseColor(SCHEME_WHITE);
@@ -193,6 +200,12 @@ struct GeoWhiteBlueLight : GeoGrayModuleLight {
 	GeoWhiteBlueLight() {
 		addBaseColor(SCHEME_WHITE);
 		addBaseColor(SCHEME_BLUE);
+	}
+};
+struct GeoBlueYellowLight : GeoGrayModuleLight {
+	GeoBlueYellowLight() {
+		addBaseColor(SCHEME_BLUE);
+		addBaseColor(SCHEME_YELLOW);
 	}
 };
 struct GeoBlueYellowWhiteLight : GeoGrayModuleLight {
@@ -207,12 +220,6 @@ struct GeoBlueYellowWhiteLight : GeoGrayModuleLight {
 		addBaseColor(SCHEME_YELLOW);
 		addBaseColor(SCHEME_RED);
 		addBaseColor(SCHEME_WHITE);
-	}
-};
-struct GeoBlueYellowLight : GeoGrayModuleLight {
-	GeoBlueYellowLight() {
-		addBaseColor(SCHEME_BLUE);
-		addBaseColor(SCHEME_YELLOW);
 	}
 };
 

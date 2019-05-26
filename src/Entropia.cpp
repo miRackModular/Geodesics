@@ -501,7 +501,7 @@ struct Entropia : Module {
 		
 		// lights
 		if (refresh.processLights()) {
-			float deltaTime = args.sampleTime * RefreshCounter::displayRefreshStepSkips;
+			float deltaTime = args.sampleTime * (RefreshCounter::displayRefreshStepSkips >> 2);
 
 			// Reset light
 			lights[RESET_LIGHT].setSmoothBrightness(resetLight, deltaTime);	

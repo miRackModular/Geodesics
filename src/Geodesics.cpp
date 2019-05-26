@@ -25,6 +25,7 @@ void init(rack::Plugin *p) {
 	p->addModel(modelEntropia);
 	p->addModel(modelEnergy);
 	p->addModel(modelTorus);
+	p->addModel(modelFate);
 	p->addModel(modelBlankLogo);
 	p->addModel(modelBlankInfo);
 }
