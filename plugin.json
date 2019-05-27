@@ -42,7 +42,7 @@
 			"slug": "Energy",
 			"name": "Energy",
 			"description": "Relativistic oscillator",
-			"tags": ["Oscillator"]
+			"tags": ["Oscillator", "Synth voice"]
 		},
 		{
 			"slug": "Torus",

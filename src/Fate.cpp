@@ -56,7 +56,7 @@ struct Fate : Module {
 	Fate() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		
-		configParam(Fate::FREEWILL_PARAM, 0.0f, 1.0f, 0.5f, "Free will");
+		configParam(Fate::FREEWILL_PARAM, 0.0f, 1.0f, 0.0f, "Free will");
 		configParam(Fate::CHOICESDEPTH_PARAM, 0.0f, 1.0f, 0.5f, "Choices depth");
 
 		onReset();

@@ -40,8 +40,8 @@ struct Pulsars : Module {
 		ENUMS(VOID_LIGHTS, 2),
 		ENUMS(REV_LIGHTS, 2),
 		ENUMS(RND_LIGHTS, 2),
-		ENUMS(CVALEVEL_LIGHTS, 2),// White, but two lights (light 0 is cvMode bit = 0, light 1 is cvMode bit = 1)
-		ENUMS(CVBLEVEL_LIGHTS, 2),// White, but two lights
+		ENUMS(CVALEVEL_LIGHTS, 2),// White, but two lights (light 0 is cvMode == 0, light 1 is cvMode == 1)
+		ENUMS(CVBLEVEL_LIGHTS, 2),// Same but for lower pulsar
 		NUM_LIGHTS
 	};
 	
@@ -52,7 +52,7 @@ struct Pulsars : Module {
 	
 	// Need to save
 	int panelTheme;
-	int cvMode;// 0 is -5v to 5v, 1 is 0v to 10v; bit 0 is upper Pulsar, bit 1 is lower Pulsar
+	int cvModes[2];// 0 is -5v to 5v, 1 is 0v to 10v, 2 is new ALL mode (0-10V); index 0 is upper Pulsar, index 1 is lower Pulsar
 	bool isVoid[2];
 	bool isReverse[2];
 	bool isRandom[2];
@@ -91,8 +91,8 @@ struct Pulsars : Module {
 
 	
 	void onReset() override {
-		cvMode = 0;
 		for (int i = 0; i < 2; i++) {
+			cvModes[i] = 0;
 			isVoid[i] = false;
 			isReverse[i] = false;
 			isRandom[i] = false;
@@ -137,8 +137,10 @@ struct Pulsars : Module {
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
 		// cvMode
-		json_object_set_new(rootJ, "cvMode", json_integer(cvMode));
-
+		// json_object_set_new(rootJ, "cvMode", json_integer(cvMode));// deprecated
+		json_object_set_new(rootJ, "cvMode0", json_integer(cvModes[0]));
+		json_object_set_new(rootJ, "cvMode1", json_integer(cvModes[1]));
+		
 		return rootJ;
 	}
 
@@ -174,9 +176,22 @@ struct Pulsars : Module {
 			panelTheme = json_integer_value(panelThemeJ);
 
 		// cvMode
-		json_t *cvModeJ = json_object_get(rootJ, "cvMode");
-		if (cvModeJ)
-			cvMode = json_integer_value(cvModeJ);
+		json_t *cvModeJ = json_object_get(rootJ, "cvMode");// legacy
+		if (cvModeJ) {
+			int cvModeRead = json_integer_value(cvModeJ);
+			cvModes[0] = (cvModeRead & 0x1);			
+			cvModes[1] = (cvModeRead >> 1);
+		}
+		else {
+			json_t *cvModes0J = json_object_get(rootJ, "cvMode0");
+			if (cvModes0J) {
+				cvModes[0] = json_integer_value(cvModes0J);
+			}
+			json_t *cvModes1J = json_object_get(rootJ, "cvMode1");
+			if (cvModes1J) {
+				cvModes[1] = json_integer_value(cvModes1J);
+			}
+		}
 
 		posA = 0;// no need to check isVoid here, will be checked in step()
 		posB = 0;// no need to check isVoid here, will be checked in step()
@@ -202,8 +217,11 @@ struct Pulsars : Module {
 			
 			// CV Level buttons
 			for (int i = 0; i < 2; i++) {
-				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].getValue()))
-					cvMode ^= (0x1 << i);
+				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].getValue())) {
+					cvModes[i]++;
+					if (cvModes[i] > 1)
+						cvModes[i] = 0;
+				}
 			}
 		}// userInputs refresh
 
@@ -212,7 +230,7 @@ struct Pulsars : Module {
 		lfoVal[0] = inputs[LFO_INPUTS + 0].getVoltage();
 		lfoVal[1] = inputs[LFO_INPUTS + 1].isConnected() ? inputs[LFO_INPUTS + 1].getVoltage() : lfoVal[0];
 		for (int i = 0; i < 2; i++)
-			lfoVal[i] = clamp( (lfoVal[i] + ((cvMode & (0x1 << i)) == 0 ? 5.0f : 0.0f)) / 10.0f , 0.0f , 1.0f);
+			lfoVal[i] = clamp( (lfoVal[i] + (cvModes[i] == 0 ? 5.0f : 0.0f)) / 10.0f , 0.0f , 1.0f);
 		
 		
 		// Pulsar A
@@ -303,10 +321,10 @@ struct Pulsars : Module {
 			}
 			
 			// CV Level lights
-			bool isBiolar = (cvMode & 0x1) == 0;
+			bool isBiolar = (cvModes[0]) == 0;
 			lights[CVALEVEL_LIGHTS + 0].setBrightness(isBiolar ? 1.0f : 0.0f);
 			lights[CVALEVEL_LIGHTS + 1].setBrightness(isBiolar ? 0.0f : 1.0f);
-			isBiolar = (cvMode & 0x2) == 0;
+			isBiolar = (cvModes[1]) == 0;
 			lights[CVBLEVEL_LIGHTS + 0].setBrightness(isBiolar ? 1.0f : 0.0f);
 			lights[CVBLEVEL_LIGHTS + 1].setBrightness(isBiolar ? 0.0f : 1.0f);
 
