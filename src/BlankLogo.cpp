@@ -181,12 +181,12 @@ struct BlankLogoWidget : ModuleWidget {
 	}
 };
 
-Model *modelBlankLogo = createModel<BlankLogo, BlankLogoWidget>("BlankPanelLogo");
+Model *modelBlankLogo = createModel<BlankLogo, BlankLogoWidget>("Blank-PanelLogo");
 
 /*CHANGE LOG
 
 1.0.0:
-slug changed from "Blank-Panel Logo" to "BlankPanelLogo"
+slug changed from "Blank-Panel Logo" to "Blank-PanelLogo"
 
 */
 

@@ -57,13 +57,13 @@
 			"tags": ["Utility"]
 		},
 		{
-			"slug": "BlankPanelInfo",
+			"slug": "Blank-PanelInfo",
 			"name": "Blank-Panel Info",
 			"description": "Blank panel with info",
 			"tags": ["Blank"]
 		},
 		{
-			"slug": "BlankPanelLogo",
+			"slug": "Blank-PanelLogo",
 			"name": "Blank-Panel Logo",
 			"description": "Blank panel with logo",
 			"tags": ["Blank"]
