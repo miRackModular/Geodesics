@@ -51,11 +51,21 @@ struct BlankLogo : Module {
 	};
 	
 	
+	// Constants
+	const float song[5] = {7.0f/12.0f, 9.0f/12.0f, 5.0f/12.0f, 5.0f/12.0f - 1.0f, 0.0f/12.0f};
+
+
+	// Need to save, no reset
 	int panelTheme;
+	
+	// Need to save, with reset
+	// none
+	
+	// No need to save, with reset
 	float clkValue;
 	int stepIndex;
-	float song[5] = {7.0f/12.0f, 9.0f/12.0f, 5.0f/12.0f, 5.0f/12.0f - 1.0f, 0.0f/12.0f};
-
+	
+	// No need to save, no reset
 	LowFrequencyOscillator oscillatorClk;
 	Trigger clkTrigger;
 	
@@ -71,13 +81,19 @@ struct BlankLogo : Module {
 		panelTheme = (loadDarkAsDefault() ? 1 : 0);
 	}
 
+
 	void onReset() override {	
+		resetNonJson();
+	}
+	void resetNonJson() {
 		clkValue = 0.0f;
 		stepIndex = 0;
 	}
+	
 
 	void onRandomize() override {
 	}
+
 
 	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
@@ -88,11 +104,14 @@ struct BlankLogo : Module {
 		return rootJ;
 	}
 
+
 	void dataFromJson(json_t *rootJ) override {
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
 			panelTheme = json_integer_value(panelThemeJ);
+
+		resetNonJson();
 	}
 
 	

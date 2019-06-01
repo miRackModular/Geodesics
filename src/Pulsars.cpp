@@ -50,20 +50,23 @@ struct Pulsars : Module {
 	static constexpr float epsilon = 0.0001f;// pulsar crossovers at epsilon and 1-epsilon in 0.0f to 1.0f space
 
 	
-	// Need to save
+	// Need to save, no reset
 	int panelTheme;
+	
+	// Need to save, with reset
 	int cvModes[2];// 0 is -5v to 5v, 1 is 0v to 10v, 2 is new ALL mode (0-10V); index 0 is upper Pulsar, index 1 is lower Pulsar
 	bool isVoid[2];
 	bool isReverse[2];
 	bool isRandom[2];
 	
-	
-	// No need to save
+	// No need to save, with reset
 	bool topCross[2];
 	int posA;// always between 0 and 7
 	int posB;// always between 0 and 7
 	int posAnext;// always between 0 and 7
 	int posBnext;// always between 0 and 7
+	
+	// No need to save, no reset
 	Trigger voidTriggers[2];
 	Trigger revTriggers[2];
 	Trigger rndTriggers[2];
@@ -71,6 +74,12 @@ struct Pulsars : Module {
 	float lfoLights[2] = {0.0f, 0.0f};
 	RefreshCounter refresh;
 
+	
+	void updatePosNext() {
+		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
+		posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
+	}
+	
 	
 	Pulsars() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -96,12 +105,16 @@ struct Pulsars : Module {
 			isVoid[i] = false;
 			isReverse[i] = false;
 			isRandom[i] = false;
+		}
+		resetNonJson();
+	}
+	void resetNonJson() {
+		for (int i = 0; i < 2; i++) {
 			topCross[i] = false;
 		}
 		posA = 0;// no need to check isVoid here, will be checked in step()
 		posB = 0;// no need to check isVoid here, will be checked in step()
-		posAnext = 1;// no need to check isVoid here, will be checked in step()
-		posBnext = 1;// no need to check isVoid here, will be checked in step()
+		updatePosNext();
 	}
 
 	
@@ -113,13 +126,15 @@ struct Pulsars : Module {
 		}
 		posA = random::u32() % 8;// no need to check isVoid here, will be checked in step()
 		posB = random::u32() % 8;// no need to check isVoid here, will be checked in step()
-		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
-		posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
+		updatePosNext();
 	}
 
 	
 	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
+
+		// panelTheme
+		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
 		// isVoid
 		json_object_set_new(rootJ, "isVoid0", json_real(isVoid[0]));
@@ -133,9 +148,6 @@ struct Pulsars : Module {
 		json_object_set_new(rootJ, "isRandom0", json_real(isRandom[0]));
 		json_object_set_new(rootJ, "isRandom1", json_real(isRandom[1]));
 		
-		// panelTheme
-		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
-
 		// cvMode
 		// json_object_set_new(rootJ, "cvMode", json_integer(cvMode));// deprecated
 		json_object_set_new(rootJ, "cvMode0", json_integer(cvModes[0]));
@@ -146,6 +158,11 @@ struct Pulsars : Module {
 
 	
 	void dataFromJson(json_t *rootJ) override {
+		// panelTheme
+		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
+		if (panelThemeJ)
+			panelTheme = json_integer_value(panelThemeJ);
+
 		// isVoid
 		json_t *isVoid0J = json_object_get(rootJ, "isVoid0");
 		if (isVoid0J)
@@ -170,11 +187,6 @@ struct Pulsars : Module {
 		if (isRandom1J)
 			isRandom[1] = json_number_value(isRandom1J);
 
-		// panelTheme
-		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
-		if (panelThemeJ)
-			panelTheme = json_integer_value(panelThemeJ);
-
 		// cvMode
 		json_t *cvModeJ = json_object_get(rootJ, "cvMode");// legacy
 		if (cvModeJ) {
@@ -193,10 +205,7 @@ struct Pulsars : Module {
 			}
 		}
 
-		posA = 0;// no need to check isVoid here, will be checked in step()
-		posB = 0;// no need to check isVoid here, will be checked in step()
-		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
-		posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
+		resetNonJson();
 	}
 
 	

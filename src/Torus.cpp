@@ -135,14 +135,18 @@ struct Torus : Module {
 	// Constants
 	// none
 	
-	// Need to save
+	// Need to save, no reset
 	int panelTheme;
+	
+	// Need to save, with reset
 	int mixmode;// 0 is decay, 1 is constant, 2 is filter
 	
-	// No need to save
+	// No need to save, with reset
+	mixMapOutput mixMap[7];// 7 outputs
+	
+	// No need to save, no reset
 	RefreshCounter refresh;
 	Trigger modeTrigger;
-	mixMapOutput mixMap[7];// 7 outputs
 	
 	
 	Torus() {
@@ -159,6 +163,9 @@ struct Torus : Module {
 	
 	void onReset() override {
 		mixmode = 0;
+		resetNonJson();
+	}
+	void resetNonJson() {
 		updateMixMap(APP->engine->getSampleRate());
 	}
 
@@ -182,7 +189,6 @@ struct Torus : Module {
 
 	
 	void dataFromJson(json_t *rootJ) override {
-
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
@@ -192,7 +198,10 @@ struct Torus : Module {
 		json_t *mixmodeJ = json_object_get(rootJ, "mixmode");
 		if (mixmodeJ)
 			mixmode = json_integer_value(mixmodeJ);
+		
+		resetNonJson();
 	}
+	
 
 	void process(const ProcessArgs &args) override {		
 		// user inputs

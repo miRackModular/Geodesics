@@ -77,30 +77,35 @@ struct Entropia : Module {
 	// Constants
 	enum SourceIds {SRC_CV, SRC_EXT, SRC_RND};
 	
-	// Need to save, with reset
+	// Need to save, no reset
 	int panelTheme;
+	
+	// Need to save, with reset
 	bool running;
 	bool resetOnRun;
 	int length;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
 	int audio;// bit0 = blue has audio src (else is cv), bit1 = yellow has audio src (else is cv)
-	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
 	bool addMode;
+	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
 	int sources[2];// [0; ], first is blue, 2nd yellow; follows SourceIds
 	int stepIndex;
 	bool pipeBlue[8];
 	float randomCVs[2];// used in SRC_RND
 	int clkSource;// which clock to use (0 = both, 1 = certain only, 2 = uncertain only)
 	
-	
-	// No need to save
+	// No need to save, with reset
+	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
+	long clockIgnoreOnReset;
 	int stepIndexOld;// when equal to stepIndex, crossfade (antipop) is finished, when not equal, crossfade until counter 0, then set to stepIndex
 	long crossFadeStepsToGo;
-	long clockIgnoreOnReset;
+	
+	// No need to save, no reset
 	float resetLight = 0.0f;
 	float cvLight = 0.0f;
+	float stepClockLight = 0.0f;
+	float stateSwitchLight = 0.0f;
 	RefreshCounter refresh;
-	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
 	Trigger runningTrigger;
 	Trigger plankTriggers[2];
 	Trigger lengthTrigger;
@@ -117,8 +122,6 @@ struct Entropia : Module {
 	Trigger extSrcTriggers[2];
 	Trigger extAudioTriggers[2];
 	Trigger clkSrcTrigger;
-	float stepClockLight = 0.0f;
-	float stateSwitchLight = 0.0f;
 	
 	inline float quantizeCV(float cv) {return std::round(cv * 12.0f) / 12.0f;}
 	inline void updatePipeBlue(int step) {
@@ -191,28 +194,34 @@ struct Entropia : Module {
 			ranges[i] = 1;	
 			sources[i] = SRC_CV;
 		}
+		// stepIndex done in resetNonJson(true) -> initRun(true)
+		// pipeBlue[] done in resetNonJson(true) -> initRun(true)
+		// randomCVs[] done in resetNonJson(true) -> initRun(true)
 		clkSource = 0;
-		initRun();
-		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * APP->engine->getSampleRate());
+		resetNonJson(true);
 	}
-
+	void resetNonJson(bool hard) {
+		rangeInc[0] = true;
+		rangeInc[1] = true;
+		initRun(hard);
+	}
+	void initRun(bool hard) {
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * APP->engine->getSampleRate());
+		if (hard) {
+			stepIndex = 0;
+			for (int i = 0; i < 8; i++)
+				updatePipeBlue(i);
+			updateRandomCVs();
+		}
+		stepIndexOld = stepIndex;
+		crossFadeStepsToGo = 0;
+	}
+	
 	
 	void onRandomize() override {
-		initRun();
+		initRun(true);
 	}
-	
 
-	void initRun() {
-		stepIndex = 0;
-		stepIndexOld = 0;
-		crossFadeStepsToGo = 0;
-		for (int i = 0; i < 8; i++)
-			updatePipeBlue(i);
-		updateRandomCVs();
-		resetLight = 0.0f;
-		cvLight = 0.0f;
-	}
-	
 
 	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
@@ -338,9 +347,7 @@ struct Entropia : Module {
 		if (clkSourceJ)
 			clkSource = json_integer_value(clkSourceJ);
 
-		rangeInc[0] = true;
-		rangeInc[1] = true;
-		stepIndexOld = stepIndex;
+		resetNonJson(false);// soft init, don't want to init stepIndex, pipeBlue nor randomCVs
 	}
 
 	
@@ -353,10 +360,9 @@ struct Entropia : Module {
 		if (runningTrigger.process(params[RUN_PARAM].getValue() + inputs[RUN_INPUT].getVoltage())) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
 			if (running) {
-				if (resetOnRun)
-					initRun();
-				if (resetOnRun || clockIgnoreOnRun)
-					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
+				if (resetOnRun) {
+					initRun(true);
+				}
 			}
 		}
 		
@@ -473,9 +479,8 @@ struct Entropia : Module {
 		
 		// Reset
 		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage() + params[RESET_PARAM].getValue())) {
-			initRun();
+			initRun(true);
 			resetLight = 1.0f;
-			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
 			certainClockTrigger.reset();
 			uncertainClockTrigger.reset();
 		}

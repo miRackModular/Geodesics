@@ -146,7 +146,6 @@ struct NoiseEngine {
 struct Branes : Module {
 	enum ParamIds {
 		ENUMS(TRIG_BYPASS_PARAMS, 2),
-		// -- 0.6.3 ^^
 		ENUMS(NOISE_RANGE_PARAMS, 2),
 		NUM_PARAMS
 	};
@@ -166,7 +165,6 @@ struct Branes : Module {
 	enum LightIds {
 		ENUMS(UNUSED1, 2 * 2),// no longer used
 		ENUMS(BYPASS_TRIG_LIGHTS, 4 * 2),// room for blue-yellow-red-white
-		// -- 0.6.3 ^^
 		ENUMS(NOISE_RANGE_LIGHTS, 2),
 		NUM_LIGHTS
 	};
@@ -175,17 +173,17 @@ struct Branes : Module {
 	// Constants
 	// none
 	
-	// Need to save, with reset
+	// Need to save, no reset
 	int panelTheme;
+	
+	// Need to save, with reset
 	int vibrations[2];
 	bool noiseRange[2];
 	
-	
-	// No need to save
+	// No need to save, with reset
 	float heldOuts[14];
 	
-	
-	// No need to save
+	// No need to save, no reset
 	Trigger sampleTriggers[2];
 	Trigger trigBypassTriggers[2];
 	Trigger noiseRangeTriggers[2];
@@ -216,6 +214,9 @@ struct Branes : Module {
 			vibrations[i] = 0;
 			noiseRange[i] = false;
 		}
+		resetNonJson();
+	}
+	void resetNonJson() {
 		for (int i = 0; i < 14; i++)
 			heldOuts[i] = 0.0f;
 	}
@@ -234,6 +235,9 @@ struct Branes : Module {
 	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
+		// panelTheme
+		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
+
 		// trigBypass (DEPRECATED, replaced by vibrations below)
 		//json_object_set_new(rootJ, "trigBypass0", json_real(trigBypass[0]));// should have been bool instead of real
 		//json_object_set_new(rootJ, "trigBypass1", json_real(trigBypass[1]));// should have been bool instead of real
@@ -246,14 +250,16 @@ struct Branes : Module {
 		json_object_set_new(rootJ, "noiseRange0", json_real(noiseRange[0]));
 		json_object_set_new(rootJ, "noiseRange1", json_real(noiseRange[1]));
 
-		// panelTheme
-		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
-
 		return rootJ;
 	}
 
 	
 	void dataFromJson(json_t *rootJ) override {
+		// panelTheme
+		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
+		if (panelThemeJ)
+			panelTheme = json_integer_value(panelThemeJ);
+
 		// vibrations (0 - top)
 		json_t *vibrations0J = json_object_get(rootJ, "vibrations0");
 		if (vibrations0J)
@@ -281,13 +287,7 @@ struct Branes : Module {
 		if (noiseRange1J)
 			noiseRange[1] = json_number_value(noiseRange1J);
 
-		// panelTheme
-		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
-		if (panelThemeJ)
-			panelTheme = json_integer_value(panelThemeJ);
-
-		for (int i = 0; i < 14; i++)
-			heldOuts[i] = 0.0f;
+		resetNonJson();
 	}
 
 

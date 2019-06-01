@@ -43,14 +43,18 @@ struct BlackHoles : Module {
 	static constexpr float expBase = 50.0f;
 
 	
-	// Need to save
+	// Need to save, no reset
 	int panelTheme;
+	
+	// Need to save, with reset
 	bool isExponential[2];
 	bool wormhole;
 	int cvMode;// 0 is -5v to 5v, 1 is -10v to 10v; bit 0 is upper BH, bit 1 is lower BH
 	
+	// No need to save, with reset
+	// none
 	
-	// No need to save
+	// No need to save, no reset
 	Trigger expTriggers[2];
 	Trigger cvLevelTriggers[2];
 	Trigger wormholeTrigger;
@@ -85,7 +89,11 @@ struct BlackHoles : Module {
 		isExponential[1] = false;
 		wormhole = true;
 		cvMode = 0x3;
+		// resetNonJson
 	}
+	// void resetNonJson() {
+		// none
+	// }
 
 	
 	void onRandomize() override {
@@ -99,15 +107,15 @@ struct BlackHoles : Module {
 	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
+		// panelTheme
+		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
+
 		// isExponential
 		json_object_set_new(rootJ, "isExponential0", json_real(isExponential[0]));
 		json_object_set_new(rootJ, "isExponential1", json_real(isExponential[1]));
 		
 		// wormhole
 		json_object_set_new(rootJ, "wormhole", json_boolean(wormhole));
-
-		// panelTheme
-		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
 		// cvMode
 		json_object_set_new(rootJ, "cvMode", json_integer(cvMode));
@@ -117,6 +125,11 @@ struct BlackHoles : Module {
 
 	
 	void dataFromJson(json_t *rootJ) override {
+		// panelTheme
+		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
+		if (panelThemeJ)
+			panelTheme = json_integer_value(panelThemeJ);
+
 		// isExponential
 		json_t *isExponential0J = json_object_get(rootJ, "isExponential0");
 		if (isExponential0J)
@@ -130,15 +143,12 @@ struct BlackHoles : Module {
 		if (wormholeJ)
 			wormhole = json_is_true(wormholeJ);
 
-		// panelTheme
-		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
-		if (panelThemeJ)
-			panelTheme = json_integer_value(panelThemeJ);
-
 		// cvMode
 		json_t *cvModeJ = json_object_get(rootJ, "cvMode");
 		if (cvModeJ)
 			cvMode = json_integer_value(cvModeJ);
+		
+		// resetNonJson();
 	}
 
 	

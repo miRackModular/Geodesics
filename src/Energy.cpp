@@ -50,8 +50,12 @@ struct Energy : Module {
 	// Constants
 	// none
 	
-	// Need to save
+	// Need to save, no reset
 	int panelTheme;
+	
+	// Need to save, with reset
+	FMOp* oscM;
+	FMOp* oscC;
 	int routing;// routing of knob 1. 
 		// 0 is independant (i.e. blue only) (bottom light, light index 0),
 		// 1 is control (i.e. blue and yellow) (top light, light index 1),
@@ -60,15 +64,16 @@ struct Energy : Module {
 	int modtypes[2];// index is left/right, value is: {0 to 3} = {bypass, add, amp}
 	int cross;// cross momentum active or not
 	
-	// No need to save
+	// No need to save, with reset
+	// none
+	
+	// No need to save, no reset
 	RefreshCounter refresh;
 	float feedbacks[2] = {0.0f, 0.0f};
 	Trigger routingTrigger;
 	Trigger planckTriggers[2];
 	Trigger modtypeTriggers[2];
 	Trigger crossTrigger;
-	FMOp* oscM;
-	FMOp* oscC;
 	SlewLimiter multiplySlew;
 	
 	
@@ -110,7 +115,11 @@ struct Energy : Module {
 			modtypes[i] = 1;// default is add mode
 		}
 		cross = 0;
+		// resetNonJson();
 	}
+	// void resetNonJson() {
+		// none
+	// }	
 
 	
 	void onRandomize() override {
@@ -131,6 +140,10 @@ struct Energy : Module {
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
+		// oscM and oscC
+		oscM->dataToJson(rootJ, "oscM_");
+		oscC->dataToJson(rootJ, "oscC_");
+
 		// routing
 		json_object_set_new(rootJ, "routing", json_integer(routing));
 
@@ -145,19 +158,19 @@ struct Energy : Module {
 		// cross
 		json_object_set_new(rootJ, "cross", json_integer(cross));
 
-		oscM->dataToJson(rootJ, "oscM_");
-		oscC->dataToJson(rootJ, "oscC_");
-
 		return rootJ;
 	}
 
 	
 	void dataFromJson(json_t *rootJ) override {
-
 		// panelTheme
 		json_t *panelThemeJ = json_object_get(rootJ, "panelTheme");
 		if (panelThemeJ)
 			panelTheme = json_integer_value(panelThemeJ);
+
+		// oscM and oscC
+		oscM->dataFromJson(rootJ, "oscM_");
+		oscC->dataFromJson(rootJ, "oscC_");
 
 		// routing
 		json_t *routingJ = json_object_get(rootJ, "routing");
@@ -184,10 +197,8 @@ struct Energy : Module {
 		json_t *crossJ = json_object_get(rootJ, "cross");
 		if (crossJ)
 			cross = json_integer_value(crossJ);
-
-		oscM->dataFromJson(rootJ, "oscM_");
-		oscC->dataFromJson(rootJ, "oscC_");
-
+		
+		// resetNonJson();
 	}
 
 	void process(const ProcessArgs &args) override {	

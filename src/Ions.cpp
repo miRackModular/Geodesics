@@ -25,7 +25,6 @@ struct Ions : Module {
 		UNCERTANTY_PARAM,
 		RESETONRUN_PARAM,
 		STEPCLOCKS_PARAM,
-		// -- 0.6.3 ^^
 		PLANK2_PARAM,
 		NUM_PARAMS
 	};
@@ -37,7 +36,6 @@ struct Ions : Module {
 		PROB_INPUT,// CV_value/10  is added to PROB_PARAM, which is a 0 to 1 knob
 		ENUMS(OCTCV_INPUTS, 2),
 		ENUMS(STATECV_INPUTS, 2),
-		// -- 0.6.3 ^^
 		LEAP_INPUT,
 		UNCERTANTY_INPUT,
 		NUM_INPUTS
@@ -70,9 +68,10 @@ struct Ions : Module {
 	const int cvMap[2][16] = {{0, 1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14},
 							  {0, 8, 9 ,10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7}};// map each of the 16 steps of a sequence step to a CV knob index (0-14)
 
+	// Need to save, no reset
+	int panelTheme;
 							  
 	// Need to save, with reset
-	int panelTheme;
 	bool running;
 	bool resetOnRun;
 	int quantize;// a.k.a. plank constant, bit0 = blue, bit1 = yellow
@@ -82,11 +81,14 @@ struct Ions : Module {
 	int ranges[2];// [0; 2], number of extra octaves to span each side of central octave (which is C4: 0 - 1V) 
 	bool leap;
 	
-	
-	// No need to save
-	long clockIgnoreOnReset;
-	float resetLight = 0.0f;
+	// No need to save, with reset
 	bool rangeInc[2] = {true, true};// true when 1-3-5 increasing, false when 5-3-1 decreasing
+	long clockIgnoreOnReset;
+	
+	// No need to save, no reset
+	float resetLight = 0.0f;
+	float jumpLights[2] = {0.0f, 0.0f};
+	float stepClocksLight = 0.0f;
 	Trigger runningTrigger;
 	Trigger clockTrigger;
 	Trigger clocksTriggers[2];
@@ -101,8 +103,6 @@ struct Ions : Module {
 	Trigger resetOnRunTrigger;
 	Trigger stepClocksTrigger;
 	dsp::PulseGenerator jumpPulses[2];
-	float jumpLights[2] = {0.0f, 0.0f};
-	float stepClocksLight = 0.0f;
 	RefreshCounter refresh;
 
 	
@@ -148,35 +148,40 @@ struct Ions : Module {
 		resetOnRun = false;
 		quantize = 3;
 		uncertainty = false;
+		// stepIndexes done in initRun()
 		for (int i = 0; i < 2; i++) {
 			states[i] = 0;
 			ranges[i] = 1;
 		}
 		leap = false;
-		initRun(true);
-		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * APP->engine->getSampleRate());
+		resetNonJson(true);
 	}
-
-	
-	void onRandomize() override {
-		initRun(true);
+	void resetNonJson(bool hard) {
+		rangeInc[0] = true;
+		rangeInc[1] = true;
+		initRun(hard);
 	}
-	
-
 	void initRun(bool hard) {// run button activated or run edge in run input jack
+		clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * APP->engine->getSampleRate());
 		if (hard) {
 			stepIndexes[0] = 0;
 			stepIndexes[1] = 0;
 		}
-		resetLight = 0.0f;
 	}
 	
-
+	
+	void onRandomize() override {
+	}
+	
+	
 	json_t *dataToJson() override {
 		json_t *rootJ = json_object();
 
 		// panelTheme
 		json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
+
+		// running
+		json_object_set_new(rootJ, "running", json_boolean(running));
 
 		// resetOnRun
 		json_object_set_new(rootJ, "resetOnRun", json_boolean(resetOnRun));
@@ -187,9 +192,6 @@ struct Ions : Module {
 		// uncertainty
 		json_object_set_new(rootJ, "uncertainty", json_boolean(uncertainty));
 		
-		// running
-		json_object_set_new(rootJ, "running", json_boolean(running));
-
 		// stepIndexes
 		json_object_set_new(rootJ, "stepIndexes0", json_integer(stepIndexes[0]));
 		json_object_set_new(rootJ, "stepIndexes1", json_integer(stepIndexes[1]));
@@ -215,6 +217,11 @@ struct Ions : Module {
 		if (panelThemeJ)
 			panelTheme = json_integer_value(panelThemeJ);
 
+		// running
+		json_t *runningJ = json_object_get(rootJ, "running");
+		if (runningJ)
+			running = json_is_true(runningJ);
+
 		// resetOnRun
 		json_t *resetOnRunJ = json_object_get(rootJ, "resetOnRun");
 		if (resetOnRunJ)
@@ -229,11 +236,6 @@ struct Ions : Module {
 		json_t *uncertaintyJ = json_object_get(rootJ, "uncertainty");
 		if (uncertaintyJ)
 			uncertainty = json_is_true(uncertaintyJ);
-
-		// running
-		json_t *runningJ = json_object_get(rootJ, "running");
-		if (runningJ)
-			running = json_is_true(runningJ);
 
 		// stepIndexes
 		json_t *stepIndexes0J = json_object_get(rootJ, "stepIndexes0");
@@ -264,8 +266,7 @@ struct Ions : Module {
 		if (leapJ)
 			leap = json_is_true(leapJ);
 
-		rangeInc[0] = true;
-		rangeInc[1] = true;
+		resetNonJson(false);// soft init, don't want to init stepIndexes
 	}
 
 	
@@ -277,10 +278,9 @@ struct Ions : Module {
 		if (runningTrigger.process(params[RUN_PARAM].getValue() + inputs[RUN_INPUT].getVoltage())) {// no input refresh here, don't want to introduce startup skew
 			running = !running;
 			if (running ) {
-				if (resetOnRun)
+				if (resetOnRun) {
 					initRun(true);
-				if (resetOnRun || clockIgnoreOnRun)
-					clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
+				}
 			}
 		}
 		
@@ -404,7 +404,6 @@ struct Ions : Module {
 		if (resetTrigger.process(inputs[RESET_INPUT].getVoltage() + params[RESET_PARAM].getValue())) {
 			initRun(true);
 			resetLight = 1.0f;
-			clockIgnoreOnReset = (long) (clockIgnoreOnResetDuration * args.sampleRate);
 			clockTrigger.reset();
 			clocksTriggers[0].reset();
 			clocksTriggers[1].reset();
