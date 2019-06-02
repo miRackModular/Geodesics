@@ -40,8 +40,8 @@ struct Pulsars : Module {
 		ENUMS(VOID_LIGHTS, 2),
 		ENUMS(REV_LIGHTS, 2),
 		ENUMS(RND_LIGHTS, 2),
-		ENUMS(CVALEVEL_LIGHTS, 2),// White, but two lights (light 0 is cvMode == 0, light 1 is cvMode == 1)
-		ENUMS(CVBLEVEL_LIGHTS, 2),// Same but for lower pulsar
+		ENUMS(CVALEVEL_LIGHTS, 3),// White, but three lights (light 0 is cvMode == 0, light 1 is cvMode == 1, light 2 is cvMode == 2)
+		ENUMS(CVBLEVEL_LIGHTS, 3),// Same but for lower pulsar
 		NUM_LIGHTS
 	};
 	
@@ -60,11 +60,16 @@ struct Pulsars : Module {
 	bool isRandom[2];
 	
 	// No need to save, with reset
+	int connectedA[8];// concatenated list of input indexes of connected ports
+	int connectedAnum;
+	int connectedB[8];// concatenated list of input indexes of connected ports
+	int connectedBnum;
 	bool topCross[2];
 	int posA;// always between 0 and 7
 	int posB;// always between 0 and 7
 	int posAnext;// always between 0 and 7
 	int posBnext;// always between 0 and 7
+	
 	
 	// No need to save, no reset
 	Trigger voidTriggers[2];
@@ -75,6 +80,23 @@ struct Pulsars : Module {
 	RefreshCounter refresh;
 
 	
+	void updateConnected() {
+		// builds packed list of connected ports for both pulsars
+		connectedAnum = 0;
+		for (int i = 0; i < 8; i++) {
+			if (inputs[INA_INPUTS + i].isConnected()) {
+				connectedA[connectedAnum] = i;
+				connectedAnum++;
+			}
+		}
+		connectedBnum = 0;
+		for (int i = 0; i < 8; i++) {
+			if (outputs[OUTB_OUTPUTS + i].isConnected()) {
+				connectedB[connectedBnum] = i;
+				connectedBnum++;
+			}
+		}
+	}
 	void updatePosNext() {
 		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
 		posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
@@ -109,6 +131,7 @@ struct Pulsars : Module {
 		resetNonJson();
 	}
 	void resetNonJson() {
+		updateConnected();
 		for (int i = 0; i < 2; i++) {
 			topCross[i] = false;
 		}
@@ -228,13 +251,15 @@ struct Pulsars : Module {
 			for (int i = 0; i < 2; i++) {
 				if (cvLevelTriggers[i].process(params[CVLEVEL_PARAMS + i].getValue())) {
 					cvModes[i]++;
-					if (cvModes[i] > 1)
+					if (cvModes[i] > 2)
 						cvModes[i] = 0;
 				}
 			}
+			
+			updateConnected();
 		}// userInputs refresh
 
-		// LFO values (normalized to 0.0f to 1.0f space, clamped and offset adjusted depending cvMode)
+		// LFO values (normalized to 0.0f to 1.0f space, inputs clamped and offset adjusted depending cvMode)
 		float lfoVal[2];
 		lfoVal[0] = inputs[LFO_INPUTS + 0].getVoltage();
 		lfoVal[1] = inputs[LFO_INPUTS + 1].isConnected() ? inputs[LFO_INPUTS + 1].getVoltage() : lfoVal[0];
@@ -251,25 +276,41 @@ struct Pulsars : Module {
 				atLeastOneActive = true;
 		}
 		if (atLeastOneActive) {
-			if (!isVoid[0]) {
-				if (!active8[posA])// ensure start on valid input when no void
-					posA = getNextClosestActive(posA, active8, false, false, false);
-				if (!active8[posAnext])
-					posAnext = getNextClosestActive(posA, active8, false, isReverse[0], isRandom[0]);
-			}			
-			
-			float posPercent = topCross[0] ? (1.0f - lfoVal[0]) : lfoVal[0];
-			float nextPosPercent = 1.0f - posPercent;
-			outputs[OUTA_OUTPUT].setVoltage(posPercent * inputs[INA_INPUTS + posA].getVoltage() + nextPosPercent * inputs[INA_INPUTS + posAnext].getVoltage());
-			for (int i = 0; i < 8; i++)
-				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f));
-			
-			// PulsarA crossover (LFO detection)
-			if ( (topCross[0] && lfoVal[0] > (1.0f - epsilon)) || (!topCross[0] && lfoVal[0] < epsilon) ) {
-				topCross[0] = !topCross[0];// switch to opposite detection
-				posA = posAnext;
-				posAnext = getNextClosestActive(posA, active8, isVoid[0], isReverse[0], isRandom[0]);
-				lfoLights[0] = 1.0f;
+			if (cvModes[0] < 2) {
+				// regular modes
+				if (!isVoid[0]) {
+					if (!active8[posA])// ensure start on valid input when no void
+						posA = getNextClosestActive(posA, active8, false, false, false);
+					if (!active8[posAnext])
+						posAnext = getNextClosestActive(posA, active8, false, isReverse[0], isRandom[0]);
+				}			
+				
+				float posPercent = topCross[0] ? (1.0f - lfoVal[0]) : lfoVal[0];
+				float nextPosPercent = 1.0f - posPercent;
+				outputs[OUTA_OUTPUT].setVoltage(posPercent * inputs[INA_INPUTS + posA].getVoltage() + nextPosPercent * inputs[INA_INPUTS + posAnext].getVoltage());
+				for (int i = 0; i < 8; i++)
+					lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f));
+				
+				// PulsarA crossover (LFO detection)
+				if ( (topCross[0] && lfoVal[0] > (1.0f - epsilon)) || (!topCross[0] && lfoVal[0] < epsilon) ) {
+					topCross[0] = !topCross[0];// switch to opposite detection
+					posA = posAnext;
+					posAnext = getNextClosestActive(posA, active8, isVoid[0], isReverse[0], isRandom[0]);
+					lfoLights[0] = 1.0f;
+				}
+			}
+			else {
+				// new ALL mode
+				lfoVal[0] *= (float)connectedAnum;
+				int indexA = (int)lfoVal[0];
+				float indexANextPercent = lfoVal[0] - (float)indexA;
+				int indexANext = (indexA + 1);
+				float indexApercent = 1.0f - indexANextPercent;
+				if (indexA >= connectedAnum) indexA = 0;
+				if (indexANext >= connectedAnum) indexANext = 0;
+				outputs[OUTA_OUTPUT].setVoltage(indexApercent * inputs[INA_INPUTS + connectedA[indexA]].getVoltage() + indexANextPercent * inputs[INA_INPUTS + connectedA[indexANext]].getVoltage());
+				for (int i = 0; i < 8; i++)
+					lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == connectedA[indexA]) ? indexApercent : 0.0f) + ((i == connectedA[indexANext]) ? indexANextPercent : 0.0f));
 			}
 		}
 		else {
@@ -287,29 +328,49 @@ struct Pulsars : Module {
 				atLeastOneActive = true;
 		}
 		if (atLeastOneActive) {
-			if (!isVoid[1]) {
-				if (!active8[posB])// ensure start on valid output when no void
-					posB = getNextClosestActive(posB, active8, false, false, false);
-				if (!active8[posBnext])
-					posBnext = getNextClosestActive(posB, active8, false, isReverse[1], isRandom[1]);
-			}			
-			
-			float posPercent = topCross[1] ? (1.0f - lfoVal[1]) : lfoVal[1];
-			float nextPosPercent = 1.0f - posPercent;
-			for (int i = 0; i < 8; i++) {
-				if (inputs[INB_INPUT].isConnected())
-					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
-				else// mutidimentional trick
-					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
-				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f));
+			if (cvModes[0] < 2) {
+				// regular modes
+				if (!isVoid[1]) {
+					if (!active8[posB])// ensure start on valid output when no void
+						posB = getNextClosestActive(posB, active8, false, false, false);
+					if (!active8[posBnext])
+						posBnext = getNextClosestActive(posB, active8, false, isReverse[1], isRandom[1]);
+				}			
+				
+				float posPercent = topCross[1] ? (1.0f - lfoVal[1]) : lfoVal[1];
+				float nextPosPercent = 1.0f - posPercent;
+				for (int i = 0; i < 8; i++) {
+					if (inputs[INB_INPUT].isConnected())
+						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
+					else// mutidimentional trick
+						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
+					lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f));
+				}
+				
+				// PulsarB crossover (LFO detection)
+				if ( (topCross[1] && lfoVal[1] > (1.0f - epsilon)) || (!topCross[1] && lfoVal[1] < epsilon) ) {
+					topCross[1] = !topCross[1];// switch to opposite detection
+					posB = posBnext;
+					posBnext = getNextClosestActive(posB, active8, isVoid[1], isReverse[1], isRandom[1]);
+					lfoLights[1] = 1.0f;
+				}
 			}
-			
-			// PulsarB crossover (LFO detection)
-			if ( (topCross[1] && lfoVal[1] > (1.0f - epsilon)) || (!topCross[1] && lfoVal[1] < epsilon) ) {
-				topCross[1] = !topCross[1];// switch to opposite detection
-				posB = posBnext;
-				posBnext = getNextClosestActive(posB, active8, isVoid[1], isReverse[1], isRandom[1]);
-				lfoLights[1] = 1.0f;
+			else {
+				// new ALL mode
+				lfoVal[1] *= (float)connectedBnum;
+				int indexB = (int)lfoVal[1];
+				float indexBNextPercent = lfoVal[1] - (float)indexB;
+				int indexBNext = (indexB + 1);
+				float indexBpercent = 1.0f - indexBNextPercent;
+				if (indexB >= connectedBnum) indexB = 0;
+				if (indexBNext >= connectedBnum) indexBNext = 0;
+				for (int i = 0; i < 8; i++) {
+					if (inputs[INB_INPUT].isConnected())
+						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[indexB]) ? (indexBpercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == connectedB[indexBNext]) ? (indexBNextPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
+					else// mutidimentional trick
+						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[indexB]) ? (indexBpercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == connectedB[indexBNext]) ? (indexBNextPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
+					lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == connectedB[indexB]) ? indexBpercent : 0.0f) + ((i == connectedB[indexBNext]) ? indexBNextPercent : 0.0f));
+				}
 			}
 		}
 		else {
@@ -329,14 +390,12 @@ struct Pulsars : Module {
 				lights[RND_LIGHTS + i].setBrightness(isRandom[i] ? 1.0f : 0.0f);
 			}
 			
-			// CV Level lights
-			bool isBiolar = (cvModes[0]) == 0;
-			lights[CVALEVEL_LIGHTS + 0].setBrightness(isBiolar ? 1.0f : 0.0f);
-			lights[CVALEVEL_LIGHTS + 1].setBrightness(isBiolar ? 0.0f : 1.0f);
-			isBiolar = (cvModes[1]) == 0;
-			lights[CVBLEVEL_LIGHTS + 0].setBrightness(isBiolar ? 1.0f : 0.0f);
-			lights[CVBLEVEL_LIGHTS + 1].setBrightness(isBiolar ? 0.0f : 1.0f);
-
+			// CV mode (cv level) lights
+			for (int i = 0; i < 3; i++) {
+				lights[CVALEVEL_LIGHTS + i].setBrightness(cvModes[0] == i ? 1.0f : 0.0f);
+				lights[CVBLEVEL_LIGHTS + i].setBrightness(cvModes[1] == i ? 1.0f : 0.0f);
+			}
+			
 			// LFO lights
 			for (int i = 0; i < 2; i++) {
 				lights[LFO_LIGHTS + i].setSmoothBrightness(lfoLights[i], (float)args.sampleTime * (RefreshCounter::displayRefreshStepSkips >> 2));
@@ -515,6 +574,7 @@ struct PulsarsWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRndButtonX, rowRulerPulsarA + offsetRndButtonY), module, Pulsars::CVLEVEL_PARAMS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsButBX, rowRulerPulsarA + offsetRndButtonY + offsetLedVsButBY), module, Pulsars::CVALEVEL_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsButUX, rowRulerPulsarA + offsetRndButtonY - offsetLedVsButUY), module, Pulsars::CVALEVEL_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsButUX -10, rowRulerPulsarA + offsetRndButtonY - offsetLedVsButUY + 10), module, Pulsars::CVALEVEL_LIGHTS + 2));
 
 		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA + offsetJacks + offsetLFO), true, module, Pulsars::LFO_INPUTS + 0, module ? &module->panelTheme : NULL));
@@ -562,6 +622,7 @@ struct PulsarsWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRndButtonX, rowRulerPulsarB - offsetRndButtonY), module, Pulsars::CVLEVEL_PARAMS + 1,  module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsButBX, rowRulerPulsarB - offsetRndButtonY - offsetLedVsButBY), module, Pulsars::CVBLEVEL_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsButUX, rowRulerPulsarB - offsetRndButtonY + offsetLedVsButUY), module, Pulsars::CVBLEVEL_LIGHTS + 1));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsButUX + 10, rowRulerPulsarB - offsetRndButtonY + offsetLedVsButUY - 10), module, Pulsars::CVBLEVEL_LIGHTS + 2));
 
 		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB - offsetJacks - offsetLFO), true, module, Pulsars::LFO_INPUTS + 1, module ? &module->panelTheme : NULL));		
