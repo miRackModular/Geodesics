@@ -60,15 +60,12 @@ struct Pulsars : Module {
 	bool isRandom[2];
 	
 	// No need to save, with reset
-	int connectedA[8];// concatenated list of input indexes of connected ports
-	int connectedAnum;
-	int connectedB[8];// concatenated list of input indexes of connected ports
-	int connectedBnum;
+	int connectedA[8] = {0};// concatenated list of input indexes of connected ports
+	int connectedB[8] = {0};// concatenated list of input indexes of connected ports
+	int connectedNum[2];
 	bool topCross[2];
-	int posA;// always between 0 and 7
-	int posB;// always between 0 and 7
-	int posAnext;// always between 0 and 7
-	int posBnext;// always between 0 and 7
+	int index[2];// always between 0 and 7
+	int indexNext[2];// always between 0 and 7
 	
 	
 	// No need to save, no reset
@@ -81,25 +78,42 @@ struct Pulsars : Module {
 
 	
 	void updateConnected() {
-		// builds packed list of connected ports for both pulsars
-		connectedAnum = 0;
+		// builds packed list of connected ports for both pulsars, can be empty list with num = 0
+		// Pulsar A
+		bool grabUnconnectA = isVoid[0] /*&& cvModes[0] != 2*/;
+		connectedNum[0] = 0;
 		for (int i = 0; i < 8; i++) {
-			if (inputs[INA_INPUTS + i].isConnected()) {
-				connectedA[connectedAnum] = i;
-				connectedAnum++;
+			if (grabUnconnectA || inputs[INA_INPUTS + i].isConnected()) {
+				connectedA[connectedNum[0]] = i;
+				connectedNum[0]++;
 			}
 		}
-		connectedBnum = 0;
+		// Pulsar B
+		bool grabUnconnectB = isVoid[1] /*&& cvModes[1] != 2*/;
+		connectedNum[1] = 0;
 		for (int i = 0; i < 8; i++) {
-			if (outputs[OUTB_OUTPUTS + i].isConnected()) {
-				connectedB[connectedBnum] = i;
-				connectedBnum++;
+			if (grabUnconnectB || outputs[OUTB_OUTPUTS + i].isConnected()) {
+				connectedB[connectedNum[1]] = i;
+				connectedNum[1]++;
 			}
 		}
 	}
-	void updatePosNext() {
-		posAnext = (posA + (isReverse[0] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
-		posBnext = (posB + (isReverse[1] ? 7 : 1)) % 8;// no need to check isVoid here, will be checked in step()
+	
+	void updateIndexNext(int bnum) {// brane number to update, 0 is upper, 1 is lower
+		int maxSize = (isVoid[bnum] /*&& cvModes[bnum] != 2*/) ? 8 : connectedNum[bnum];
+		if (maxSize <= 1) {
+			indexNext[bnum] = 0;
+		}
+		else {
+			if (isRandom[bnum]) {
+				indexNext[bnum] = random::u32() % (maxSize - 1);
+				if (indexNext[bnum] == index[bnum])
+					indexNext[bnum] = maxSize - 1;							
+			}
+			else {
+				indexNext[bnum] = (index[bnum] + (isReverse[bnum] ? (maxSize - 1) : 1)) % maxSize;
+			}
+		}
 	}
 	
 	
@@ -135,9 +149,10 @@ struct Pulsars : Module {
 		for (int i = 0; i < 2; i++) {
 			topCross[i] = false;
 		}
-		posA = 0;// no need to check isVoid here, will be checked in step()
-		posB = 0;// no need to check isVoid here, will be checked in step()
-		updatePosNext();
+		index[0] = 0;
+		updateIndexNext(0);
+		index[1] = 0;
+		updateIndexNext(1);
 	}
 
 	
@@ -147,9 +162,6 @@ struct Pulsars : Module {
 			isReverse[i] = (random::u32() % 2) > 0;
 			isRandom[i] = (random::u32() % 2) > 0;
 		}
-		posA = random::u32() % 8;// no need to check isVoid here, will be checked in step()
-		posB = random::u32() % 8;// no need to check isVoid here, will be checked in step()
-		updatePosNext();
 	}
 
 	
@@ -259,6 +271,7 @@ struct Pulsars : Module {
 			updateConnected();
 		}// userInputs refresh
 
+
 		// LFO values (normalized to 0.0f to 1.0f space, inputs clamped and offset adjusted depending cvMode)
 		float lfoVal[2];
 		lfoVal[0] = inputs[LFO_INPUTS + 0].getVoltage();
@@ -268,50 +281,35 @@ struct Pulsars : Module {
 		
 		
 		// Pulsar A
-		bool active8[8];
-		bool atLeastOneActive = false;
-		for (int i = 0; i < 8; i++) {
-			active8[i] = inputs[INA_INPUTS + i].isConnected();
-			if (active8[i]) 
-				atLeastOneActive = true;
-		}
-		if (atLeastOneActive) {
+		if (connectedNum[0] > 0) {
+			float indexPercent;
+			float indexNextPercent;
 			if (cvModes[0] < 2) {
 				// regular modes
 				if (!isVoid[0]) {
-					if (!active8[posA])// ensure start on valid input when no void
-						posA = getNextClosestActive(posA, active8, false, false, false);
-					if (!active8[posAnext])
-						posAnext = getNextClosestActive(posA, active8, false, isReverse[0], isRandom[0]);
+					if (index[0] >= connectedNum[0]) {// ensure start on valid input when no void
+						index[0] = 0;
+					}
+					if (indexNext[0] >= connectedNum[0]) {
+						updateIndexNext(0);
+					}
 				}			
-				
-				float posPercent = topCross[0] ? (1.0f - lfoVal[0]) : lfoVal[0];
-				float nextPosPercent = 1.0f - posPercent;
-				outputs[OUTA_OUTPUT].setVoltage(posPercent * inputs[INA_INPUTS + posA].getVoltage() + nextPosPercent * inputs[INA_INPUTS + posAnext].getVoltage());
-				for (int i = 0; i < 8; i++)
-					lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == posA) ? posPercent : 0.0f) + ((i == posAnext) ? nextPosPercent : 0.0f));
-				
-				// PulsarA crossover (LFO detection)
-				if ( (topCross[0] && lfoVal[0] > (1.0f - epsilon)) || (!topCross[0] && lfoVal[0] < epsilon) ) {
-					topCross[0] = !topCross[0];// switch to opposite detection
-					posA = posAnext;
-					posAnext = getNextClosestActive(posA, active8, isVoid[0], isReverse[0], isRandom[0]);
-					lfoLights[0] = 1.0f;
-				}
+				indexPercent = topCross[0] ? (1.0f - lfoVal[0]) : lfoVal[0];
+				indexNextPercent = 1.0f - indexPercent;
 			}
 			else {
 				// new ALL mode
-				lfoVal[0] *= (float)connectedAnum;
-				int indexA = (int)lfoVal[0];
-				float indexANextPercent = lfoVal[0] - (float)indexA;
-				int indexANext = (indexA + 1);
-				float indexApercent = 1.0f - indexANextPercent;
-				if (indexA >= connectedAnum) indexA = 0;
-				if (indexANext >= connectedAnum) indexANext = 0;
-				outputs[OUTA_OUTPUT].setVoltage(indexApercent * inputs[INA_INPUTS + connectedA[indexA]].getVoltage() + indexANextPercent * inputs[INA_INPUTS + connectedA[indexANext]].getVoltage());
-				for (int i = 0; i < 8; i++)
-					lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == connectedA[indexA]) ? indexApercent : 0.0f) + ((i == connectedA[indexANext]) ? indexANextPercent : 0.0f));
+				lfoVal[0] *= (float)connectedNum[0];
+				index[0] = (int)lfoVal[0];
+				indexNextPercent = lfoVal[0] - (float)index[0];
+				indexNext[0] = (index[0] + 1);
+				indexPercent = 1.0f - indexNextPercent;
+				if (index[0] >= connectedNum[0]) index[0] = 0;
+				if (indexNext[0] >= connectedNum[0]) indexNext[0] = 0;
 			}
+			outputs[OUTA_OUTPUT].setVoltage(indexPercent * inputs[INA_INPUTS + connectedA[index[0]]].getVoltage() + indexNextPercent * inputs[INA_INPUTS + connectedA[indexNext[0]]].getVoltage());
+			for (int i = 0; i < 8; i++)
+				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == connectedA[index[0]]) ? indexPercent : 0.0f) + ((i == connectedA[indexNext[0]]) ? indexNextPercent : 0.0f));
 		}
 		else {
 			outputs[OUTA_OUTPUT].setVoltage(0.0f);
@@ -321,62 +319,57 @@ struct Pulsars : Module {
 
 
 		// Pulsar B
-		atLeastOneActive = false;
-		for (int i = 0; i < 8; i++) {
-			active8[i] = outputs[OUTB_OUTPUTS + i].isConnected();
-			if (active8[i]) 
-				atLeastOneActive = true;
-		}
-		if (atLeastOneActive) {
-			if (cvModes[0] < 2) {
+		if (connectedNum[1] > 0) {
+			float indexPercent;
+			float indexNextPercent;
+			if (cvModes[1] < 2) {
 				// regular modes
 				if (!isVoid[1]) {
-					if (!active8[posB])// ensure start on valid output when no void
-						posB = getNextClosestActive(posB, active8, false, false, false);
-					if (!active8[posBnext])
-						posBnext = getNextClosestActive(posB, active8, false, isReverse[1], isRandom[1]);
-				}			
-				
-				float posPercent = topCross[1] ? (1.0f - lfoVal[1]) : lfoVal[1];
-				float nextPosPercent = 1.0f - posPercent;
-				for (int i = 0; i < 8; i++) {
-					if (inputs[INB_INPUT].isConnected())
-						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
-					else// mutidimentional trick
-						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == posB) ? (posPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == posBnext) ? (nextPosPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
-					lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == posB) ? posPercent : 0.0f) + ((i == posBnext) ? nextPosPercent : 0.0f));
-				}
-				
-				// PulsarB crossover (LFO detection)
-				if ( (topCross[1] && lfoVal[1] > (1.0f - epsilon)) || (!topCross[1] && lfoVal[1] < epsilon) ) {
-					topCross[1] = !topCross[1];// switch to opposite detection
-					posB = posBnext;
-					posBnext = getNextClosestActive(posB, active8, isVoid[1], isReverse[1], isRandom[1]);
-					lfoLights[1] = 1.0f;
-				}
+					if (index[1] >= connectedNum[1]) {// ensure start on valid input when no void
+						index[1] = 0;
+					}
+					if (indexNext[1] >= connectedNum[1]) {
+						updateIndexNext(1);
+					}
+				}					
+				indexPercent = topCross[1] ? (1.0f - lfoVal[1]) : lfoVal[1];
+				indexNextPercent = 1.0f - indexPercent;
 			}
 			else {
 				// new ALL mode
-				lfoVal[1] *= (float)connectedBnum;
-				int indexB = (int)lfoVal[1];
-				float indexBNextPercent = lfoVal[1] - (float)indexB;
-				int indexBNext = (indexB + 1);
-				float indexBpercent = 1.0f - indexBNextPercent;
-				if (indexB >= connectedBnum) indexB = 0;
-				if (indexBNext >= connectedBnum) indexBNext = 0;
-				for (int i = 0; i < 8; i++) {
-					if (inputs[INB_INPUT].isConnected())
-						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[indexB]) ? (indexBpercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == connectedB[indexBNext]) ? (indexBNextPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
-					else// mutidimentional trick
-						outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[indexB]) ? (indexBpercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == connectedB[indexBNext]) ? (indexBNextPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
-					lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == connectedB[indexB]) ? indexBpercent : 0.0f) + ((i == connectedB[indexBNext]) ? indexBNextPercent : 0.0f));
-				}
+				lfoVal[1] *= (float)connectedNum[1];
+				index[1] = (int)lfoVal[1];
+				indexNextPercent = lfoVal[1] - (float)index[1];
+				indexNext[1] = (index[1] + 1);
+				indexPercent = 1.0f - indexNextPercent;
+				if (index[1] >= connectedNum[1]) index[1] = 0;
+				if (indexNext[1] >= connectedNum[1]) indexNext[1] = 0;
+			}
+			for (int i = 0; i < 8; i++) {
+				if (inputs[INB_INPUT].isConnected())
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[index[1]]) ? (indexPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == connectedB[indexNext[1]]) ? (indexNextPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
+				else// mutidimentional trick
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[index[1]]) ? (indexPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == connectedB[indexNext[1]]) ? (indexNextPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
+				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == connectedB[index[1]]) ? indexPercent : 0.0f) + ((i == connectedB[indexNext[1]]) ? indexNextPercent : 0.0f));
 			}
 		}
 		else {
 			for (int i = 0; i < 8; i++) {
 				outputs[OUTB_OUTPUTS + i].setVoltage(0.0f);
 				lights[MIXB_LIGHTS + i].setBrightness(0.0f);
+			}
+		}
+
+		
+		// Pulsar crossovers (LFO detection)
+		for (int bnum = 0; bnum < 2; bnum++) {
+			if (cvModes[bnum] < 2) {
+				if ( (topCross[bnum] && lfoVal[bnum] > (1.0f - epsilon)) || (!topCross[bnum] && lfoVal[bnum] < epsilon) ) {
+					topCross[bnum] = !topCross[bnum];// switch to opposite detection
+					index[bnum] = indexNext[bnum];
+					updateIndexNext(bnum);
+					lfoLights[bnum] = 1.0f;
+				}
 			}
 		}
 
@@ -405,53 +398,6 @@ struct Pulsars : Module {
 		}// lightRefreshCounter
 		
 	}// step()
-	
-	
-	int getNextClosestActive(int pos, bool* active8, bool voidd, bool reverse, bool random) {
-		// finds the next closest active position (excluding current if active)
-		// assumes at least one active, but may not be given pos; will always return an active pos
-		// scans all 8 positions
-		int posNext = -1;// should never be returned
-		if (random) {
-			if (voidd)
-				posNext = (pos + 1 + random::u32() % 7) % 8;
-			else {
-				posNext = pos;
-				int activeIndexes[8];// room for all indexes of active positions except current if active(max size is guaranteed to be < 8)
-				int activeIndexesI = 0;
-				for (int i = 0; i < 8; i++) {
-					if (active8[i] && i != pos) {
-						activeIndexes[activeIndexesI] = i;
-						activeIndexesI++;
-					}
-				}
-				if (activeIndexesI > 0)
-					posNext = activeIndexes[random::u32()%activeIndexesI];
-			}	
-		}
-		else { 
-			posNext = (pos + (reverse ? 7 : 1)) % 8;// void approach by default (choose slot whether active of not)
-			if (!voidd) {
-				if (reverse) {
-					for (int i = posNext + 8; i > posNext; i--) {
-						if (active8[i % 8]) {
-							posNext = i % 8;
-							break;
-						}
-					}
-				}
-				else {
-					for (int i = posNext; i < posNext + 8; i++) {
-						if (active8[i % 8]) {
-							posNext = i % 8;
-							break;
-						}
-					}
-				}
-			}
-		}
-		return posNext;
-	}
 };
 
 
