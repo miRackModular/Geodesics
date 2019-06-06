@@ -60,12 +60,12 @@ struct Pulsars : Module {
 	bool isRandom[2];
 	
 	// No need to save, with reset
-	int connectedA[8] = {0};// concatenated list of input indexes of connected ports
-	int connectedB[8] = {0};// concatenated list of input indexes of connected ports
+	int connected[2][8] = {0};// concatenated list of input indexes of connected ports
 	int connectedNum[2];
 	bool topCross[2];
 	int index[2];// always between 0 and 7
 	int indexNext[2];// always between 0 and 7
+	int connectedRand[2][8] = {0};// concatenated list of input indexes of connected ports, for ALL mode supernova
 	
 	
 	// No need to save, no reset
@@ -79,39 +79,55 @@ struct Pulsars : Module {
 	
 	void updateConnected() {
 		// builds packed list of connected ports for both pulsars, can be empty list with num = 0
-		// Pulsar A
-		bool grabUnconnectA = isVoid[0] /*&& cvModes[0] != 2*/;
+		// this method takes care of isVoid and isReverse
 		connectedNum[0] = 0;
-		for (int i = 0; i < 8; i++) {
-			if (grabUnconnectA || inputs[INA_INPUTS + i].isConnected()) {
-				connectedA[connectedNum[0]] = i;
-				connectedNum[0]++;
-			}
-		}
-		// Pulsar B
-		bool grabUnconnectB = isVoid[1] /*&& cvModes[1] != 2*/;
 		connectedNum[1] = 0;
 		for (int i = 0; i < 8; i++) {
-			if (grabUnconnectB || outputs[OUTB_OUTPUTS + i].isConnected()) {
-				connectedB[connectedNum[1]] = i;
+			// Pulsar A
+			int irA = isReverse[0] ? ((8 - i) & 0x7) : i;
+			if (isVoid[0] || inputs[INA_INPUTS + irA].isConnected()) {
+				connected[0][connectedNum[0]] = irA;
+				connectedNum[0]++;
+			}
+			// Pulsar B
+			int irB = isReverse[1] ? ((8 - i) & 0x7) : i;
+			if (isVoid[1] || outputs[OUTB_OUTPUTS + irB].isConnected()) {
+				connected[1][connectedNum[1]] = irB;
 				connectedNum[1]++;
 			}
 		}
 	}
 	
+	// void updateConnectedRand(int bnum) {
+		// int tmpList[7];
+		// connectedRand[bnum][0] = connected[bnum][0];// first element is always the same (no random)
+		// int connectedRandNum = 1;
+		// if (connectedNum[bnum] < 2) 
+			// return;
+		
+		// for (int i = 1; i < connectedNum[bnum]; i++) {
+			// tmpList[i - 1] = connected[bnum][i];
+		// }
+		// for (int i = connectedNum[bnum] - 2; i >= 0; i--) {
+			// int pickIndex = (random::u32() % (i + 1));
+			// connectedRand[bnum][connectedRandNum] = tmpList[pickIndex];
+			// connectedRandNum++;
+			// tmpList[pickIndex] = tmpList[i];
+		// }
+	// }
+	
 	void updateIndexNext(int bnum) {// brane number to update, 0 is upper, 1 is lower
-		int maxSize = (isVoid[bnum] /*&& cvModes[bnum] != 2*/) ? 8 : connectedNum[bnum];
-		if (maxSize <= 1) {
+		if (connectedNum[bnum] <= 1) {
 			indexNext[bnum] = 0;
 		}
 		else {
 			if (isRandom[bnum]) {
-				indexNext[bnum] = random::u32() % (maxSize - 1);
+				indexNext[bnum] = random::u32() % (connectedNum[bnum] - 1);
 				if (indexNext[bnum] == index[bnum])
-					indexNext[bnum] = maxSize - 1;							
+					indexNext[bnum] = connectedNum[bnum] - 1;							
 			}
 			else {
-				indexNext[bnum] = (index[bnum] + (isReverse[bnum] ? (maxSize - 1) : 1)) % maxSize;
+				indexNext[bnum] = (index[bnum] + 1) % connectedNum[bnum];
 			}
 		}
 	}
@@ -146,6 +162,8 @@ struct Pulsars : Module {
 	}
 	void resetNonJson() {
 		updateConnected();
+		// updateConnectedRand(0);
+		// updateConnectedRand(1);
 		for (int i = 0; i < 2; i++) {
 			topCross[i] = false;
 		}
@@ -254,8 +272,11 @@ struct Pulsars : Module {
 				if (revTriggers[i].process(params[REV_PARAMS + i].getValue() + inputs[REV_INPUTS + i].getVoltage())) {
 					isReverse[i] = !isReverse[i];
 				}
-				if (rndTriggers[i].process(params[RND_PARAMS + i].getValue())) {// + inputs[RND_INPUTS + i].getVoltage())) {
+				if (rndTriggers[i].process(params[RND_PARAMS + i].getValue())) {
 					isRandom[i] = !isRandom[i];
+					// if (isRandom[i] && cvModes[i] == 2) {
+						// updateConnectedRand(i);
+					// }
 				}
 			}
 			
@@ -265,6 +286,7 @@ struct Pulsars : Module {
 					cvModes[i]++;
 					if (cvModes[i] > 2)
 						cvModes[i] = 0;
+					topCross[i] = false;
 				}
 			}
 			
@@ -301,15 +323,15 @@ struct Pulsars : Module {
 				// new ALL mode
 				lfoVal[0] *= (float)connectedNum[0];
 				index[0] = (int)lfoVal[0];
-				indexNextPercent = lfoVal[0] - (float)index[0];
 				indexNext[0] = (index[0] + 1);
+				indexNextPercent = lfoVal[0] - (float)index[0];
 				indexPercent = 1.0f - indexNextPercent;
 				if (index[0] >= connectedNum[0]) index[0] = 0;
 				if (indexNext[0] >= connectedNum[0]) indexNext[0] = 0;
 			}
-			outputs[OUTA_OUTPUT].setVoltage(indexPercent * inputs[INA_INPUTS + connectedA[index[0]]].getVoltage() + indexNextPercent * inputs[INA_INPUTS + connectedA[indexNext[0]]].getVoltage());
+			outputs[OUTA_OUTPUT].setVoltage(indexPercent * inputs[INA_INPUTS + connected[0][index[0]]].getVoltage() + indexNextPercent * inputs[INA_INPUTS + connected[0][indexNext[0]]].getVoltage());
 			for (int i = 0; i < 8; i++)
-				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == connectedA[index[0]]) ? indexPercent : 0.0f) + ((i == connectedA[indexNext[0]]) ? indexNextPercent : 0.0f));
+				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == connected[0][index[0]]) ? indexPercent : 0.0f) + ((i == connected[0][indexNext[0]]) ? indexNextPercent : 0.0f));
 		}
 		else {
 			outputs[OUTA_OUTPUT].setVoltage(0.0f);
@@ -339,18 +361,18 @@ struct Pulsars : Module {
 				// new ALL mode
 				lfoVal[1] *= (float)connectedNum[1];
 				index[1] = (int)lfoVal[1];
-				indexNextPercent = lfoVal[1] - (float)index[1];
 				indexNext[1] = (index[1] + 1);
+				indexNextPercent = lfoVal[1] - (float)index[1];
 				indexPercent = 1.0f - indexNextPercent;
 				if (index[1] >= connectedNum[1]) index[1] = 0;
 				if (indexNext[1] >= connectedNum[1]) indexNext[1] = 0;
 			}
 			for (int i = 0; i < 8; i++) {
 				if (inputs[INB_INPUT].isConnected())
-					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[index[1]]) ? (indexPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == connectedB[indexNext[1]]) ? (indexNextPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connected[1][index[1]]) ? (indexPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == connected[1][indexNext[1]]) ? (indexNextPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
 				else// mutidimentional trick
-					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connectedB[index[1]]) ? (indexPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == connectedB[indexNext[1]]) ? (indexNextPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
-				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == connectedB[index[1]]) ? indexPercent : 0.0f) + ((i == connectedB[indexNext[1]]) ? indexNextPercent : 0.0f));
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connected[1][index[1]]) ? (indexPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == connected[1][indexNext[1]]) ? (indexNextPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
+				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == connected[1][index[1]]) ? indexPercent : 0.0f) + ((i == connected[1][indexNext[1]]) ? indexNextPercent : 0.0f));
 			}
 		}
 		else {
