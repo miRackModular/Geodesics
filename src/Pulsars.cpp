@@ -490,7 +490,7 @@ struct PulsarsWidget : ModuleWidget {
 		float colRulerCenter = box.size.x / 2.0f;
 		static constexpr float rowRulerPulsarA = 127.5;
 		static constexpr float rowRulerPulsarB = 261.5f;
-		float rowRulerLFOlights = (rowRulerPulsarA + rowRulerPulsarB) / 2.0f;
+		float rowRulerLFOlights = 380.0f - 185.5f;
 		static constexpr float offsetLFOlightsX = 25.0f;
 		static constexpr float radiusLeds = 23.0f;
 		static constexpr float radiusJacks = 46.0f;
@@ -505,10 +505,6 @@ struct PulsarsWidget : ModuleWidget {
 		static constexpr float offsetRndButtonY = 24.0f;// from center of pulsar
 		static constexpr float offsetRndLedX = 63.0f;// from center of pulsar
 		static constexpr float offsetRndLedY = 11.0f;// from center of pulsar
-		static constexpr float offsetLedVsButBX = 8.0f;// BI
-		static constexpr float offsetLedVsButBY = 10.0f;
-		static constexpr float offsetLedVsButUX = 13.0f;// UNI
-		static constexpr float offsetLedVsButUY = 1.0f;
 
 
 		// PulsarA center output
@@ -549,13 +545,13 @@ struct PulsarsWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRndButtonX, rowRulerPulsarA + offsetRndButtonY), module, Pulsars::RND_PARAMS + 0, module ? &module->panelTheme : NULL));
 
 		// PulsarA CV level (lights and button)
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRndButtonX, rowRulerPulsarA + offsetRndButtonY), module, Pulsars::CVLEVEL_PARAMS + 0, module ? &module->panelTheme : NULL));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsButBX, rowRulerPulsarA + offsetRndButtonY + offsetLedVsButBY), module, Pulsars::CVALEVEL_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsButUX, rowRulerPulsarA + offsetRndButtonY - offsetLedVsButUY), module, Pulsars::CVALEVEL_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetRndButtonX - offsetLedVsButUX -10, rowRulerPulsarA + offsetRndButtonY - offsetLedVsButUY + 10), module, Pulsars::CVALEVEL_LIGHTS + 2));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - 62.0f, 380.0f - 224.5f), module, Pulsars::CVLEVEL_PARAMS + 0, module ? &module->panelTheme : NULL));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 74.0f, 380.0f - 220.5f), module, Pulsars::CVALEVEL_LIGHTS + 0));// Bi
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 66.0f, 380.0f - 212.5f), module, Pulsars::CVALEVEL_LIGHTS + 1));// Uni
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 51.0f, 380.0f - 231.5f), module, Pulsars::CVALEVEL_LIGHTS + 2));// Add
 
 		// PulsarA LFO input and light
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetJacks - offsetLFO, rowRulerPulsarA + offsetJacks + offsetLFO), true, module, Pulsars::LFO_INPUTS + 0, module ? &module->panelTheme : NULL));
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - 52.0f, 380.0f - 189.5f), true, module, Pulsars::LFO_INPUTS + 0, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 0));
 		
 		
@@ -597,13 +593,13 @@ struct PulsarsWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter - offsetRndButtonX, rowRulerPulsarB - offsetRndButtonY), module, Pulsars::RND_PARAMS + 1, module ? &module->panelTheme : NULL));
 		
 		// PulsarB CV level (lights and button)
-		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetRndButtonX, rowRulerPulsarB - offsetRndButtonY), module, Pulsars::CVLEVEL_PARAMS + 1,  module ? &module->panelTheme : NULL));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsButBX, rowRulerPulsarB - offsetRndButtonY - offsetLedVsButBY), module, Pulsars::CVBLEVEL_LIGHTS + 0));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsButUX, rowRulerPulsarB - offsetRndButtonY + offsetLedVsButUY), module, Pulsars::CVBLEVEL_LIGHTS + 1));
-		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetRndButtonX + offsetLedVsButUX + 10, rowRulerPulsarB - offsetRndButtonY + offsetLedVsButUY - 10), module, Pulsars::CVBLEVEL_LIGHTS + 2));
+		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + 62.0f, 380.0f - 145.5f), module, Pulsars::CVLEVEL_PARAMS + 1,  module ? &module->panelTheme : NULL));
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 74.0f, 380.0f - 150.5f), module, Pulsars::CVBLEVEL_LIGHTS + 0));// Bi
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 66.0f, 380.0f - 158.5f), module, Pulsars::CVBLEVEL_LIGHTS + 1));// Uni
+		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + 51.0f, 380.0f - 138.5f), module, Pulsars::CVBLEVEL_LIGHTS + 2));// All
 
 		// PulsarA LFO input and light
-		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetJacks + offsetLFO, rowRulerPulsarB - offsetJacks - offsetLFO), true, module, Pulsars::LFO_INPUTS + 1, module ? &module->panelTheme : NULL));		
+		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 52.0f, 380.0f - 182.5f), true, module, Pulsars::LFO_INPUTS + 1, module ? &module->panelTheme : NULL));		
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 1));
 	}
 	
