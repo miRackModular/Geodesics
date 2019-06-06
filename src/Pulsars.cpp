@@ -60,12 +60,12 @@ struct Pulsars : Module {
 	bool isRandom[2];
 	
 	// No need to save, with reset
-	int connected[2][8] = {0};// concatenated list of input indexes of connected ports
 	int connectedNum[2];
+	int connected[2][8] = {0};// concatenated list of input indexes of connected ports
+	int connectedRand[2][8] = {0};// concatenated list of input indexes of connected ports, for ALL mode supernova
 	bool topCross[2];
 	int index[2];// always between 0 and 7
 	int indexNext[2];// always between 0 and 7
-	int connectedRand[2][8] = {0};// concatenated list of input indexes of connected ports, for ALL mode supernova
 	
 	
 	// No need to save, no reset
@@ -80,6 +80,7 @@ struct Pulsars : Module {
 	void updateConnected() {
 		// builds packed list of connected ports for both pulsars, can be empty list with num = 0
 		// this method takes care of isVoid and isReverse
+		int oldConnectedNum[2] = {connectedNum[0], connectedNum[1]};
 		connectedNum[0] = 0;
 		connectedNum[1] = 0;
 		for (int i = 0; i < 8; i++) {
@@ -96,25 +97,30 @@ struct Pulsars : Module {
 				connectedNum[1]++;
 			}
 		}
+		for (int i = 0; i < 2; i++) {
+			if (oldConnectedNum[i] != connectedNum[i]) {// ok to update when this happens, since user is slow such that one cable changed at most before this method is re-run, and if many cables change at one as a result of dataFromJson(), connectedNum[x] will have been reset anyways to trigger a refresh
+				updateConnectedRand(i);
+			}
+		}
 	}
 	
-	// void updateConnectedRand(int bnum) {
-		// int tmpList[7];
-		// connectedRand[bnum][0] = connected[bnum][0];// first element is always the same (no random)
-		// int connectedRandNum = 1;
-		// if (connectedNum[bnum] < 2) 
-			// return;
+	void updateConnectedRand(int bnum) {
+		int tmpList[7];
+		connectedRand[bnum][0] = connected[bnum][0];// first element is always the same (no random)
+		int connectedRandNum = 1;
+		if (connectedNum[bnum] < 2) 
+			return;
 		
-		// for (int i = 1; i < connectedNum[bnum]; i++) {
-			// tmpList[i - 1] = connected[bnum][i];
-		// }
-		// for (int i = connectedNum[bnum] - 2; i >= 0; i--) {
-			// int pickIndex = (random::u32() % (i + 1));
-			// connectedRand[bnum][connectedRandNum] = tmpList[pickIndex];
-			// connectedRandNum++;
-			// tmpList[pickIndex] = tmpList[i];
-		// }
-	// }
+		for (int i = 1; i < connectedNum[bnum]; i++) {
+			tmpList[i - 1] = connected[bnum][i];
+		}
+		for (int i = connectedNum[bnum] - 2; i >= 0; i--) {
+			int pickIndex = (random::u32() % (i + 1));
+			connectedRand[bnum][connectedRandNum] = tmpList[pickIndex];
+			connectedRandNum++;
+			tmpList[pickIndex] = tmpList[i];
+		}
+	}
 	
 	void updateIndexNext(int bnum) {// brane number to update, 0 is upper, 1 is lower
 		if (connectedNum[bnum] <= 1) {
@@ -161,16 +167,14 @@ struct Pulsars : Module {
 		resetNonJson();
 	}
 	void resetNonJson() {
-		updateConnected();
-		// updateConnectedRand(0);
-		// updateConnectedRand(1);
+		connectedNum[0] = 0;// need this to start change detection to trigger new connectedRand[][] generation
+		connectedNum[1] = 0;// idem
+		updateConnected();// will update connectedRand[][] also if cables connectedNum[x] non-zero
 		for (int i = 0; i < 2; i++) {
 			topCross[i] = false;
+			index[i] = 0;
+			updateIndexNext(i);
 		}
-		index[0] = 0;
-		updateIndexNext(0);
-		index[1] = 0;
-		updateIndexNext(1);
 	}
 
 	
@@ -274,9 +278,9 @@ struct Pulsars : Module {
 				}
 				if (rndTriggers[i].process(params[RND_PARAMS + i].getValue())) {
 					isRandom[i] = !isRandom[i];
-					// if (isRandom[i] && cvModes[i] == 2) {
-						// updateConnectedRand(i);
-					// }
+					if (isRandom[i] && cvModes[i] == 2) {
+						updateConnectedRand(i);
+					}
 				}
 			}
 			
@@ -306,6 +310,7 @@ struct Pulsars : Module {
 		if (connectedNum[0] > 0) {
 			float indexPercent;
 			float indexNextPercent;
+			int *srcConnected = connected[0];
 			if (cvModes[0] < 2) {
 				// regular modes
 				if (!isVoid[0]) {
@@ -328,10 +333,12 @@ struct Pulsars : Module {
 				indexPercent = 1.0f - indexNextPercent;
 				if (index[0] >= connectedNum[0]) index[0] = 0;
 				if (indexNext[0] >= connectedNum[0]) indexNext[0] = 0;
+				if (isRandom[0])
+					srcConnected = connectedRand[0];
 			}
-			outputs[OUTA_OUTPUT].setVoltage(indexPercent * inputs[INA_INPUTS + connected[0][index[0]]].getVoltage() + indexNextPercent * inputs[INA_INPUTS + connected[0][indexNext[0]]].getVoltage());
+			outputs[OUTA_OUTPUT].setVoltage(indexPercent * inputs[INA_INPUTS + srcConnected[index[0]]].getVoltage() + indexNextPercent * inputs[INA_INPUTS + srcConnected[indexNext[0]]].getVoltage());
 			for (int i = 0; i < 8; i++)
-				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == connected[0][index[0]]) ? indexPercent : 0.0f) + ((i == connected[0][indexNext[0]]) ? indexNextPercent : 0.0f));
+				lights[MIXA_LIGHTS + i].setBrightness(0.0f + ((i == srcConnected[index[0]]) ? indexPercent : 0.0f) + ((i == srcConnected[indexNext[0]]) ? indexNextPercent : 0.0f));
 		}
 		else {
 			outputs[OUTA_OUTPUT].setVoltage(0.0f);
@@ -344,6 +351,7 @@ struct Pulsars : Module {
 		if (connectedNum[1] > 0) {
 			float indexPercent;
 			float indexNextPercent;
+			int *srcConnected = connected[1];
 			if (cvModes[1] < 2) {
 				// regular modes
 				if (!isVoid[1]) {
@@ -366,13 +374,15 @@ struct Pulsars : Module {
 				indexPercent = 1.0f - indexNextPercent;
 				if (index[1] >= connectedNum[1]) index[1] = 0;
 				if (indexNext[1] >= connectedNum[1]) indexNext[1] = 0;
+				if (isRandom[1])
+					srcConnected = connectedRand[1];
 			}
 			for (int i = 0; i < 8; i++) {
 				if (inputs[INB_INPUT].isConnected())
-					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connected[1][index[1]]) ? (indexPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == connected[1][indexNext[1]]) ? (indexNextPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == srcConnected[index[1]]) ? (indexPercent * inputs[INB_INPUT].getVoltage()) : 0.0f) + ((i == srcConnected[indexNext[1]]) ? (indexNextPercent * inputs[INB_INPUT].getVoltage()) : 0.0f));
 				else// mutidimentional trick
-					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == connected[1][index[1]]) ? (indexPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == connected[1][indexNext[1]]) ? (indexNextPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
-				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == connected[1][index[1]]) ? indexPercent : 0.0f) + ((i == connected[1][indexNext[1]]) ? indexNextPercent : 0.0f));
+					outputs[OUTB_OUTPUTS + i].setVoltage(0.0f + ((i == srcConnected[index[1]]) ? (indexPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f) + ((i == srcConnected[indexNext[1]]) ? (indexNextPercent * inputs[INA_INPUTS + i].getVoltage()) : 0.0f));
+				lights[MIXB_LIGHTS + i].setBrightness(0.0f + ((i == srcConnected[index[1]]) ? indexPercent : 0.0f) + ((i == srcConnected[indexNext[1]]) ? indexNextPercent : 0.0f));
 			}
 		}
 		else {
