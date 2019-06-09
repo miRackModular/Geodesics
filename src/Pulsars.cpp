@@ -61,8 +61,8 @@ struct Pulsars : Module {
 	
 	// No need to save, with reset
 	int connectedNum[2];
-	int connected[2][8] = {0};// concatenated list of input indexes of connected ports
-	int connectedRand[2][8] = {0};// concatenated list of input indexes of connected ports, for ALL mode supernova
+	int connected[2][8];// concatenated list of input indexes of connected ports
+	int connectedRand[2][8];// concatenated list of input indexes of connected ports, for ALL mode supernova
 	bool topCross[2];
 	int index[2];// always between 0 and 7
 	int indexNext[2];// always between 0 and 7
