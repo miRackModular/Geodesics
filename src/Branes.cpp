@@ -126,15 +126,13 @@ struct NoiseEngine {
 			if (cacheHitBlue[braneIndex])
 				ret = -1.0f * cacheValBlue[braneIndex];
 			else {
-				float pinkForBlue = pinkForBlueNoise[braneIndex].process();
+				float pinkForBlue = pinkForBlueNoise[braneIndex].process();			
 				pinkForBlue -= blueFilter[braneIndex].process(pinkForBlue);// (input - lowpass) technique is used to make the highpass
 				cacheValBlue[braneIndex] = 5.8f * pinkForBlue;
 				cacheHitBlue[braneIndex] = true;
 				ret = cacheValBlue[braneIndex];
 			}
 		}
-		// if (noiseIndex == BLUE)// use for calibrating multipliers in the above code
-			// if (ret > 5.0f || ret < -5.0f) INFO("OUT OF BOUNDS %f",ret);
 		return ret;
 	}		
 };
@@ -332,18 +330,17 @@ struct Branes : Module {
 		trigInConnect[0] = (vibrations[0] == 1 ? false : inputs[TRIG_INPUTS + 0].isConnected());
 		trigInConnect[1] = (vibrations[1] == 1 ? false : inputs[TRIG_INPUTS + 1].isConnected());
 		
-		bool hasTrigSource[14];
-		for (int sh = 0; sh < 14; sh++)
-			hasTrigSource[sh] = trigInConnect[sh < 7 ? 0 : 1];
-		hasTrigSource[6] |= trigInConnect[1];// cross trigger the lower right of BraneA with trigger of BraneB
-		hasTrigSource[13] |= trigInConnect[0];// cross trigger the top left of BraneB with trigger of BraneA
-
-		bool receivedTrig[14] = {false};
+		int hasTrigSourceBits = (trigInConnect[0] ? 0x7F : 0x0);// brane 0 is lsbit, brane 13 is bit 13
+		hasTrigSourceBits |= (trigInConnect[1] ? 0x3F8 : 0x0);
+		hasTrigSourceBits |= (trigInConnect[1] ? 0x0040 : 0x0);// cross trigger the lower right of BraneA with trigger of BraneB
+		hasTrigSourceBits |= (trigInConnect[0] ? 0x2000 : 0x0);// cross trigger the top left of BraneB with trigger of BraneA
+		
+		// int receivedTrig[14] = {false};
+		int receivedTrigBits = 0x0;// brane 0 is lsbit, brane 13 is bit 13
 		for (int bi = 0; bi < 2; bi++) {// brane index
 			if (vibrations[bi] < 2) {// normal or bypass mode
 				if (trigs[bi] && trigInConnect[bi]) {
-					for (int i = 7 * bi; i < (7 * bi + 7); i++)
-						receivedTrig[i] = true;
+					receivedTrigBits |= (bi == 0 ? 0x7F : 0x3F8);
 				}
 			}
 			else if (vibrations[bi] == 2) {// yellow mode (only one of the active outs gets the trigger, random choice)
@@ -357,7 +354,7 @@ struct Branes : Module {
 					}
 					if (cnt > 0) {
 						int selected = random::u32() % cnt;	
-						receivedTrig[connectedIndexes[selected]] = true;
+						receivedTrigBits |= (0x1 << (connectedIndexes[selected]));
 					}
 				}
 			}
@@ -365,17 +362,19 @@ struct Branes : Module {
 				if (trigs[bi] && trigInConnect[bi]) {
 					for (int i = 7 * bi; i < (7 * bi + 7); i++) {
 						if (outputs[OUT_OUTPUTS + i].isConnected()) {
-							receivedTrig[i] = ((random::u32() % 2) > 0);
+							receivedTrigBits |= ((random::u32() % 2) << i);
 						}
 					}
 				}
 			}			
 		}
-		// cross triggering
-		if (trigs[0] && trigInConnect[0])
-			receivedTrig[13] = true;
-		if (trigs[1] && trigInConnect[1])
-			receivedTrig[6] = true;
+		// perform the actual cross triggering
+		if (trigs[0] && trigInConnect[0]) {
+			receivedTrigBits |= 0x2000;
+		}
+		if (trigs[1] && trigInConnect[1]) {
+			receivedTrigBits |= 0x0040;
+		}
 
 		
 		// main branes code
@@ -399,16 +398,17 @@ struct Branes : Module {
 		
 		// sample and hold outputs (noise continually generated or else stepping non-white on S&H only will not work well because of filters)
 		noiseEngine.clearCache();
-		float noises[14];
+		// float noises[14];
 		for (int sh = startSh; sh < endSh; sh++) {
-			noises[sh] = getNoise(sh);
+			// noises[sh] = getNoise(sh);
+			float noise = getNoise(sh);// must call even if won't get used so that proper noise is produced when s&h colored noise
 			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
-				if (hasTrigSource[sh]) {
-					if (receivedTrig[sh]) {
+				if ((hasTrigSourceBits & (0x1 << sh)) != 0) {
+					if ((receivedTrigBits & (0x1 << sh)) != 0) {
 						if (inputs[IN_INPUTS + sh].isConnected())// if input cable
 							heldOuts[sh] = inputs[IN_INPUTS + sh].getVoltage();// sample and hold input
 						else
-							heldOuts[sh] = noises[sh];// sample and hold noise
+							heldOuts[sh] = noise; // noises[sh];// sample and hold noise
 					}
 					// else no rising edge, so simply preserve heldOuts[sh], nothing to do
 				}
@@ -416,7 +416,7 @@ struct Branes : Module {
 					if (inputs[IN_INPUTS + sh].isConnected())
 						heldOuts[sh] = inputs[IN_INPUTS + sh].getVoltage();// copy of input if no trig and input
 					else
-						heldOuts[sh] = noises[sh];// continuous noise if no trig and no input
+						heldOuts[sh] = noise; // noises[sh];// continuous noise if no trig and no input
 				}
 				outputs[OUT_OUTPUTS + sh].setVoltage(heldOuts[sh]);
 			}
