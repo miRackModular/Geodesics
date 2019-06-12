@@ -330,17 +330,16 @@ struct Branes : Module {
 		trigInConnect[0] = (vibrations[0] == 1 ? false : inputs[TRIG_INPUTS + 0].isConnected());
 		trigInConnect[1] = (vibrations[1] == 1 ? false : inputs[TRIG_INPUTS + 1].isConnected());
 		
-		int hasTrigSourceBits = (trigInConnect[0] ? 0x7F : 0x0);// brane 0 is lsbit, brane 13 is bit 13
-		hasTrigSourceBits |= (trigInConnect[1] ? 0x3F8 : 0x0);
-		hasTrigSourceBits |= (trigInConnect[1] ? 0x0040 : 0x0);// cross trigger the lower right of BraneA with trigger of BraneB
-		hasTrigSourceBits |= (trigInConnect[0] ? 0x2000 : 0x0);// cross trigger the top left of BraneB with trigger of BraneA
+		// The 0x2000 bit in the next line is to cross trigger the top left of BraneB with trigger of BraneA
+		int hasTrigSourceBits = (trigInConnect[0] ? 0x207F : 0x0);// brane 0 is lsbit, brane 13 is bit 13
+		// The 0x0040 bit in the next line is to cross trigger the lower right of BraneA with trigger of BraneB
+		hasTrigSourceBits |= (trigInConnect[1] ? 0x3FC0 : 0x0);
 		
-		// int receivedTrig[14] = {false};
 		int receivedTrigBits = 0x0;// brane 0 is lsbit, brane 13 is bit 13
 		for (int bi = 0; bi < 2; bi++) {// brane index
 			if (vibrations[bi] < 2) {// normal or bypass mode
 				if (trigs[bi] && trigInConnect[bi]) {
-					receivedTrigBits |= (bi == 0 ? 0x7F : 0x3F8);
+					receivedTrigBits |= (bi == 0 ? 0x7F : 0x3F80);
 				}
 			}
 			else if (vibrations[bi] == 2) {// yellow mode (only one of the active outs gets the trigger, random choice)
@@ -379,36 +378,18 @@ struct Branes : Module {
 		
 		// main branes code
 		// -----------------------
-				
-		// detect unused brane and avoid noise when so (unused = not a single output connected)
-		int startSh = 7;
-		int endSh = 7;
-		for (int sh = 0; sh < 7; sh++) {
-			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
-				startSh = 0;
-				break;
-			}
-		}
-		for (int sh = 7; sh < 14; sh++) {
-			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
-				endSh = 14;
-				break;
-			}
-		}			
 		
 		// sample and hold outputs (noise continually generated or else stepping non-white on S&H only will not work well because of filters)
 		noiseEngine.clearCache();
-		// float noises[14];
-		for (int sh = startSh; sh < endSh; sh++) {
-			// noises[sh] = getNoise(sh);
-			float noise = getNoise(sh);// must call even if won't get used so that proper noise is produced when s&h colored noise
+		for (int sh = 0; sh < 14; sh++) {
 			if (outputs[OUT_OUTPUTS + sh].isConnected()) {
+				float noise = getNoise(sh);// must call even if won't get used below so that proper noise is produced when s&h colored noise
 				if ((hasTrigSourceBits & (0x1 << sh)) != 0) {
 					if ((receivedTrigBits & (0x1 << sh)) != 0) {
 						if (inputs[IN_INPUTS + sh].isConnected())// if input cable
 							heldOuts[sh] = inputs[IN_INPUTS + sh].getVoltage();// sample and hold input
 						else
-							heldOuts[sh] = noise; // noises[sh];// sample and hold noise
+							heldOuts[sh] = noise; // sample and hold noise
 					}
 					// else no rising edge, so simply preserve heldOuts[sh], nothing to do
 				}
@@ -416,7 +397,7 @@ struct Branes : Module {
 					if (inputs[IN_INPUTS + sh].isConnected())
 						heldOuts[sh] = inputs[IN_INPUTS + sh].getVoltage();// copy of input if no trig and input
 					else
-						heldOuts[sh] = noise; // noises[sh];// continuous noise if no trig and no input
+						heldOuts[sh] = noise; // continuous noise if no trig and no input
 				}
 				outputs[OUT_OUTPUTS + sh].setVoltage(heldOuts[sh]);
 			}
