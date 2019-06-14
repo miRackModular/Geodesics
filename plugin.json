@@ -1,12 +1,16 @@
 {
 	"slug": "Geodesics",
 	"name": "Geodesics",
-	"author": "Geodesics",
-	"license": "BSD-3-Clause",
-	"authorEmail": "geodesics.modular@outlook.com",
-	"authorUrl": "https://www.pyer.be/geodesics.html",
-	"manualUrl": "https://github.com/MarcBoule/Geodesics",
 	"version": "1.0.0",
+	"license": "BSD-3-Clause",
+	"author": "Pyer & Marc Boul\u00e9",
+	"brand": "Geodesics",
+	"authorEmail": "geodesics.modular@outlook.com",
+	"authorUrl": "",
+	"pluginUrl": "https://www.pyer.be/geodesics.html",
+	"manualUrl": "https://github.com/MarcBoule/Geodesics",
+	"sourceUrl": "https://github.com/MarcBoule/Geodesics",
+	"donateUrl": "https://paypal.me/pyercollard",
 	"modules": [
 		{
 			"slug": "BlackHoles",
