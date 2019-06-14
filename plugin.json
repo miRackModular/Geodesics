@@ -8,8 +8,8 @@
 	"authorEmail": "geodesics.modular@outlook.com",
 	"authorUrl": "",
 	"pluginUrl": "https://www.pyer.be/geodesics.html",
-	"manualUrl": "https://github.com/MarcBoule/Geodesics",
-	"sourceUrl": "https://github.com/MarcBoule/Geodesics",
+	"manualUrl": "https://github.com/MarcBoule/Geodesics/tree/v1#modules-",
+	"sourceUrl": "https://github.com/MarcBoule/Geodesics/tree/v1",
 	"donateUrl": "https://paypal.me/pyercollard",
 	"modules": [
 		{
