@@ -612,55 +612,11 @@ struct Entropia : Module {
 
 
 struct EntropiaWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		Entropia *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};
-	void appendContextMenu(Menu *menu) override {
-		MenuLabel *spacerLabel = new MenuLabel();
-		menu->addChild(spacerLabel);
-
-		Entropia *module = dynamic_cast<Entropia*>(this->module);
-		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-	}	
-	
 	EntropiaWidget(Entropia *module) {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Entropia-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Entropia-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Entropia-DM.svg")));
 		
 		// Screws 
 		// part of svg panel, no code required
@@ -857,14 +813,6 @@ struct EntropiaWidget : ModuleWidget {
 		// Reset on Run light and button
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetMagneticButton + 15.0f, rowRulerRunJack), module, Entropia::RESETONRUN_LIGHT));
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetMagneticButton, rowRulerRunJack), module, Entropia::RESETONRUN_PARAM, module ? &module->panelTheme : NULL));	
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((Entropia*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((Entropia*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

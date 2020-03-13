@@ -140,55 +140,11 @@ struct Fate : Module {
 
 
 struct FateWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		Fate *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};	
-	void appendContextMenu(Menu *menu) override {
-		MenuLabel *spacerLabel = new MenuLabel();
-		menu->addChild(spacerLabel);
-
-		Fate *module = dynamic_cast<Fate*>(this->module);
-		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-		
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-	}	
-	
 	FateWidget(Fate *module) {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Fate-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Fate-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Fate-DM.svg")));
 
 		// Screws 
 		// part of svg panel, no code required
@@ -214,14 +170,6 @@ struct FateWidget : ModuleWidget {
 		// choices depth cv input and knob
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter, 380.0f - 87.5f), true, module, Fate::CHOICSDEPTH_INPUT, module ? &module->panelTheme : NULL));
 		addParam(createDynamicParam<GeoKnob>(Vec(colRulerCenter, 380.0f - 51.5f), module, Fate::CHOICESDEPTH_PARAM, module ? &module->panelTheme : NULL));
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((Fate*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((Fate*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

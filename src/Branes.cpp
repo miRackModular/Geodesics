@@ -452,22 +452,10 @@ struct Branes : Module {
 
 
 struct BranesWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		Branes *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};	
 	struct SecretModeItem : MenuItem {
 		Branes *module;
 		int braneIndex = 0;
-		void onAction(const event::Action &e) override {
+		void onAction(event::Action &e) override {
 			if (module->vibrations[braneIndex] > 1)
 				module->vibrations[braneIndex] = 0;// turn off secret mode
 			else
@@ -480,26 +468,6 @@ struct BranesWidget : ModuleWidget {
 
 		Branes *module = dynamic_cast<Branes*>(this->module);
 		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-		
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-
-		menu->addChild(new MenuLabel());// empty line
 		
 		MenuLabel *settingsLabel = new MenuLabel();
 		settingsLabel->text = "Settings";
@@ -519,13 +487,7 @@ struct BranesWidget : ModuleWidget {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Branes-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Branes-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Branes-DM.svg")));
 		
 		// Screws 
 		// part of svg panel, no code required
@@ -606,14 +568,6 @@ struct BranesWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 327.5f), module, Branes::NOISE_RANGE_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter - 53.0f, 380.0f - 38.5f), module, Branes::NOISE_RANGE_LIGHTS + 1));
 
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((Branes*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((Branes*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

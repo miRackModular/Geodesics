@@ -239,55 +239,11 @@ struct BlackHoles : Module {
 
 
 struct BlackHolesWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		BlackHoles *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};
-	void appendContextMenu(Menu *menu) override {
-		MenuLabel *spacerLabel = new MenuLabel();
-		menu->addChild(spacerLabel);
-
-		BlackHoles *module = dynamic_cast<BlackHoles*>(this->module);
-		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-		
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-	}	
-	
 	BlackHolesWidget(BlackHoles *module) {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/BlackHoles-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/BlackHoles-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/BlackHoles-DM.svg")));
 		
 		// Screws 
 		// part of svg panel, no code required
@@ -383,14 +339,6 @@ struct BlackHolesWidget : ModuleWidget {
 		addParam(createDynamicParam<GeoPushButton>(Vec(colRulerCenter + offsetButtonsX, rowRulerBlack1 + offsetButtonsY), module, BlackHoles::CVLEVEL_PARAMS + 1, module ? &module->panelTheme : NULL));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButL, rowRulerBlack1 + offsetButtonsY + offsetLedVsButS), module, BlackHoles::CVBLEVEL_LIGHTS + 0));
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetButtonsX + offsetLedVsButS, rowRulerBlack1 + offsetButtonsY + offsetLedVsButL), module, BlackHoles::CVBLEVEL_LIGHTS + 1));
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((BlackHoles*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((BlackHoles*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

@@ -434,55 +434,11 @@ struct Pulsars : Module {
 
 
 struct PulsarsWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		Pulsars *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};	
-	void appendContextMenu(Menu *menu) override {
-		MenuLabel *spacerLabel = new MenuLabel();
-		menu->addChild(spacerLabel);
-
-		Pulsars *module = dynamic_cast<Pulsars*>(this->module);
-		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-	}	
-	
 	PulsarsWidget(Pulsars *module) {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Pulsars-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Pulsars-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Pulsars-DM.svg")));
 		
 		// Screws 
 		// part of svg panel, no code required
@@ -601,14 +557,6 @@ struct PulsarsWidget : ModuleWidget {
 		// PulsarA LFO input and light
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + 52.0f, 380.0f - 182.5f), true, module, Pulsars::LFO_INPUTS + 1, module ? &module->panelTheme : NULL));		
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(colRulerCenter + offsetLFOlightsX, rowRulerLFOlights), module, Pulsars::LFO_LIGHTS + 1));
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((Pulsars*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((Pulsars*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

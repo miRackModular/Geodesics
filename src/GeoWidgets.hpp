@@ -34,7 +34,6 @@ struct DynamicSVGPort : SvgPort {
 
     void addFrame(std::shared_ptr<Svg> svg);
     void addFrameAlt(std::string filename) {frameAltName = filename;}
-    void step() override;
 };
 
 
@@ -58,7 +57,6 @@ struct DynamicSVGSwitch : SvgSwitch {
 	void addFrameAll(std::shared_ptr<Svg> svg);
     void addFrameAlt0(std::string filename) {frameAltName0 = filename;}
     void addFrameAlt1(std::string filename) {frameAltName1 = filename;}
-    void step() override;
 };
 
 struct DynamicSVGKnob : SvgKnob {
@@ -70,7 +68,6 @@ struct DynamicSVGKnob : SvgKnob {
 	void setOrientation(float angle);
 	void addFrameAll(std::shared_ptr<Svg> svg);
     void addFrameAlt(std::string filename) {frameAltName = filename;}
-    void step() override;
 };
 
 

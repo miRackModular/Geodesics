@@ -52,8 +52,7 @@ static const float blurRadiusRatio = 0.06f;
 
 struct GeoPort : DynamicSVGPort {
 	GeoPort() {
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Jack-WL.svg")));
-		addFrameAlt(asset::plugin(pluginInstance, "res/DarkMatter/Jack-DM.svg"));
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Jack-DM.svg")));
 		shadow->blurRadius = 1.0f;
 	}
 };
@@ -71,10 +70,8 @@ struct BlankPort : SvgPort {
 struct GeoPushButton : DynamicSVGSwitch {
 	GeoPushButton() {
 		momentary = true;
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/PushButton1_0.svg")));
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/PushButton1_1.svg")));
-		addFrameAlt0(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_0.svg"));
-		addFrameAlt1(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_1.svg"));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_0.svg")));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/PushButton1_1.svg")));
 	}
 };
 
@@ -87,8 +84,7 @@ struct GeoKnob : DynamicSVGKnob {
 		minAngle = -0.73*M_PI;
 		maxAngle = 0.73*M_PI;
 		//shadow->box.pos = Vec(0.0, box.size.y * 0.15); may need this if knob is small (taken from IMSmallKnob)
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Knob-WL.svg")));
-		addFrameAlt(asset::plugin(pluginInstance, "res/DarkMatter/Knob-DM.svg"));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Knob-DM.svg")));
 		shadow->blurRadius = box.size.y * blurRadiusRatio;
 	}
 };
@@ -120,8 +116,7 @@ struct BlankCKnob : DynamicSVGKnob {
 	BlankCKnob() {
 		minAngle = -0.73*M_PI;
 		maxAngle = 0.73*M_PI;
-		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/C-WL.svg")));
-		addFrameAlt(asset::plugin(pluginInstance, "res/DarkMatter/C-DM.svg"));
+		addFrameAll(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/C-DM.svg")));
 		shadow->opacity = 0.0;
 	}
 };
@@ -136,29 +131,29 @@ struct GeoGrayModuleLight : ModuleLightWidget {
 		borderColor = nvgRGB(0x1d, 0x1d, 0x1b);//nvgRGBA(0, 0, 0, 0x60);
 	}
 	
-	void drawLight(const DrawArgs &args) override { // from app/LightWidget.cpp (only nvgStrokeWidth of border was changed)
+	void drawLight(NVGcontext *vg) override { // from app/LightWidget.cpp (only nvgStrokeWidth of border was changed)
 		float radius = box.size.x / 2.0;
 
-		nvgBeginPath(args.vg);
-		nvgCircle(args.vg, radius, radius, radius);
+		nvgBeginPath(vg);
+		nvgCircle(vg, radius, radius, radius);
 
 		// Background
 		if (bgColor.a > 0.0) {
-			nvgFillColor(args.vg, bgColor);
-			nvgFill(args.vg);
+			nvgFillColor(vg, bgColor);
+			nvgFill(vg);
 		}
 
 		// Foreground
 		if (color.a > 0.0) {
-			nvgFillColor(args.vg, color);
-			nvgFill(args.vg);
+			nvgFillColor(vg, color);
+			nvgFill(vg);
 		}
 
 		// Border
 		if (borderColor.a > 0.0) {
-			nvgStrokeWidth(args.vg, 1.0);//0.5);
-			nvgStrokeColor(args.vg, borderColor);
-			nvgStroke(args.vg);
+			nvgStrokeWidth(vg, 1.0);//0.5);
+			nvgStrokeColor(vg, borderColor);
+			nvgStroke(vg);
 		}
 	}
 };
@@ -297,7 +292,7 @@ void saveDarkAsDefault(bool darkAsDefault);
 bool loadDarkAsDefault();
 
 struct DarkDefaultItem : MenuItem {
-	void onAction(const event::Action &e) override {
+	void onAction(event::Action &e) override {
 		saveDarkAsDefault(rightText.empty());// implicitly toggled
 	}
 };	

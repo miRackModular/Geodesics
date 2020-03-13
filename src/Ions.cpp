@@ -499,55 +499,11 @@ struct Ions : Module {
 
 
 struct IonsWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		Ions *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};
-	void appendContextMenu(Menu *menu) override {
-		MenuLabel *spacerLabel = new MenuLabel();
-		menu->addChild(spacerLabel);
-
-		Ions *module = dynamic_cast<Ions*>(this->module);
-		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-	}	
-	
 	IonsWidget(Ions *module) {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Ions-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Ions-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Ions-DM.svg")));
 		
 		// Screws 
 		// part of svg panel, no code required
@@ -717,14 +673,6 @@ struct IonsWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GeoWhiteLight>>(Vec(gclkX - 5.0f, 298.5f), module, Ions::UNCERTANTY_LIGHT));
 		addParam(createDynamicParam<GeoPushButton>(Vec(gclkX + 3.0f, 310.5f), module, Ions::UNCERTANTY_PARAM, module ? &module->panelTheme : NULL));	
 		addInput(createDynamicPort<GeoPort>(Vec(gclkX - 14.0f, 282.5f), true, module, Ions::UNCERTANTY_INPUT, module ? &module->panelTheme : NULL));
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((Ions*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((Ions*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

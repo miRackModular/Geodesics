@@ -322,55 +322,11 @@ struct Torus : Module {
 
 
 struct TorusWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		Torus *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};	
-	void appendContextMenu(Menu *menu) override {
-		MenuLabel *spacerLabel = new MenuLabel();
-		menu->addChild(spacerLabel);
-
-		Torus *module = dynamic_cast<Torus*>(this->module);
-		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-		
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-	}	
-	
 	TorusWidget(Torus *module) {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Torus-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Torus-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Torus-DM.svg")));
 
 		// Screws 
 		// part of svg panel, no code required
@@ -399,14 +355,6 @@ struct TorusWidget : ModuleWidget {
 		for (int i = 0; i < 7; i++) {
 			addOutput(createDynamicPort<GeoPort>(Vec(colRulerCenter, 380 - (253 - offsetY * i)), false, module, Torus::MIX_OUTPUTS + i, module ? &module->panelTheme : NULL));
 		}
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((Torus*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((Torus*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

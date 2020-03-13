@@ -341,55 +341,11 @@ struct Energy : Module {
 
 
 struct EnergyWidget : ModuleWidget {
-	SvgPanel* darkPanel;
-
-	struct PanelThemeItem : MenuItem {
-		Energy *module;
-		int theme;
-		void onAction(const event::Action &e) override {
-			module->panelTheme = theme;
-		}
-		void step() override {
-			rightText = (module->panelTheme == theme) ? "✔" : "";
-		}
-	};	
-	void appendContextMenu(Menu *menu) override {
-		MenuLabel *spacerLabel = new MenuLabel();
-		menu->addChild(spacerLabel);
-
-		Energy *module = dynamic_cast<Energy*>(this->module);
-		assert(module);
-
-		MenuLabel *themeLabel = new MenuLabel();
-		themeLabel->text = "Panel Theme";
-		menu->addChild(themeLabel);
-
-		PanelThemeItem *lightItem = new PanelThemeItem();
-		lightItem->text = lightPanelID;// Geodesics.hpp
-		lightItem->module = module;
-		lightItem->theme = 0;
-		menu->addChild(lightItem);
-
-		PanelThemeItem *darkItem = new PanelThemeItem();
-		darkItem->text = darkPanelID;// Geodesics.hpp
-		darkItem->module = module;
-		darkItem->theme = 1;
-		menu->addChild(darkItem);
-		
-		menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault())));
-	}	
-	
 	EnergyWidget(Energy *module) {
 		setModule(module);
 
 		// Main panels from Inkscape
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/WhiteLight/Energy-WL.svg")));
-        if (module) {
-			darkPanel = new SvgPanel();
-			darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Energy-DM.svg")));
-			darkPanel->visible = false;
-			addChild(darkPanel);
-		}
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DarkMatter/Energy-DM.svg")));
 
 		// Screws 
 		// part of svg panel, no code required
@@ -459,14 +415,6 @@ struct EnergyWidget : ModuleWidget {
 		// freq inputs (mass and speed of light)
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter - offsetX - 0.5f, 380.0f - 32.5f), true, module, Energy::FREQCV_INPUTS + 0, module ? &module->panelTheme : NULL));
 		addInput(createDynamicPort<GeoPort>(Vec(colRulerCenter + offsetX + 0.5f, 380.0f - 32.5f), true, module, Energy::FREQCV_INPUTS + 1, module ? &module->panelTheme : NULL));
-	}
-	
-	void step() override {
-		if (module) {
-			panel->visible = ((((Energy*)module)->panelTheme) == 0);
-			darkPanel->visible  = ((((Energy*)module)->panelTheme) == 1);
-		}
-		Widget::step();
 	}
 };
 

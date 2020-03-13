@@ -37,7 +37,7 @@ void init(rack::Plugin *p) {
 
 
 bool Trigger::process(float in) {
-	/*switch (state) {
+	switch (state) {
 		case LOW:
 			if (in >= 1.0f) {
 				state = HIGH;
@@ -58,8 +58,8 @@ bool Trigger::process(float in) {
 			}
 			break;
 	}
-	return false;*/
-	if (state) {
+	return false;
+	/*if (state) {
 		// HIGH to LOW
 		if (in <= 0.1f) {
 			state = false;
@@ -72,7 +72,7 @@ bool Trigger::process(float in) {
 			return true;
 		}
 	}
-	return false;
+	return false;*/
 }	
 
 
@@ -112,38 +112,8 @@ int getWeighted1to8random() {
 }
 
 void saveDarkAsDefault(bool darkAsDefault) {
-	json_t *settingsJ = json_object();
-	json_object_set_new(settingsJ, "darkAsDefault", json_boolean(darkAsDefault));
-	std::string settingsFilename = asset::user("Geodesics.json");
-	FILE *file = fopen(settingsFilename.c_str(), "w");
-	if (file) {
-		json_dumpf(settingsJ, file, JSON_INDENT(2) | JSON_REAL_PRECISION(9));
-		fclose(file);
-	}
-	json_decref(settingsJ);
 }
 
 bool loadDarkAsDefault() {
-	bool ret = false;
-	std::string settingsFilename = asset::user("Geodesics.json");
-	FILE *file = fopen(settingsFilename.c_str(), "r");
-	if (!file) {
-		saveDarkAsDefault(false);
-		return ret;
-	}
-	json_error_t error;
-	json_t *settingsJ = json_loadf(file, 0, &error);
-	if (!settingsJ) {
-		// invalid setting json file
-		fclose(file);
-		saveDarkAsDefault(false);
-		return ret;
-	}
-	json_t *darkAsDefaultJ = json_object_get(settingsJ, "darkAsDefault");
-	if (darkAsDefaultJ)
-		ret = json_boolean_value(darkAsDefaultJ);
-	
-	fclose(file);
-	json_decref(settingsJ);
-	return ret;
+	return true;
 }
